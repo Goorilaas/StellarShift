@@ -1,14 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as MediaLibrary from 'expo-media-library';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Dimensions,
-  FlatList, Image,
+  FlatList,
+  Image,
   Modal,
+  Pressable,
   StatusBar,
   StyleSheet,
   Text,
@@ -18,7 +19,9 @@ import {
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { CATEGORIES, MIX_QUERIES, Photo, UNSPLASH_KEY } from './components/categories';
+import { ICON } from './components/icons';
 import SkeletonCard from './components/SkeletonCard';
+import { setWallpaperFromUrl } from './wallpaperService';
 
 const { width, height } = Dimensions.get('window');
 const IMG_SIZE = (width - 36) / 2;
@@ -83,6 +86,11 @@ export default function HomeScreen() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');
+  const [settingWallpaper, setSettingWallpaper] = useState(false);
+  const [showHeart, setShowHeart] = useState(false);
+  const heartScale = useRef(new Animated.Value(0)).current;
+  const heartOpacity = useRef(new Animated.Value(1)).current;
+  const lastTapRef = useRef<number>(0);
   const abortRef = useRef<AbortController | null>(null);
 
 
@@ -110,6 +118,32 @@ export default function HomeScreen() {
   const showToast = (message: string) => {
     setToast(message);
     setTimeout(() => setToast(null), 3000);
+  };
+
+  const triggerHeartAnim = () => {
+    setShowHeart(true);
+    heartScale.setValue(0);
+    heartOpacity.setValue(1);
+    Animated.sequence([
+      Animated.spring(heartScale, { toValue: 1.4, useNativeDriver: true, speed: 20 }),
+      Animated.timing(heartScale, { toValue: 1, duration: 100, useNativeDriver: true }),
+      Animated.delay(400),
+      Animated.timing(heartOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+    ]).start(() => setShowHeart(false));
+  };
+
+  const handleModalImageTap = () => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 350) {
+      lastTapRef.current = 0;
+      if (selectedPhoto && !favorites.includes(selectedPhoto.id)) {
+        toggleFavorite(selectedPhoto);
+        triggerHeartAnim();
+      }
+      // вже в улюблених — ігноруємо, без анімації
+    } else {
+      lastTapRef.current = now;
+    }
   };
 
   const loadMix = async () => {
@@ -191,20 +225,17 @@ export default function HomeScreen() {
   };
 
   const setAsWallpaper = async (photo: Photo) => {
+    setSettingWallpaper(true);
     try {
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') {
-        showToast('❌ Потрібен дозвіл для збереження фото');
-        return;
-      }
-      showToast('⏳ Завантажується...');
-      const dest = (FileSystem.cacheDirectory ?? '') + `stellarshift_${photo.id}.jpg`;
-      const { uri } = await FileSystem.downloadAsync(photo.urls.regular, dest);
-      await MediaLibrary.saveToLibraryAsync(uri);
-      try { await FileSystem.deleteAsync(dest, { idempotent: true }); } catch { }
-      showToast('✅ Фото збережено в галерею!');
-    } catch (e) {
-      showToast('❌ Не вдалося завантажити фото');
+      const settings = await AsyncStorage.getItem('settings');
+      const target = settings ? (JSON.parse(settings).applyTo ?? 'both') : 'both';
+      await setWallpaperFromUrl(photo.urls.regular, target);
+      setSelectedPhoto(null);
+      showToast('✅ Красу встановлено!');
+    } catch {
+      showToast('❌ Не вдалося встановити шпалери');
+    } finally {
+      setSettingWallpaper(false);
     }
   };
 
@@ -230,11 +261,16 @@ export default function HomeScreen() {
   };
 
   const renderPhoto = ({ item }: { item: Photo }) => (
-    <TouchableOpacity style={styles.photoCard} onPress={() => setSelectedPhoto(item)}>
+    <TouchableOpacity
+      style={styles.photoCard}
+      onPress={() => setSelectedPhoto(item)}
+      onLongPress={() => { toggleFavorite(item); triggerHeartAnim(); }}
+      delayLongPress={300}
+    >
       <Image source={{ uri: item.urls.small }} style={styles.photo} resizeMode="cover" />
       {favorites.includes(item.id) && (
         <View style={styles.favBadge}>
-          <Text style={{ fontSize: 12 }}>❤️</Text>
+          <SvgXml xml={ICON.heartFilled} width={14} height={14} />
         </View>
       )}
     </TouchableOpacity>
@@ -261,7 +297,7 @@ export default function HomeScreen() {
       {/* Пошук */}
       <View style={styles.searchRow}>
         <View style={styles.searchWrap}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <SvgXml xml={ICON.search} width={16} height={16} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Пошук шпалер..."
@@ -348,34 +384,45 @@ export default function HomeScreen() {
         </View>
       )}
 
+      {/* Серце анімація (grid) */}
+      {showHeart && (
+        <Animated.Text style={[styles.heartOverlay, { transform: [{ scale: heartScale }], opacity: heartOpacity }]}>
+          ❤️
+        </Animated.Text>
+      )}
+
       {/* Модальне вікно */}
-      <Modal visible={!!selectedPhoto} transparent animationType="fade">
+      <Modal visible={!!selectedPhoto} transparent animationType="fade" onRequestClose={() => setSelectedPhoto(null)}>
         <View style={styles.modalBg}>
 
-          {/* Розмитий фон */}
           <Image
             source={{ uri: selectedPhoto?.urls?.small }}
             style={[StyleSheet.absoluteFill, { opacity: 0.6 }]}
             blurRadius={25}
             resizeMode="cover"
           />
-
-          {/* Затемнення */}
           <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.4)' }]} />
 
-          {/* Основне фото */}
-          <Image
-            source={{ uri: selectedPhoto?.urls?.regular }}
-            style={styles.fullImage}
-            resizeMode="contain"
-          />
+          {/* Фото з подвійним тапом */}
+          <Pressable onPress={handleModalImageTap} style={StyleSheet.absoluteFill}>
+            <Image
+              source={{ uri: selectedPhoto?.urls?.regular }}
+              style={styles.fullImage}
+              resizeMode="cover"
+            />
+          </Pressable>
 
-          {/* Кнопка закрити */}
+          {/* Серце анімація (модалка) */}
+          {showHeart && (
+            <Animated.Text style={[styles.heartOverlay, { transform: [{ scale: heartScale }], opacity: heartOpacity }]}>
+              ❤️
+            </Animated.Text>
+          )}
+
           <TouchableOpacity style={styles.closeTop} onPress={() => setSelectedPhoto(null)}>
             <Text style={styles.closeTopText}>✕</Text>
           </TouchableOpacity>
 
-          {/* Автор */}
           {selectedPhoto && (
             <TouchableOpacity
               style={styles.authorRow}
@@ -393,21 +440,25 @@ export default function HomeScreen() {
             </TouchableOpacity>
           )}
 
-          {/* Кнопки */}
           <View style={styles.modalButtons}>
             <TouchableOpacity
               style={[styles.modalBtn, favorites.includes(selectedPhoto?.id ?? '') && styles.modalBtnActive]}
               onPress={() => selectedPhoto && toggleFavorite(selectedPhoto)}
             >
+              <SvgXml xml={favorites.includes(selectedPhoto?.id ?? '') ? ICON.heartFilled : ICON.heartOutline} width={18} height={18} />
               <Text style={styles.modalBtnText}>
-                {favorites.includes(selectedPhoto?.id ?? '') ? '❤️ В улюблених' : '🤍 В улюблені'}
+                {favorites.includes(selectedPhoto?.id ?? '') ? 'В улюблених' : 'В улюблені'}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.modalBtn, { marginTop: 12, borderColor: 'rgba(29,158,117,0.6)' }]}
+              style={[styles.modalBtn, { marginTop: 12, borderColor: 'rgba(29,158,117,0.6)', opacity: settingWallpaper ? 0.6 : 1 }]}
               onPress={() => selectedPhoto && setAsWallpaper(selectedPhoto)}
+              disabled={settingWallpaper}
             >
-              <Text style={styles.modalBtnText}>🖼 Встановити шпалери</Text>
+              <SvgXml xml={ICON.wallpaper} width={18} height={18} />
+              <Text style={styles.modalBtnText}>
+                {settingWallpaper ? 'Встановлюємо...' : 'Встановити шпалери'}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -426,7 +477,7 @@ const styles = StyleSheet.create({
   shuffleBtnText: { color: '#7F77DD', fontSize: 13, fontWeight: '600' },
   searchRow: { paddingHorizontal: 16, marginBottom: 10 },
   searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a1a2e', borderRadius: 14, paddingHorizontal: 12, borderWidth: 1, borderColor: '#2a2a3e' },
-  searchIcon: { fontSize: 14, marginRight: 8 },
+  searchIcon: { marginRight: 8 },
   searchInput: { flex: 1, color: '#fff', fontSize: 14, paddingVertical: 10 },
   searchClear: { color: '#555', fontSize: 16, paddingLeft: 8 },
   catList: { paddingHorizontal: 12, marginBottom: 12, flexGrow: 0 },
@@ -444,6 +495,7 @@ const styles = StyleSheet.create({
   favBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: 4 },
   modalBg: { flex: 1, backgroundColor: '#000' },
   fullImage: { width: width, height: height },
+  heartOverlay: { position: 'absolute', fontSize: 80, alignSelf: 'center', top: height / 2 - 60, zIndex: 99, pointerEvents: 'none' },
   closeTop: { position: 'absolute', top: 50, right: 20, backgroundColor: 'rgba(0,0,0,0.5)', width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   closeTopText: { color: '#fff', fontSize: 16 },
   authorRow: { position: 'absolute', top: 50, left: 16, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(0,0,0,0.55)', padding: 8, borderRadius: 14 },
@@ -451,7 +503,7 @@ const styles = StyleSheet.create({
   authorName: { color: '#fff', fontSize: 13, fontWeight: '600' },
   authorUsername: { color: '#aaa', fontSize: 11 },
   modalButtons: { position: 'absolute', bottom: 40, width: '100%', alignItems: 'center' },
-  modalBtn: { paddingVertical: 14, paddingHorizontal: 40, borderRadius: 30, backgroundColor: 'rgba(0,0,0,0.6)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+  modalBtn: { paddingVertical: 14, paddingHorizontal: 32, borderRadius: 30, backgroundColor: 'rgba(0,0,0,0.6)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', flexDirection: 'row', alignItems: 'center', gap: 8 },
   modalBtnActive: { backgroundColor: 'rgba(83,74,183,0.8)', borderColor: '#534AB7' },
   modalBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   toast: { position: 'absolute', bottom: 100, alignSelf: 'center', backgroundColor: 'rgba(20,20,40,0.95)', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 24, borderWidth: 1, borderColor: '#534AB7', zIndex: 999, },

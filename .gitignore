@@ -40,4 +40,7 @@ app-example
 
 # generated native folders
 /ios
-/android
+# /android — tracked (contains custom Kotlin modules)
+.claude/
+android/build
+android/.gradle
