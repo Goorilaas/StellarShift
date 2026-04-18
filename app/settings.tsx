@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import Constants from 'expo-constants';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -417,7 +418,7 @@ export default function SettingsScreen() {
                 <SvgXml xml={ABOUT_LOGO} width={56} height={56} />
                 <View style={styles.aboutInfo}>
                     <Text style={styles.aboutName}>StellarShift</Text>
-                    <Text style={styles.aboutVersion}>Версія 3.1.2</Text>
+                    <Text style={styles.aboutVersion}>Версія {Constants.expoConfig?.version ?? '—'}</Text>
                 </View>
             </View>
             <View style={styles.aboutFooter}>
