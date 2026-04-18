@@ -1,7 +1,7 @@
 {
   "name": "stellarshift",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "3.1.0",
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
@@ -28,6 +28,7 @@
     "expo-media-library": "~18.2.1",
     "expo-network": "~8.0.8",
     "expo-router": "~6.0.23",
+    "expo-sharing": "~14.0.8",
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
     "expo-symbols": "~1.0.8",

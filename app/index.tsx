@@ -1,5 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as MediaLibrary from 'expo-media-library';
+import * as Sharing from 'expo-sharing';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -21,6 +24,7 @@ import { SvgXml } from 'react-native-svg';
 import { CATEGORIES, MIX_QUERIES, Photo, UNSPLASH_KEY } from './components/categories';
 import { ICON } from './components/icons';
 import SkeletonCard from './components/SkeletonCard';
+import Toast from './components/Toast';
 import { setWallpaperFromUrl } from './wallpaperService';
 
 const { width, height } = Dimensions.get('window');
@@ -229,13 +233,47 @@ export default function HomeScreen() {
     try {
       const settings = await AsyncStorage.getItem('settings');
       const target = settings ? (JSON.parse(settings).applyTo ?? 'both') : 'both';
-      await setWallpaperFromUrl(photo.urls.regular, target);
+      await setWallpaperFromUrl(photo.urls.regular, target, { id: photo.id, small: photo.urls.small });
       setSelectedPhoto(null);
       showToast('✅ Красу встановлено!');
     } catch {
       showToast('❌ Не вдалося встановити шпалери');
     } finally {
       setSettingWallpaper(false);
+    }
+  };
+
+  const saveToGallery = async (photo: Photo) => {
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        showToast('❌ Потрібен дозвіл для збереження');
+        return;
+      }
+      showToast('⏳ Завантажуємо...');
+      const dest = (FileSystem.cacheDirectory ?? '') + `stellarshift_${photo.id}.jpg`;
+      const { uri } = await FileSystem.downloadAsync(photo.urls.regular, dest);
+      await MediaLibrary.saveToLibraryAsync(uri);
+      try { await FileSystem.deleteAsync(dest, { idempotent: true }); } catch { }
+      showToast('✅ Збережено в галерею!');
+    } catch {
+      showToast('❌ Не вдалося завантажити');
+    }
+  };
+
+  const sharePhoto = async (photo: Photo) => {
+    try {
+      if (!(await Sharing.isAvailableAsync())) {
+        showToast('❌ Поділитись недоступно');
+        return;
+      }
+      showToast('⏳ Готуємо...');
+      const dest = (FileSystem.cacheDirectory ?? '') + `stellarshift_share_${photo.id}.jpg`;
+      const { uri } = await FileSystem.downloadAsync(photo.urls.regular, dest);
+      await Sharing.shareAsync(uri, { mimeType: 'image/jpeg', dialogTitle: 'Поділитись шпалерами' });
+      try { await FileSystem.deleteAsync(dest, { idempotent: true }); } catch { }
+    } catch {
+      showToast('❌ Не вдалося поділитись');
     }
   };
 
@@ -378,11 +416,7 @@ export default function HomeScreen() {
       </View>
 
       {/* Toast */}
-      {toast && (
-        <View style={styles.toast}>
-          <Text style={styles.toastText}>{toast}</Text>
-        </View>
-      )}
+      <Toast message={toast} />
 
       {/* Серце анімація (grid) */}
       {showHeart && (
@@ -460,6 +494,14 @@ export default function HomeScreen() {
                 {settingWallpaper ? 'Встановлюємо...' : 'Встановити шпалери'}
               </Text>
             </TouchableOpacity>
+            <View style={styles.actionRow}>
+              <TouchableOpacity style={styles.iconBtn} onPress={() => selectedPhoto && saveToGallery(selectedPhoto)}>
+                <SvgXml xml={ICON.save} width={22} height={22} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.iconBtn} onPress={() => selectedPhoto && sharePhoto(selectedPhoto)}>
+                <SvgXml xml={ICON.share} width={22} height={22} />
+              </TouchableOpacity>
+            </View>
           </View>
 
         </View>
@@ -506,6 +548,6 @@ const styles = StyleSheet.create({
   modalBtn: { paddingVertical: 14, paddingHorizontal: 32, borderRadius: 30, backgroundColor: 'rgba(0,0,0,0.6)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', flexDirection: 'row', alignItems: 'center', gap: 8 },
   modalBtnActive: { backgroundColor: 'rgba(83,74,183,0.8)', borderColor: '#534AB7' },
   modalBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  toast: { position: 'absolute', bottom: 100, alignSelf: 'center', backgroundColor: 'rgba(20,20,40,0.95)', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 24, borderWidth: 1, borderColor: '#534AB7', zIndex: 999, },
-  toastText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  actionRow: { flexDirection: 'row', gap: 12, marginTop: 14 },
+  iconBtn: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(0,0,0,0.6)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' },
 });

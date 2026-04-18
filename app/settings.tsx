@@ -3,6 +3,8 @@ import axios from 'axios';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+    Alert,
+    Image,
     ScrollView,
     StyleSheet,
     Switch,
@@ -13,7 +15,8 @@ import {
 import { SvgXml } from 'react-native-svg';
 import { CATEGORIES, MIX_QUERIES, UNSPLASH_KEY } from './components/categories';
 import { ICON } from './components/icons';
-import { changeWallpaperNow, isIgnoringBatteryOptimization, PoolItem, requestIgnoreBatteryOptimization, startWallpaperRotation, stopWallpaperRotation } from './wallpaperService';
+import Toast from './components/Toast';
+import { changeWallpaperNow, clearHistory, getHistory, HistoryEntry, isIgnoringBatteryOptimization, PoolItem, requestIgnoreBatteryOptimization, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation } from './wallpaperService';
 
 const ABOUT_LOGO = `<svg width="56" height="56" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
   <circle cx="50" cy="50" r="50" fill="#0a0a1a"/>
@@ -62,6 +65,7 @@ export default function SettingsScreen() {
     const [autoChange, setAutoChange] = useState(false);
     const [poolLoading, setPoolLoading] = useState(false);
     const [toast, setToast] = useState<string | null>(null);
+    const [history, setHistory] = useState<HistoryEntry[]>([]);
     const loaded = useRef(false);
     const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const autoChangeRef = useRef(false);
@@ -69,6 +73,7 @@ export default function SettingsScreen() {
     useFocusEffect(
         useCallback(() => {
             loadSettings();
+            getHistory().then(setHistory);
         }, [])
     );
 
@@ -185,6 +190,36 @@ export default function SettingsScreen() {
         }
     };
 
+    const handleReapply = (entry: HistoryEntry) => {
+        const targetLabel = entry.target === 'lock' ? 'Заставку' : entry.target === 'home' ? 'Екран' : 'Обидва';
+        Alert.alert('Застосувати знову?', `Шпалери буде встановлено на «${targetLabel}»`, [
+            { text: 'Скасувати', style: 'cancel' },
+            {
+                text: 'Застосувати', onPress: async () => {
+                    try {
+                        await setWallpaperFromUrl(entry.url, entry.target, { id: entry.id, small: entry.small });
+                        showToast('✅ Шпалери встановлено!');
+                        getHistory().then(setHistory);
+                    } catch {
+                        showToast('❌ Не вдалось застосувати');
+                    }
+                },
+            },
+        ]);
+    };
+
+    const handleClearHistory = () => {
+        Alert.alert('Очистити історію?', 'Всі записи буде видалено', [
+            { text: 'Скасувати', style: 'cancel' },
+            {
+                text: 'Очистити', style: 'destructive', onPress: async () => {
+                    await clearHistory();
+                    setHistory([]);
+                },
+            },
+        ]);
+    };
+
     const toggleCategory = (id: string) => {
         setActiveCategories(prev =>
             prev.includes(id)
@@ -194,6 +229,7 @@ export default function SettingsScreen() {
     };
 
     return (
+        <View style={{ flex: 1, backgroundColor: '#0a0a1a' }}>
         <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 60 }}>
             <View style={styles.titleRow}>
                 <SvgXml xml={ICON.gear} width={24} height={24} />
@@ -315,10 +351,30 @@ export default function SettingsScreen() {
                 </TouchableOpacity>
             )}
 
-            {toast && (
-                <View style={styles.toast}>
-                    <Text style={styles.toastText}>{toast}</Text>
-                </View>
+            {/* Історія */}
+            {history.length > 0 && (
+                <>
+                    <View style={styles.historyHeader}>
+                        <Text style={styles.sectionLabel}>Історія шпалер</Text>
+                        <TouchableOpacity onPress={handleClearHistory}>
+                            <Text style={styles.clearText}>Очистити</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.historyRow}>
+                        {history.map(h => (
+                            <TouchableOpacity key={`${h.id}-${h.appliedAt}`} style={styles.historyCard} onPress={() => handleReapply(h)}>
+                                {h.small ? (
+                                    <Image source={{ uri: h.small }} style={styles.historyImg} />
+                                ) : (
+                                    <View style={[styles.historyImg, { backgroundColor: '#1a1a2e' }]} />
+                                )}
+                                <View style={styles.historyOverlay}>
+                                    <SvgXml xml={ICON.refresh} width={14} height={14} />
+                                </View>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </>
             )}
 
             {/* Про застосунок */}
@@ -327,7 +383,7 @@ export default function SettingsScreen() {
                 <SvgXml xml={ABOUT_LOGO} width={56} height={56} />
                 <View style={styles.aboutInfo}>
                     <Text style={styles.aboutName}>StellarShift</Text>
-                    <Text style={styles.aboutVersion}>Версія 2.1.0</Text>
+                    <Text style={styles.aboutVersion}>Версія 3.1.0</Text>
                 </View>
             </View>
             <View style={styles.aboutFooter}>
@@ -340,6 +396,8 @@ export default function SettingsScreen() {
             </View>
 
         </ScrollView>
+        <Toast message={toast} />
+        </View>
     );
 }
 
@@ -362,8 +420,12 @@ const styles = StyleSheet.create({
     toggleSub: { color: '#555', fontSize: 11, marginTop: 2 },
     changeNowBtn: { marginTop: 28, backgroundColor: '#1D9E75', borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
     btnActionText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-    toast: { marginTop: 20, backgroundColor: 'rgba(20,20,40,0.95)', paddingHorizontal: 20, paddingVertical: 14, borderRadius: 16, borderWidth: 1, borderColor: '#534AB7', alignItems: 'center' },
-    toastText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+    historyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+    clearText: { color: '#7F77DD', fontSize: 12, fontWeight: '600', marginBottom: 10 },
+    historyRow: { gap: 8, paddingVertical: 4 },
+    historyCard: { width: 70, height: 105, borderRadius: 10, overflow: 'hidden', position: 'relative' },
+    historyImg: { width: 70, height: 105, borderRadius: 10 },
+    historyOverlay: { position: 'absolute', bottom: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 10, padding: 4 },
     aboutCard: { flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: '#1a1a2e', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#2a2a4e' },
     aboutInfo: { gap: 4 },
     aboutName: { color: '#fff', fontSize: 18, fontWeight: '700' },

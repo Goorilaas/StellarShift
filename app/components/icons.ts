@@ -70,6 +70,23 @@ export const ICON = {
     <path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.4 4.4l1.4 1.4M14.2 14.2l1.4 1.4M4.4 15.6l1.4-1.4M14.2 5.8l1.4-1.4" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/>
   </svg>`,
 
+  save: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M10 3v9M6 8.5l4 4 4-4" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M3 14v2a1.5 1.5 0 001.5 1.5h11A1.5 1.5 0 0017 16v-2" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
+  </svg>`,
+
+  share: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="5" cy="10" r="2" stroke="#fff" stroke-width="1.5"/>
+    <circle cx="15" cy="4.5" r="2" stroke="#fff" stroke-width="1.5"/>
+    <circle cx="15" cy="15.5" r="2" stroke="#fff" stroke-width="1.5"/>
+    <path d="M6.8 9L13.2 5.5M6.8 11L13.2 14.5" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
+  </svg>`,
+
+  trash: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3.5 5.5h13M8 3h4M5 5.5l1 11.5a1.5 1.5 0 001.5 1.4h5a1.5 1.5 0 001.5-1.4l1-11.5" stroke="#cc3355" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M8.5 9v6M11.5 9v6" stroke="#cc3355" stroke-width="1.4" stroke-linecap="round"/>
+  </svg>`,
+
   galaxy: `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
     <circle cx="32" cy="32" r="30" fill="#0a0a1a" stroke="#1a1a3e" stroke-width="1.5"/>
     <circle cx="15" cy="15" r="1" fill="#aaa" opacity="0.7"/>

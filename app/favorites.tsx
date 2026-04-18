@@ -1,5 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as MediaLibrary from 'expo-media-library';
 import { useFocusEffect } from 'expo-router';
+import * as Sharing from 'expo-sharing';
 import { useCallback, useState } from 'react';
 import {
     Dimensions,
@@ -16,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import { Photo } from './components/categories';
 import { ICON } from './components/icons';
+import Toast from './components/Toast';
 import { setWallpaperFromUrl } from './wallpaperService';
 
 const { width, height } = Dimensions.get('window');
@@ -57,13 +61,47 @@ export default function FavoritesScreen() {
         try {
             const s = await AsyncStorage.getItem('settings');
             const target = s ? (JSON.parse(s).applyTo ?? 'both') : 'both';
-            await setWallpaperFromUrl(photo.urls.regular, target);
+            await setWallpaperFromUrl(photo.urls.regular, target, { id: photo.id, small: photo.urls.small });
             setSelectedPhoto(null);
             showToast('✅ Красу встановлено!');
         } catch {
             showToast('❌ Не вдалося встановити');
         } finally {
             setSetting(false);
+        }
+    };
+
+    const saveToGallery = async (photo: Photo) => {
+        try {
+            const { status } = await MediaLibrary.requestPermissionsAsync();
+            if (status !== 'granted') {
+                showToast('❌ Потрібен дозвіл для збереження');
+                return;
+            }
+            showToast('⏳ Завантажуємо...');
+            const dest = (FileSystem.cacheDirectory ?? '') + `stellarshift_${photo.id}.jpg`;
+            const { uri } = await FileSystem.downloadAsync(photo.urls.regular, dest);
+            await MediaLibrary.saveToLibraryAsync(uri);
+            try { await FileSystem.deleteAsync(dest, { idempotent: true }); } catch { }
+            showToast('✅ Збережено в галерею!');
+        } catch {
+            showToast('❌ Не вдалося завантажити');
+        }
+    };
+
+    const sharePhoto = async (photo: Photo) => {
+        try {
+            if (!(await Sharing.isAvailableAsync())) {
+                showToast('❌ Поділитись недоступно');
+                return;
+            }
+            showToast('⏳ Готуємо...');
+            const dest = (FileSystem.cacheDirectory ?? '') + `stellarshift_share_${photo.id}.jpg`;
+            const { uri } = await FileSystem.downloadAsync(photo.urls.regular, dest);
+            await Sharing.shareAsync(uri, { mimeType: 'image/jpeg', dialogTitle: 'Поділитись шпалерами' });
+            try { await FileSystem.deleteAsync(dest, { idempotent: true }); } catch { }
+        } catch {
+            showToast('❌ Не вдалося поділитись');
         }
     };
 
@@ -122,22 +160,25 @@ export default function FavoritesScreen() {
                                 {setting ? 'Встановлюємо...' : 'Встановити'}
                             </Text>
                         </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[styles.modalBtn, styles.modalBtnRemove]}
-                            onPress={() => selectedPhoto && removeFavorite(selectedPhoto)}
-                        >
-                            <SvgXml xml={ICON.heartBroken} width={18} height={18} />
-                            <Text style={styles.modalBtnText}>Зняти з улюблених</Text>
-                        </TouchableOpacity>
+                        <View style={styles.actionRow}>
+                            <TouchableOpacity style={styles.iconBtn} onPress={() => selectedPhoto && saveToGallery(selectedPhoto)}>
+                                <SvgXml xml={ICON.save} width={22} height={22} />
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.iconBtn} onPress={() => selectedPhoto && sharePhoto(selectedPhoto)}>
+                                <SvgXml xml={ICON.share} width={22} height={22} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.iconBtn, { borderColor: 'rgba(204,51,85,0.6)' }]}
+                                onPress={() => selectedPhoto && removeFavorite(selectedPhoto)}
+                            >
+                                <SvgXml xml={ICON.trash} width={22} height={22} />
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </Modal>
 
-            {toast && (
-                <View style={styles.toast}>
-                    <Text style={styles.toastText}>{toast}</Text>
-                </View>
-            )}
+            <Toast message={toast} />
         </View>
     );
 }
@@ -154,11 +195,10 @@ const styles = StyleSheet.create({
     photo: { width: IMG_SIZE, height: IMG_SIZE * 1.5, borderRadius: 12 },
     modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)' },
     fullImage: { width: width, height: height },
-    modalButtons: { position: 'absolute', left: 24, right: 24, gap: 10 },
-    modalBtn: { paddingVertical: 16, borderRadius: 18, alignItems: 'center', borderWidth: 1, flexDirection: 'row', justifyContent: 'center', gap: 8 },
+    modalButtons: { position: 'absolute', left: 24, right: 24, gap: 10, alignItems: 'center' },
+    modalBtn: { paddingVertical: 16, borderRadius: 18, alignItems: 'center', borderWidth: 1, flexDirection: 'row', justifyContent: 'center', gap: 8, alignSelf: 'stretch' },
     modalBtnPrimary: { backgroundColor: 'rgba(83,74,183,0.85)', borderColor: '#534AB7' },
-    modalBtnRemove: { backgroundColor: 'rgba(30,10,10,0.8)', borderColor: '#aa2244' },
     modalBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-    toast: { position: 'absolute', bottom: 40, alignSelf: 'center', backgroundColor: 'rgba(20,20,40,0.95)', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 24, borderWidth: 1, borderColor: '#534AB7' },
-    toastText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+    actionRow: { flexDirection: 'row', gap: 12, marginTop: 4 },
+    iconBtn: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(0,0,0,0.6)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' },
 });
