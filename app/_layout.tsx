@@ -46,6 +46,10 @@ export default function TabLayout() {
         options={{ href: null }}
       />
       <Tabs.Screen
+        name="components/Toast"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
         name="wallpaperService"
         options={{ href: null }}
       />

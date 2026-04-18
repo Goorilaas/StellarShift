@@ -21,7 +21,7 @@ import {
   View,
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
-import { CATEGORIES, MIX_QUERIES, Photo, UNSPLASH_KEY } from './components/categories';
+import { CATEGORIES, filterNoPeople, Photo, UNSPLASH_KEY } from './components/categories';
 import { ICON } from './components/icons';
 import SkeletonCard from './components/SkeletonCard';
 import Toast from './components/Toast';
@@ -94,6 +94,8 @@ export default function HomeScreen() {
   const [showHeart, setShowHeart] = useState(false);
   const heartScale = useRef(new Animated.Value(0)).current;
   const heartOpacity = useRef(new Animated.Value(1)).current;
+  const heartTranslateY = useRef(new Animated.Value(0)).current;
+  const heartRotate = useRef(new Animated.Value(0)).current;
   const lastTapRef = useRef<number>(0);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -127,12 +129,31 @@ export default function HomeScreen() {
   const triggerHeartAnim = () => {
     setShowHeart(true);
     heartScale.setValue(0);
-    heartOpacity.setValue(1);
-    Animated.sequence([
-      Animated.spring(heartScale, { toValue: 1.4, useNativeDriver: true, speed: 20 }),
-      Animated.timing(heartScale, { toValue: 1, duration: 100, useNativeDriver: true }),
-      Animated.delay(400),
-      Animated.timing(heartOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+    heartOpacity.setValue(0);
+    heartTranslateY.setValue(0);
+    heartRotate.setValue(0);
+    Animated.parallel([
+      // pop-in
+      Animated.sequence([
+        Animated.spring(heartScale, { toValue: 1.3, useNativeDriver: true, speed: 16, bounciness: 14 }),
+        Animated.spring(heartScale, { toValue: 1.1, useNativeDriver: true, speed: 12 }),
+      ]),
+      // fade in fast → hold → fade out slow with float up
+      Animated.sequence([
+        Animated.timing(heartOpacity, { toValue: 1, duration: 120, useNativeDriver: true }),
+        Animated.delay(500),
+        Animated.parallel([
+          Animated.timing(heartOpacity, { toValue: 0, duration: 450, useNativeDriver: true }),
+          Animated.timing(heartTranslateY, { toValue: -50, duration: 450, useNativeDriver: true }),
+          Animated.timing(heartScale, { toValue: 1.4, duration: 450, useNativeDriver: true }),
+        ]),
+      ]),
+      // subtle wobble
+      Animated.sequence([
+        Animated.timing(heartRotate, { toValue: -1, duration: 80, useNativeDriver: true }),
+        Animated.timing(heartRotate, { toValue: 1, duration: 120, useNativeDriver: true }),
+        Animated.timing(heartRotate, { toValue: 0, duration: 100, useNativeDriver: true }),
+      ]),
     ]).start(() => setShowHeart(false));
   };
 
@@ -156,7 +177,15 @@ export default function HomeScreen() {
     setLoading(true);
     setPhotos([]);
     try {
-      const randomQueries = shuffle(MIX_QUERIES).slice(0, 8);
+      const s = await AsyncStorage.getItem('settings');
+      const mixIds: string[] = s
+        ? (JSON.parse(s).mixCategories ?? CATEGORIES.filter(c => c.id !== 'mix').map(c => c.id))
+        : CATEGORIES.filter(c => c.id !== 'mix').map(c => c.id);
+      const allQueries = mixIds
+        .map(id => CATEGORIES.find(c => c.id === id)?.query)
+        .filter((q): q is string => !!q);
+      const pool = allQueries.length > 0 ? allQueries : CATEGORIES.filter(c => c.query).map(c => c.query);
+      const randomQueries = shuffle(pool).slice(0, 8);
       const results = await Promise.all(
         randomQueries.map(q =>
           axios.get('https://api.unsplash.com/search/photos', {
@@ -166,8 +195,9 @@ export default function HomeScreen() {
           })
         )
       );
-      const mixed = shuffle(results.flatMap(r => r.data.results));
-      setPhotos(mixed);
+      const flat: Photo[] = results.flatMap(r => r.data.results);
+      const filtered = filterNoPeople(flat);
+      setPhotos(shuffle(filtered.length >= 8 ? filtered : flat));
     } catch (e: any) {
       if (e?.code === 'ERR_CANCELED') return;
       if (e?.response?.status === 403) Alert.alert('Ліміт запитів', 'Забагато запитів. Спробуй пізніше ⏳');
@@ -188,15 +218,20 @@ export default function HomeScreen() {
     abortRef.current?.abort();
     abortRef.current = new AbortController();
     try {
+      const cat = CATEGORIES.find(c => c.query === query);
+      const perPage = cat?.excludePeople ? 30 : 20;
       const res = await axios.get('https://api.unsplash.com/search/photos', {
-        params: { query, page: pageNum, per_page: 20, orientation: 'portrait' },
+        params: { query, page: pageNum, per_page: perPage, orientation: 'portrait' },
         headers: { Authorization: `Client-ID ${UNSPLASH_KEY}` },
         signal: abortRef.current?.signal,
       });
+      const incoming: Photo[] = res.data.results;
+      const filtered = cat?.excludePeople ? filterNoPeople(incoming) : incoming;
+      const final = cat?.excludePeople && filtered.length < 6 ? incoming : filtered;
       if (pageNum === 1) {
-        setPhotos(res.data.results);
+        setPhotos(final);
       } else {
-        setPhotos(prev => [...prev, ...res.data.results]);
+        setPhotos(prev => [...prev, ...final]);
       }
       setPage(pageNum);
     } catch (e: any) {
@@ -420,7 +455,7 @@ export default function HomeScreen() {
 
       {/* Серце анімація (grid) */}
       {showHeart && (
-        <Animated.Text style={[styles.heartOverlay, { transform: [{ scale: heartScale }], opacity: heartOpacity }]}>
+        <Animated.Text style={[styles.heartOverlay, { opacity: heartOpacity, transform: [{ translateY: heartTranslateY }, { scale: heartScale }, { rotate: heartRotate.interpolate({ inputRange: [-1, 1], outputRange: ['-12deg', '12deg'] }) }] }]}>
           ❤️
         </Animated.Text>
       )}
@@ -448,7 +483,7 @@ export default function HomeScreen() {
 
           {/* Серце анімація (модалка) */}
           {showHeart && (
-            <Animated.Text style={[styles.heartOverlay, { transform: [{ scale: heartScale }], opacity: heartOpacity }]}>
+            <Animated.Text style={[styles.heartOverlay, { opacity: heartOpacity, transform: [{ translateY: heartTranslateY }, { scale: heartScale }, { rotate: heartRotate.interpolate({ inputRange: [-1, 1], outputRange: ['-12deg', '12deg'] }) }] }]}>
               ❤️
             </Animated.Text>
           )}

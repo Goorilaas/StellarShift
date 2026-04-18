@@ -13,7 +13,9 @@ import {
     View,
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
-import { CATEGORIES, MIX_QUERIES, UNSPLASH_KEY } from './components/categories';
+import { CATEGORIES, filterNoPeople, UNSPLASH_KEY } from './components/categories';
+
+const DEFAULT_MIX = CATEGORIES.filter(c => c.id !== 'mix').map(c => c.id);
 import { ICON } from './components/icons';
 import Toast from './components/Toast';
 import { changeWallpaperNow, clearHistory, getHistory, HistoryEntry, isIgnoringBatteryOptimization, PoolItem, requestIgnoreBatteryOptimization, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation } from './wallpaperService';
@@ -62,6 +64,7 @@ export default function SettingsScreen() {
     const [wifiOnly, setWifiOnly] = useState(true);
     const [chargingOnly, setChargingOnly] = useState(false);
     const [activeCategories, setActiveCategories] = useState(['space']);
+    const [mixCategories, setMixCategories] = useState<string[]>(DEFAULT_MIX);
     const [autoChange, setAutoChange] = useState(false);
     const [poolLoading, setPoolLoading] = useState(false);
     const [toast, setToast] = useState<string | null>(null);
@@ -92,6 +95,7 @@ export default function SettingsScreen() {
                 setWifiOnly(p.wifiOnly ?? true);
                 setChargingOnly(p.chargingOnly ?? false);
                 setActiveCategories(p.activeCategories ?? ['space']);
+                setMixCategories(p.mixCategories ?? DEFAULT_MIX);
                 setAutoChange(p.autoChange ?? false);
                 autoChangeRef.current = p.autoChange ?? false;
             }
@@ -103,9 +107,9 @@ export default function SettingsScreen() {
     useEffect(() => {
         if (!loaded.current) return;
         AsyncStorage.setItem('settings', JSON.stringify({
-            interval, applyTo, wifiOnly, chargingOnly, activeCategories, autoChange,
+            interval, applyTo, wifiOnly, chargingOnly, activeCategories, mixCategories, autoChange,
         }));
-    }, [interval, applyTo, wifiOnly, chargingOnly, activeCategories, autoChange]);
+    }, [interval, applyTo, wifiOnly, chargingOnly, activeCategories, mixCategories, autoChange]);
 
     // When rotation settings change while autoChange is ON → debounced reload
     useEffect(() => {
@@ -113,36 +117,41 @@ export default function SettingsScreen() {
         if (reloadTimer.current) clearTimeout(reloadTimer.current);
         reloadTimer.current = setTimeout(() => loadAndStart(), 1500);
         return () => { if (reloadTimer.current) clearTimeout(reloadTimer.current); };
-    }, [activeCategories, interval, applyTo, wifiOnly, chargingOnly]);
+    }, [activeCategories, mixCategories, interval, applyTo, wifiOnly, chargingOnly]);
 
     const loadPhotoPool = async (categories: string[]): Promise<PoolItem[] | null> => {
         setPoolLoading(true);
         try {
-            const queries: string[] = [];
+            const queryJobs: { query: string; excludePeople: boolean }[] = [];
+            const seenQ = new Set<string>();
+            const addCat = (cat: { query: string; excludePeople?: boolean } | undefined) => {
+                if (!cat?.query || seenQ.has(cat.query)) return;
+                seenQ.add(cat.query);
+                queryJobs.push({ query: cat.query, excludePeople: !!cat.excludePeople });
+            };
             categories.forEach(catId => {
                 if (catId === 'mix') {
-                    queries.push(...MIX_QUERIES);
+                    const mixIds = mixCategories.length > 0 ? mixCategories : DEFAULT_MIX;
+                    mixIds.forEach(id => addCat(CATEGORIES.find(c => c.id === id)));
                 } else {
-                    const cat = CATEGORIES.find(c => c.id === catId);
-                    if (cat?.query) queries.push(cat.query);
+                    addCat(CATEGORIES.find(c => c.id === catId));
                 }
             });
-            const uniqueQueries = [...new Set(queries)];
-            const results = await Promise.all(
-                uniqueQueries.flatMap(q => {
+            const responses = await Promise.all(
+                queryJobs.flatMap(job => {
                     const p1 = Math.ceil(Math.random() * 5);
                     const p2 = p1 < 5 ? p1 + 5 : p1 - 4;
                     return [p1, p2].map(page =>
                         axios.get('https://api.unsplash.com/search/photos', {
-                            params: { query: q, page, per_page: 30, orientation: 'portrait' },
+                            params: { query: job.query, page, per_page: 30, orientation: 'portrait' },
                             headers: { Authorization: `Client-ID ${UNSPLASH_KEY}` },
-                        })
+                        }).then(r => ({ data: r.data.results, excludePeople: job.excludePeople }))
                     );
                 })
             );
             const seen = new Set<string>();
-            const pool: PoolItem[] = results
-                .flatMap(r => r.data.results)
+            const pool: PoolItem[] = responses
+                .flatMap(r => (r.excludePeople ? filterNoPeople(r.data) : r.data))
                 .filter((p: any) => {
                     if (seen.has(p.id)) return false;
                     seen.add(p.id);
@@ -228,6 +237,14 @@ export default function SettingsScreen() {
         );
     };
 
+    const toggleMixCategory = (id: string) => {
+        setMixCategories(prev =>
+            prev.includes(id)
+                ? prev.length === 1 ? prev : prev.filter(c => c !== id)
+                : [...prev, id]
+        );
+    };
+
     return (
         <View style={{ flex: 1, backgroundColor: '#0a0a1a' }}>
         <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 60 }}>
@@ -297,6 +314,23 @@ export default function SettingsScreen() {
                     >
                         <SvgXml xml={c.icon} width={14} height={14} />
                         <Text style={[styles.btnText, activeCategories.includes(c.id) && styles.btnTextActive]}>
+                            {c.label}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+
+            <Text style={styles.sectionLabel}>Що міксувати</Text>
+            <Text style={styles.sectionHint}>З яких категорій збирати «Мікс» у каталозі та автозміні</Text>
+            <View style={styles.grid}>
+                {CATEGORIES.filter(c => c.id !== 'mix').map(c => (
+                    <TouchableOpacity
+                        key={c.id}
+                        style={[styles.btn, mixCategories.includes(c.id) && styles.btnActive]}
+                        onPress={() => toggleMixCategory(c.id)}
+                    >
+                        <SvgXml xml={c.icon} width={14} height={14} />
+                        <Text style={[styles.btnText, mixCategories.includes(c.id) && styles.btnTextActive]}>
                             {c.label}
                         </Text>
                     </TouchableOpacity>
@@ -383,7 +417,7 @@ export default function SettingsScreen() {
                 <SvgXml xml={ABOUT_LOGO} width={56} height={56} />
                 <View style={styles.aboutInfo}>
                     <Text style={styles.aboutName}>StellarShift</Text>
-                    <Text style={styles.aboutVersion}>Версія 3.1.0</Text>
+                    <Text style={styles.aboutVersion}>Версія 3.1.1</Text>
                 </View>
             </View>
             <View style={styles.aboutFooter}>
@@ -407,6 +441,7 @@ const styles = StyleSheet.create({
     title: { fontSize: 22, fontWeight: '700', color: '#fff' },
     toggleLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     sectionLabel: { fontSize: 12, color: '#7F77DD', fontWeight: '600', letterSpacing: 1, marginBottom: 10, marginTop: 20, textTransform: 'uppercase' },
+    sectionHint: { fontSize: 11, color: '#666', marginTop: -6, marginBottom: 10 },
     grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     row: { flexDirection: 'row', gap: 8 },
     btn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#1a1a2e', borderWidth: 1, borderColor: '#333', flexDirection: 'row', alignItems: 'center', gap: 6 },

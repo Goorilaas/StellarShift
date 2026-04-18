@@ -171,7 +171,7 @@ export default function FavoritesScreen() {
                                 style={[styles.iconBtn, { borderColor: 'rgba(204,51,85,0.6)' }]}
                                 onPress={() => selectedPhoto && removeFavorite(selectedPhoto)}
                             >
-                                <SvgXml xml={ICON.trash} width={22} height={22} />
+                                <SvgXml xml={ICON.heartBroken} width={24} height={24} />
                             </TouchableOpacity>
                         </View>
                     </View>
