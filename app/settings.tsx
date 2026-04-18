@@ -417,7 +417,7 @@ export default function SettingsScreen() {
                 <SvgXml xml={ABOUT_LOGO} width={56} height={56} />
                 <View style={styles.aboutInfo}>
                     <Text style={styles.aboutName}>StellarShift</Text>
-                    <Text style={styles.aboutVersion}>Версія 3.1.1</Text>
+                    <Text style={styles.aboutVersion}>Версія 3.1.2</Text>
                 </View>
             </View>
             <View style={styles.aboutFooter}>
