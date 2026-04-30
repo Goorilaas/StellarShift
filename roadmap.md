@@ -74,13 +74,15 @@
 - [x] Rate app prompt через `expo-store-review` (після 10 успішних setWallpaper)
 - [x] Privacy Policy (написана руками, у `docs/`, готово до GitHub Pages)
 - [x] Permission rationale dialogs (для READ_MEDIA_IMAGES — пояснити чому)
-- [ ] Store listing assets:
-  - Назва: "StellarShift — Космічні шпалери" / "StellarShift — Cosmic wallpapers"
-  - Short description (80 chars) UA + EN
-  - Full description (4000 chars) UA + EN
-  - Feature graphic 1024×500
-  - 5+ скріншотів (catalog, modal, settings, history, favorites)
-  - Іконка ✅
+- [→] Store listing assets — тексти готові в [STORE.md](STORE.md):
+  - [x] App name: `StellarShift` (UA + EN, 12 chars)
+  - [x] Short description: «Свіжі шпалери кожні 15 хвилин. Космос, природа — на ваш вибір.» (UA + EN)
+  - [x] Full description (UA + EN, ~1700 chars кожна)
+  - [ ] Feature graphic 1024×500 — концепт A/B описано, треба намалювати у Figma або згенерити
+  - [ ] 8 скріншотів 1080×2400 — список кадрів є, треба зняти на emulator'і
+  - [x] Іконка через `app.json` adaptive-icon
+  - [x] ASO keywords UA + EN
+  - [x] Data Safety form — відповіді готові
 - [→] Generate release keystore + backup в bitwarden — інструкція готова в [RELEASE.md](RELEASE.md), виконуєш сам коли підемо на launch
 - [x] ProGuard/R8 rules — minify+shrink ввімкнено, keep-rules для `com.gorilas.StellarShift.**`, WorkManager, Kotlin metadata, Sentry SourceFile
 

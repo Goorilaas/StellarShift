@@ -11,6 +11,7 @@
 - **Privacy Policy** — повний документ написаний руками під реалії застосунку (AsyncStorage local-only, Unsplash API + download tracking, Sentry опційно, без реклами/аналітики/акаунтів) у `docs/privacy.md` (UA) та `docs/privacy-en.md` (EN). `docs/_config.yml` + `docs/index.md` готові до GitHub Pages (Settings → Pages → branch `master`, folder `/docs`). У Settings → Про застосунок з'явилось посилання «Політика конфіденційності» — відкриває локалізовану сторінку в браузері.
 - **R8 / ProGuard увімкнено** у release builds (`android.enableMinifyInReleaseBuilds=true` + `enableShrinkResources`). Keep-rules для нашого пакету `com.gorilas.StellarShift.**`, для `WorkManager.Worker`/`CoroutineWorker` (інстанціюються рефлексією), для `kotlin.Metadata` і для `SourceFile`/`LineNumberTable` (Sentry stack-trace). Очікуване зменшення APK на 10-30%, легка обфускація.
 - **`RELEASE.md`** — інструкція по генерації release keystore: `keytool` команда (PKCS12, 4096-bit, 25000-day), завантаження в EAS (`eas credentials`), three-location backup checklist, рекомендація Play App Signing як страхувальну сітку, troubleshooting-табличка.
+- **`STORE.md`** — повний Play Store listing (UA + EN): назва, short / full description, концепти feature graphic (1024×500), список 8 рекомендованих скріншотів, відповіді для Data Safety form, ASO-keywords, чек-лист перед submission.
 - `.gitignore` зміцнено: додано `*.keystore` і `google-services.json` (раніше було тільки `*.jks`).
 
 ### Змінено
