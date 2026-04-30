@@ -2,7 +2,7 @@ export type Photo = {
     id: string;
     urls: { small: string; full: string; regular: string };
     links?: { html?: string; download?: string; download_location?: string };
-    user: { name: string; username: string; profile_image?: { small: string }; links?: { html?: string } };
+    user: { name: string; username: string; profile_image?: { small: string; medium?: string; large?: string }; links?: { html?: string } };
     description?: string;
     alt_description?: string;
     tags?: { title: string }[];

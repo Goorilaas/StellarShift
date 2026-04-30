@@ -9,6 +9,9 @@
 ### Змінено
 - `app/_layout.tsx` — gate показу onboarding до того як рендеряться таби; чекаємо паралельно `initI18n()` та `AsyncStorage.getItem('onboarding_seen')`.
 
+### Виправлено
+- TS-помилка в `app/index.tsx:814` — `Photo.user.profile_image` розширено до `{ small; medium?; large? }` (Unsplash API віддає всі три розміри; код у попапі автора використовує `medium` з fallback на `small`).
+
 ## 3.7.1 — 2026-04-30
 
 🦄 **Unsplash production compliance + Sentry + .env.** Підготовка до Play Store: API ключі більше не в git, Unsplash API ToS виконується (download tracking + UTM + clickable author + «Powered by Unsplash»), додано crash reporting через Sentry.
