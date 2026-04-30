@@ -27,6 +27,7 @@ import { SvgXml } from 'react-native-svg';
 import { Blessing, nextBlessingFromQueue } from '../components/blessings';
 import { Category, CATEGORIES, CHAOS_CATEGORY, CHAOS_QUERIES, filterNoPeople, Photo } from '../components/categories';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { ensureGalleryPermission } from '../services/galleryPermission';
 import { getUnsplashKey, useUnsplashKey } from '../services/unsplashKey';
 import { ICON } from '../components/icons';
 import SkeletonCard from '../components/SkeletonCard';
@@ -425,11 +426,8 @@ export default function HomeScreen() {
 
   const saveToGallery = async (photo: Photo) => {
     try {
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') {
-        showToast(t('catalog.toast.needPermSave'));
-        return;
-      }
+      const granted = await ensureGalleryPermission(t);
+      if (!granted) return;
       showToast(t('catalog.toast.downloading'));
       const dest = (FileSystem.cacheDirectory ?? '') + `stellarshift_${photo.id}.jpg`;
       const { uri } = await FileSystem.downloadAsync(photo.urls.regular, dest);

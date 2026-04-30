@@ -23,6 +23,7 @@ import { ICON } from '../components/icons';
 import Toast, { ToastAction } from '../components/Toast';
 import { setWallpaperFromUrl } from '../services/wallpaperService';
 import { trackDownload } from '../services/unsplashTracking';
+import { ensureGalleryPermission } from '../services/galleryPermission';
 
 const { width, height } = Dimensions.get('window');
 const IMG_SIZE = (width - 36) / 2;
@@ -96,11 +97,8 @@ export default function FavoritesScreen() {
 
     const saveToGallery = async (photo: Photo) => {
         try {
-            const { status } = await MediaLibrary.requestPermissionsAsync();
-            if (status !== 'granted') {
-                showToast(t('favorites.toast.needPermSave'));
-                return;
-            }
+            const granted = await ensureGalleryPermission(t);
+            if (!granted) return;
             showToast(t('favorites.toast.downloading'));
             const dest = (FileSystem.cacheDirectory ?? '') + `stellarshift_${photo.id}.jpg`;
             const { uri } = await FileSystem.downloadAsync(photo.urls.regular, dest);

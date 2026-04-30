@@ -7,6 +7,16 @@
     "delete": "Delete",
     "confirm": "Confirm"
   },
+  "perm": {
+    "gallery": {
+      "rationaleTitle": "Gallery access",
+      "rationaleMsg": "StellarShift will save the wallpaper to your gallery. Access is used only at the moment of saving — we don't read or scan anything.",
+      "allow": "Allow",
+      "deniedTitle": "Access blocked",
+      "deniedMsg": "To save photos, turn on the «Photos and media» permission in app settings.",
+      "openSettings": "Open settings"
+    }
+  },
   "onboarding": {
     "skip": "Skip",
     "next": "Next",
@@ -165,7 +175,6 @@
     "toast": {
       "applied": "✅ Wallpaper set!",
       "applyFail": "❌ Failed to set wallpaper",
-      "needPermSave": "❌ Permission needed to save",
       "downloading": "⏳ Downloading...",
       "saved": "✅ Saved to gallery!",
       "downloadFail": "❌ Failed to download",
@@ -200,7 +209,6 @@
       "applied": "✅ Wallpaper set!",
       "applyFail": "❌ Failed to set",
       "removed": "💔 Removed from favorites",
-      "needPermSave": "❌ Permission needed to save",
       "downloading": "⏳ Downloading...",
       "saved": "✅ Saved to gallery!",
       "downloadFail": "❌ Failed to download",
