@@ -945,7 +945,7 @@ export default function SettingsScreen() {
             <View style={styles.aboutFooter}>
                 <View style={styles.aboutFooterRow}>
                     <Text style={styles.aboutFooterText}>{t('settings.about.builtWith')}</Text>
-                    <SvgXml xml={ICON_HANDSHAKE} width={20} height={20} />
+                    <SvgXml xml={lang === 'uk' ? ICON_HANDSHAKE : ICON.heartFilled} width={20} height={20} />
                     <Text style={styles.aboutFooterText}>{t('settings.about.bratan')}</Text>
                 </View>
                 <Text style={styles.aboutFooterSub}>
@@ -1072,8 +1072,8 @@ const styles = StyleSheet.create({
     aboutFooterLink: { color: '#7F77DD', textDecorationLine: 'underline' },
     logoWrap: { width: 56, height: 56, alignItems: 'center', justifyContent: 'center' },
     blessingWrap: { alignSelf: 'stretch', marginTop: 12, paddingHorizontal: 24, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-    blessingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
-    blessingText: { color: '#AFA9EC', fontSize: 14, lineHeight: 20, fontWeight: '600', textAlign: 'center', fontStyle: 'italic', flexShrink: 1 },
+    blessingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'stretch' },
+    blessingText: { color: '#AFA9EC', fontSize: 14, lineHeight: 20, fontWeight: '600', fontStyle: 'italic', flex: 1, flexWrap: 'wrap' },
     // BYO key
     byoHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     byoBadgeOk: { backgroundColor: 'rgba(29,158,117,0.18)', borderColor: '#1D9E75', borderWidth: 1, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, marginTop: 14 },

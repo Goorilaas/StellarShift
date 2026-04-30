@@ -34,7 +34,7 @@ import SkeletonCard from '../components/SkeletonCard';
 import Toast, { ToastAction } from '../components/Toast';
 import { blockPhoto as blockPhotoStore, getBlockedIds, unblockPhoto as unblockPhotoStore } from '../services/blocked';
 import { setWallpaperFromUrl } from '../services/wallpaperService';
-import { openAuthorProfile, openPhotoOnUnsplash, trackDownload } from '../services/unsplashTracking';
+import { openAuthorProfile, trackDownload } from '../services/unsplashTracking';
 
 const { width, height } = Dimensions.get('window');
 const IMG_SIZE = (width - 36) / 2;
@@ -825,14 +825,6 @@ export default function HomeScreen() {
                   >
                     <Text style={styles.authorInfoLinkText}>{t('catalog.author.openProfile')}</Text>
                   </TouchableOpacity>
-                  {selectedPhoto.links?.html && (
-                    <TouchableOpacity
-                      style={styles.authorInfoLink}
-                      onPress={() => openPhotoOnUnsplash(selectedPhoto.links?.html)}
-                    >
-                      <Text style={styles.authorInfoLinkText}>{t('catalog.author.openPhoto')}</Text>
-                    </TouchableOpacity>
-                  )}
                 </View>
                 <TouchableOpacity style={styles.authorInfoClose} onPress={() => setAuthorInfoOpen(false)}>
                   <Text style={styles.authorInfoCloseText}>{t('common.close')}</Text>

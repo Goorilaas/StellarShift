@@ -50,10 +50,3 @@ export function openUnsplashHome(): void {
     Linking.openURL(`https://unsplash.com${UTM}`);
 }
 
-/**
- * Open photo's Unsplash page (links.html) with attribution UTM.
- */
-export function openPhotoOnUnsplash(htmlLink: string | undefined | null): void {
-    if (!htmlLink) return;
-    Linking.openURL(withUtm(htmlLink));
-}

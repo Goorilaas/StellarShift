@@ -19,6 +19,9 @@
 
 ### Виправлено
 - TS-помилка в `app/index.tsx:814` — `Photo.user.profile_image` розширено до `{ small; medium?; large? }` (Unsplash API віддає всі три розміри; код у попапі автора використовує `medium` з fallback на `small`).
+- **Кнопка «Фото на Unsplash» прибрана** з author-popup-у. У деяких випадках photo-page вантажилась повільно або 404'ила (видалені/перенесені фото), створювало враження зламаної кнопки. Залишено лише «Профіль автора» — він стабільний і виконує attribution за Unsplash ToS. Видалено `openPhotoOnUnsplash` сервіс і i18n-ключі `catalog.author.openPhoto`.
+- **Easter-egg благословення обрізалось** на довгих EN-фразах («You shine like a…»). Layout-фікс: `blessingRow` тепер `alignSelf: 'stretch'`, текст `flex: 1` + `flexWrap: 'wrap'` — фраза переноситься на другий рядок замість обрізки.
+- **Іконка «Made with … from Ukraine»** для EN-локалі тепер серце, для UA — рукостискання (як і раніше). Локаль-залежний рендер у footer About-секції.
 
 ## 3.7.1 — 2026-04-30
 

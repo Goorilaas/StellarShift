@@ -191,8 +191,7 @@
     },
     "author": {
       "fallbackDesc": "Photo from Unsplash",
-      "openProfile": "Author profile →",
-      "openPhoto": "Photo on Unsplash →"
+      "openProfile": "Author profile →"
     }
   },
   "favorites": {

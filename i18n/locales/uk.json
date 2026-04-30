@@ -191,8 +191,7 @@
     },
     "author": {
       "fallbackDesc": "Фото з Unsplash",
-      "openProfile": "Профіль автора →",
-      "openPhoto": "Фото на Unsplash →"
+      "openProfile": "Профіль автора →"
     }
   },
   "favorites": {
