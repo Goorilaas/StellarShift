@@ -7,6 +7,23 @@
     "delete": "Delete",
     "confirm": "Confirm"
   },
+  "onboarding": {
+    "skip": "Skip",
+    "next": "Next",
+    "start": "Let's go!",
+    "s1": {
+      "title": "A galaxy of beauty",
+      "body": "Tens of thousands of HD wallpapers from Unsplash. Nature, space, anime, cyberpunk, abstract."
+    },
+    "s2": {
+      "title": "Favorites at hand",
+      "body": "Double-tap → into your hearts. One move sets it as home or lock screen."
+    },
+    "s3": {
+      "title": "Auto-rotation",
+      "body": "Every 15 minutes, hour, or day — a fresh wallpaper. Runs in the background, fully tweakable."
+    }
+  },
   "settings": {
     "title": "Settings",
     "section": {

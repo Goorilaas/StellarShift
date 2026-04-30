@@ -1,11 +1,13 @@
 import * as Sentry from '@sentry/react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, Tabs } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, LogBox, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useTranslation } from 'react-i18next';
 import ByoReminderDialog from '../components/ByoReminderDialog';
+import Onboarding, { ONBOARDING_KEY } from '../components/Onboarding';
 import { initI18n } from '../i18n';
 import { UnsplashKeyProvider, useUnsplashKey } from '../services/unsplashKey';
 
@@ -102,10 +104,16 @@ function TabsInner() {
 
 function TabLayout() {
     const [i18nReady, setI18nReady] = useState(false);
+    const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
+
     useEffect(() => {
         initI18n().then(() => setI18nReady(true));
+        AsyncStorage.getItem(ONBOARDING_KEY)
+            .then(seen => setShowOnboarding(seen !== '1'))
+            .catch(() => setShowOnboarding(false));
     }, []);
-    if (!i18nReady) {
+
+    if (!i18nReady || showOnboarding === null) {
         return (
             <View style={{ flex: 1, backgroundColor: '#0a0a1a', alignItems: 'center', justifyContent: 'center' }}>
                 <ActivityIndicator color="#7F77DD" />
@@ -116,6 +124,7 @@ function TabLayout() {
         <GestureHandlerRootView style={{ flex: 1 }}>
             <UnsplashKeyProvider>
                 <TabsInner />
+                {showOnboarding && <Onboarding onDone={() => setShowOnboarding(false)} />}
             </UnsplashKeyProvider>
         </GestureHandlerRootView>
     );

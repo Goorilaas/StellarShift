@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.7.2 — 2026-04-30
+
+### Додано
+- **Onboarding** — 3 слайди при першому запуску (Каталог → Улюблені → Автозміна) з SVG-іконками (`galaxy`, `heartFilled`, `refresh`), pagination dots, «Пропустити» / «Далі» / «Поїхали!». Прапорець `onboarding_seen` в AsyncStorage. Повна i18n-підтримка (UA + EN).
+- `components/Onboarding.tsx` — full-screen overlay над табами, FlatList horizontal pagingEnabled (без нових залежностей).
+
+### Змінено
+- `app/_layout.tsx` — gate показу onboarding до того як рендеряться таби; чекаємо паралельно `initI18n()` та `AsyncStorage.getItem('onboarding_seen')`.
+
 ## 3.7.1 — 2026-04-30
 
 🦄 **Unsplash production compliance + Sentry + .env.** Підготовка до Play Store: API ключі більше не в git, Unsplash API ToS виконується (download tracking + UTM + clickable author + «Powered by Unsplash»), додано crash reporting через Sentry.

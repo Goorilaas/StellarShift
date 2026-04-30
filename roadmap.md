@@ -69,7 +69,7 @@
 ### Phase 2: Store-готовність (~5 днів)
 
 #### 🎨 v3.7.2 — Store assets + onboarding (3 дні)
-- [ ] Onboarding screen (3 слайди: Каталог → Улюблені → Автозміна) — first launch only
+- [x] Onboarding screen (3 слайди: Каталог → Улюблені → Автозміна) — first launch only
 - [ ] Share app button у Settings (`Share.share` з Play Store URL)
 - [ ] Rate app prompt через `expo-store-review` (після 10 успішних setWallpaper)
 - [ ] Privacy Policy (host на GitHub Pages, generated через termly.io)
@@ -289,5 +289,5 @@ NOW →       3.7.2  Onboarding, store assets, Privacy Policy
 
 ---
 
-*Last updated: 2026-04-30 (v3.7.1)*
-*Next update: після v3.7.2 (onboarding + store assets) release*
+*Last updated: 2026-04-30 (v3.7.2 — onboarding done)*
+*Next update: після завершення v3.7.2 (Share/Rate/Privacy/Permission rationale/Store assets)*
