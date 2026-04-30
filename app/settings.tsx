@@ -209,7 +209,7 @@ export default function SettingsScreen() {
     };
 
     const openPrivacyPolicy = () => {
-        const base = 'https://gorilas.github.io/StellarShift';
+        const base = 'https://goorilaas.github.io/StellarShift';
         Linking.openURL(getAppLanguage() === 'uk' ? `${base}/privacy/` : `${base}/privacy-en/`);
     };
 

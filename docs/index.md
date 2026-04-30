@@ -10,4 +10,4 @@ title: StellarShift
 - [Політика конфіденційності (українською)](/privacy/)
 - [Privacy Policy (English)](/privacy-en/)
 
-🐙 [Repo on GitHub](https://github.com/gorilas/StellarShift)
+🐙 [Repo on GitHub](https://github.com/Goorilaas/StellarShift)
