@@ -81,8 +81,8 @@
   - Feature graphic 1024×500
   - 5+ скріншотів (catalog, modal, settings, history, favorites)
   - Іконка ✅
-- [ ] Generate release keystore + backup в bitwarden
-- [ ] ProGuard/R8 rules — перевірити що нативні класи не obfuscate
+- [→] Generate release keystore + backup в bitwarden — інструкція готова в [RELEASE.md](RELEASE.md), виконуєш сам коли підемо на launch
+- [x] ProGuard/R8 rules — minify+shrink ввімкнено, keep-rules для `com.gorilas.StellarShift.**`, WorkManager, Kotlin metadata, Sentry SourceFile
 
 #### 🧪 v3.7.3 — Beta + Unsplash submission (2 дні)
 - [ ] Production build через EAS
