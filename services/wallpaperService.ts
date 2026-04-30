@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeModules } from 'react-native';
+import { bumpSetWallpaperCount } from './rateApp';
 import { trackDownload } from './unsplashTracking';
 
 export type PoolItem = { id: string; url: string; downloadLocation?: string };
@@ -34,6 +35,10 @@ export const setWallpaperFromUrl = async (
         await recordHistory({ id: meta.id, url, small: meta.small, target, appliedAt: Date.now(), downloadLocation: meta.downloadLocation });
         // Fire Unsplash download-tracking ping (required by API ToS for "use" events).
         if (meta.downloadLocation) trackDownload(meta.downloadLocation);
+    }
+    if (result) {
+        // user-initiated setWallpaper → лічильник для rate prompt
+        bumpSetWallpaperCount();
     }
     return result;
 };

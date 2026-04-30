@@ -6,6 +6,7 @@
 - **Onboarding** — 3 слайди при першому запуску (Каталог → Улюблені → Автозміна) з SVG-іконками (`galaxy`, `heartFilled`, `refresh`), pagination dots, «Пропустити» / «Далі» / «Поїхали!». Прапорець `onboarding_seen` в AsyncStorage. Повна i18n-підтримка (UA + EN).
 - `components/Onboarding.tsx` — full-screen overlay над табами, FlatList horizontal pagingEnabled (без нових залежностей).
 - **Share app** — рядок «Поділитися застосунком» у Settings перед розділом «Про застосунок». Системний share sheet через `Share.share` з Play Store URL (`https://play.google.com/store/apps/details?id=com.gorilas.StellarShift`). i18n-повідомлення UA + EN.
+- **Rate prompt** — після 10-го успішного user-initiated `setWallpaper` запускаємо нативний in-app review (`expo-store-review`). Лічильник у AsyncStorage (`setwallpaper_count`), one-shot прапорець (`rate_prompted`) щоб не питати повторно. WorkManager-тіки не рахуються — це не момент задоволення.
 
 ### Змінено
 - `app/_layout.tsx` — gate показу onboarding до того як рендеряться таби; чекаємо паралельно `initI18n()` та `AsyncStorage.getItem('onboarding_seen')`.
