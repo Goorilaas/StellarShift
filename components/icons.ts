@@ -87,6 +87,100 @@ export const ICON = {
     <path d="M8.5 9v6M11.5 9v6" stroke="#cc3355" stroke-width="1.4" stroke-linecap="round"/>
   </svg>`,
 
+  // Heart with white fill + purple stroke + glow — visible on будь-якому фоні
+  heartGlow: `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="hg" cx="50%" cy="45%" r="55%">
+        <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
+        <stop offset="70%" stop-color="#FFD9E8" stop-opacity="1"/>
+        <stop offset="100%" stop-color="#AFA9EC" stop-opacity="0.95"/>
+      </radialGradient>
+    </defs>
+    <path d="M12 21S2 14 2 7.5C2 4.5 4.3 2.5 7 2.5c1.7 0 3.4 1 5 3 1.6-2 3.3-3 5-3 2.7 0 5 2 5 5C22 14 12 21 12 21z" fill="url(#hg)" stroke="#7F77DD" stroke-width="1.4" stroke-linejoin="round"/>
+  </svg>`,
+
+  // Хаос — вогник для секретної категорії
+  chaos: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M8 1.5C8 1.5 4 4 4 8.5C4 11 6 13 8 13C10 13 12 11 12 8.5C12 7 11 6 11 6C11 6 10.5 7 9.5 7C9.5 4.5 8 1.5 8 1.5Z" fill="#EF9F27"/>
+    <path d="M8 4.5C8 4.5 6 6.5 6 9C6 10.5 7 11.5 8 11.5C9 11.5 10 10.5 10 9C10 8 9.5 7.5 9.5 7.5C9.5 7.5 9 8 8.5 8C8.5 6.5 8 4.5 8 4.5Z" fill="#D4537E"/>
+    <circle cx="8" cy="9.5" r="1.2" fill="#FFD9E8"/>
+  </svg>`,
+
+  // Зірочка-іскра для пасхалки
+  sparkle: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M10 1 L11.5 8.5 L19 10 L11.5 11.5 L10 19 L8.5 11.5 L1 10 L8.5 8.5 Z" fill="#AFA9EC"/>
+    <circle cx="10" cy="10" r="1.5" fill="#fff"/>
+  </svg>`,
+
+  // Прапор України — синь зверху, жовтий знизу, тонке темне обведення
+  ukraineFlag: `<svg viewBox="0 0 30 20" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0.5" y="0.5" width="29" height="9.5" fill="#0057B7"/>
+    <rect x="0.5" y="10" width="29" height="9.5" fill="#FFD700"/>
+    <rect x="0.5" y="0.5" width="29" height="19" fill="none" stroke="#1a1a3e" stroke-width="1"/>
+  </svg>`,
+
+  // Падаюча зірка — для "Загадай бажання"
+  shootingStar: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 18 L9 11" stroke="#AFA9EC" stroke-width="1.4" stroke-linecap="round" opacity="0.5"/>
+    <path d="M4 17 L8 13" stroke="#AFA9EC" stroke-width="1.2" stroke-linecap="round" opacity="0.8"/>
+    <path d="M13 3 L14.2 7 L18 8 L14.2 9 L13 13 L11.8 9 L8 8 L11.8 7 Z" fill="#FFD700" stroke="#FFA500" stroke-width="0.5" stroke-linejoin="round"/>
+    <circle cx="13" cy="8" r="0.8" fill="#fff"/>
+  </svg>`,
+
+  // Сонце
+  sun: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="10" cy="10" r="3.5" fill="#FFD700" stroke="#FFA500" stroke-width="0.8"/>
+    <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.4 4.4l1.4 1.4M14.2 14.2l1.4 1.4M4.4 15.6l1.4-1.4M14.2 5.8l1.4-1.4" stroke="#FFD700" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>`,
+
+  // Дві зорі
+  starsTwo: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M6 2.5 L7 6 L10.5 6.8 L7 7.6 L6 11 L5 7.6 L1.5 6.8 L5 6 Z" fill="#AFA9EC"/>
+    <path d="M14 9 L14.8 11.5 L17.5 12 L14.8 12.5 L14 15 L13.2 12.5 L10.5 12 L13.2 11.5 Z" fill="#7F77DD"/>
+    <circle cx="6" cy="6.8" r="0.6" fill="#fff"/>
+  </svg>`,
+
+  // Орбіта (кільце з планетою)
+  orbit: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="10" cy="10" rx="8" ry="4" stroke="#7F77DD" stroke-width="1.2" transform="rotate(-25 10 10)"/>
+    <circle cx="10" cy="10" r="2.5" fill="#534AB7"/>
+    <circle cx="10" cy="10" r="1" fill="#AFA9EC"/>
+    <circle cx="16" cy="6" r="1.2" fill="#FFD700"/>
+  </svg>`,
+
+  // Конюшина 4-листна — удача
+  clover: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M10 10 C10 6 7 3 5 5 C3 3 1 6 3 8 C1 9 2 12 5 11 C5 13 8 13 10 10 Z" fill="#2EBE85" stroke="#0a4d3a" stroke-width="0.5" stroke-linejoin="round"/>
+    <path d="M10 10 C10 6 13 3 15 5 C17 3 19 6 17 8 C19 9 18 12 15 11 C15 13 12 13 10 10 Z" fill="#2EBE85" stroke="#0a4d3a" stroke-width="0.5" stroke-linejoin="round"/>
+    <path d="M10 10 C10 14 7 17 5 15 C3 17 1 14 3 12 C1 11 2 8 5 9 C5 7 8 7 10 10 Z" fill="#1D9E75" stroke="#0a4d3a" stroke-width="0.5" stroke-linejoin="round"/>
+    <path d="M10 10 C10 14 13 17 15 15 C17 17 19 14 17 12 C19 11 18 8 15 9 C15 7 12 7 10 10 Z" fill="#1D9E75" stroke="#0a4d3a" stroke-width="0.5" stroke-linejoin="round"/>
+    <circle cx="10" cy="10" r="0.9" fill="#FFD700"/>
+    <path d="M10 12 Q11 16 13 19" stroke="#0a4d3a" stroke-width="1" stroke-linecap="round" fill="none"/>
+  </svg>`,
+
+  // Корона — головний герой
+  crown: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 7 L5 12 L10 5 L15 12 L18 7 L17 15 L3 15 Z" fill="#FFD700" stroke="#FFA500" stroke-width="1" stroke-linejoin="round"/>
+    <circle cx="2" cy="7" r="1" fill="#AFA9EC"/>
+    <circle cx="10" cy="5" r="1" fill="#ff4466"/>
+    <circle cx="18" cy="7" r="1" fill="#AFA9EC"/>
+  </svg>`,
+
+  // Лампочка — ідея/яскравий
+  lightbulb: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M10 2 C6.5 2 4 4.5 4 8 C4 10 5 11.5 6.5 12.5 L6.5 14 L13.5 14 L13.5 12.5 C15 11.5 16 10 16 8 C16 4.5 13.5 2 10 2 Z" fill="#FFD700" stroke="#FFA500" stroke-width="1" stroke-linejoin="round"/>
+    <rect x="7" y="14.5" width="6" height="2" rx="0.5" fill="#888"/>
+    <rect x="7.8" y="17" width="4.4" height="1.5" rx="0.5" fill="#666"/>
+    <path d="M8 6 L9 9 L11 9 L12 6" stroke="#FFA500" stroke-width="0.8" stroke-linecap="round" fill="none"/>
+  </svg>`,
+
+  // "Не показувати" — око з рискою, viewBox 20x20 (як save/share)
+  blocked: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M1.5 10 C3.5 6 6.5 4.2 10 4.2 C13.5 4.2 16.5 6 18.5 10 C16.5 14 13.5 15.8 10 15.8 C6.5 15.8 3.5 14 1.5 10 Z" fill="none" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
+    <circle cx="10" cy="10" r="2.5" fill="#fff"/>
+    <line x1="2.5" y1="17.5" x2="17.5" y2="2.5" stroke="#cc3355" stroke-width="2.2" stroke-linecap="round"/>
+  </svg>`,
+
   galaxy: `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
     <circle cx="32" cy="32" r="30" fill="#0a0a1a" stroke="#1a1a3e" stroke-width="1.5"/>
     <circle cx="15" cy="15" r="1" fill="#aaa" opacity="0.7"/>

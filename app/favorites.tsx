@@ -1,9 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Dimensions,
     FlatList,
@@ -17,24 +18,33 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
-import { Photo } from './components/categories';
-import { ICON } from './components/icons';
-import Toast from './components/Toast';
-import { setWallpaperFromUrl } from './wallpaperService';
+import { Photo } from '../components/categories';
+import { ICON } from '../components/icons';
+import Toast, { ToastAction } from '../components/Toast';
+import { setWallpaperFromUrl } from '../services/wallpaperService';
+import { trackDownload } from '../services/unsplashTracking';
 
 const { width, height } = Dimensions.get('window');
 const IMG_SIZE = (width - 36) / 2;
 
 export default function FavoritesScreen() {
+    const { t } = useTranslation();
     const [photos, setPhotos] = useState<Photo[]>([]);
     const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
     const [setting, setSetting] = useState<boolean>(false);
-    const [toast, setToast] = useState<string | null>(null);
+    const [toast, setToast] = useState<{ message: string; action?: ToastAction | null } | null>(null);
+    const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const { bottom } = useSafeAreaInsets();
+    const router = useRouter();
 
-    const showToast = (msg: string) => {
-        setToast(msg);
-        setTimeout(() => setToast(null), 3000);
+    const showToast = (msg: string, action?: ToastAction | null, duration = 3000) => {
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        setToast({ message: msg, action });
+        toastTimerRef.current = setTimeout(() => setToast(null), duration);
+    };
+    const dismissToast = () => {
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        setToast(null);
     };
 
     useFocusEffect(
@@ -49,11 +59,24 @@ export default function FavoritesScreen() {
     };
 
     const removeFavorite = async (photo: Photo) => {
+        const snapshot = photos;
         const newPhotos = photos.filter(p => p.id !== photo.id);
         setPhotos(newPhotos);
         await AsyncStorage.setItem('favorites_data', JSON.stringify(newPhotos));
         await AsyncStorage.setItem('favorites', JSON.stringify(newPhotos.map(p => p.id)));
         setSelectedPhoto(null);
+        showToast(t('favorites.toast.removed'), {
+            label: t('common.undo'),
+            onPress: () => undoRemove(snapshot),
+        }, 5000);
+    };
+
+    const undoRemove = async (snapshot: Photo[]) => {
+        dismissToast();
+        setPhotos(snapshot);
+        await AsyncStorage.setItem('favorites_data', JSON.stringify(snapshot));
+        await AsyncStorage.setItem('favorites', JSON.stringify(snapshot.map(p => p.id)));
+        showToast(t('favorites.toast.undone'));
     };
 
     const setAsWallpaper = async (photo: Photo) => {
@@ -61,11 +84,11 @@ export default function FavoritesScreen() {
         try {
             const s = await AsyncStorage.getItem('settings');
             const target = s ? (JSON.parse(s).applyTo ?? 'both') : 'both';
-            await setWallpaperFromUrl(photo.urls.regular, target, { id: photo.id, small: photo.urls.small });
+            await setWallpaperFromUrl(photo.urls.regular, target, { id: photo.id, small: photo.urls.small, downloadLocation: photo.links?.download_location });
             setSelectedPhoto(null);
-            showToast('✅ Красу встановлено!');
+            showToast(t('favorites.toast.applied'));
         } catch {
-            showToast('❌ Не вдалося встановити');
+            showToast(t('favorites.toast.applyFail'));
         } finally {
             setSetting(false);
         }
@@ -75,33 +98,35 @@ export default function FavoritesScreen() {
         try {
             const { status } = await MediaLibrary.requestPermissionsAsync();
             if (status !== 'granted') {
-                showToast('❌ Потрібен дозвіл для збереження');
+                showToast(t('favorites.toast.needPermSave'));
                 return;
             }
-            showToast('⏳ Завантажуємо...');
+            showToast(t('favorites.toast.downloading'));
             const dest = (FileSystem.cacheDirectory ?? '') + `stellarshift_${photo.id}.jpg`;
             const { uri } = await FileSystem.downloadAsync(photo.urls.regular, dest);
             await MediaLibrary.saveToLibraryAsync(uri);
             try { await FileSystem.deleteAsync(dest, { idempotent: true }); } catch { }
-            showToast('✅ Збережено в галерею!');
+            trackDownload(photo.links?.download_location);
+            showToast(t('favorites.toast.saved'));
         } catch {
-            showToast('❌ Не вдалося завантажити');
+            showToast(t('favorites.toast.downloadFail'));
         }
     };
 
     const sharePhoto = async (photo: Photo) => {
         try {
             if (!(await Sharing.isAvailableAsync())) {
-                showToast('❌ Поділитись недоступно');
+                showToast(t('favorites.toast.shareUnavailable'));
                 return;
             }
-            showToast('⏳ Готуємо...');
+            showToast(t('favorites.toast.preparing'));
             const dest = (FileSystem.cacheDirectory ?? '') + `stellarshift_share_${photo.id}.jpg`;
             const { uri } = await FileSystem.downloadAsync(photo.urls.regular, dest);
-            await Sharing.shareAsync(uri, { mimeType: 'image/jpeg', dialogTitle: 'Поділитись шпалерами' });
+            await Sharing.shareAsync(uri, { mimeType: 'image/jpeg', dialogTitle: t('catalog.shareDialog') });
             try { await FileSystem.deleteAsync(dest, { idempotent: true }); } catch { }
+            trackDownload(photo.links?.download_location);
         } catch {
-            showToast('❌ Не вдалося поділитись');
+            showToast(t('favorites.toast.shareFail'));
         }
     };
 
@@ -115,14 +140,18 @@ export default function FavoritesScreen() {
         <View style={styles.container}>
             <View style={styles.titleRow}>
                 <SvgXml xml={ICON.heartFilled} width={22} height={22} />
-                <Text style={styles.title}>Улюблені</Text>
+                <Text style={styles.title}>{t('favorites.title')}</Text>
             </View>
 
             {photos.length === 0 ? (
                 <View style={styles.empty}>
-                    <SvgXml xml={ICON.galaxy} width={80} height={80} />
-                    <Text style={styles.emptyText}>Ще немає збережених шпалер</Text>
-                    <Text style={styles.emptySub}>Утримуй картинку в каталозі щоб додати</Text>
+                    <SvgXml xml={ICON.heartOutline} width={84} height={84} />
+                    <Text style={styles.emptyText}>{t('favorites.empty.title')}</Text>
+                    <Text style={styles.emptySub}>{t('favorites.empty.sub')}</Text>
+                    <TouchableOpacity style={styles.emptyCta} onPress={() => router.push('/')}>
+                        <SvgXml xml={ICON.search} width={16} height={16} />
+                        <Text style={styles.emptyCtaText}>{t('favorites.empty.cta')}</Text>
+                    </TouchableOpacity>
                 </View>
             ) : (
                 <FlatList
@@ -157,7 +186,7 @@ export default function FavoritesScreen() {
                         >
                             <SvgXml xml={ICON.wallpaper} width={18} height={18} />
                             <Text style={styles.modalBtnText}>
-                                {setting ? 'Встановлюємо...' : 'Встановити'}
+                                {setting ? t('favorites.modal.setting') : t('favorites.modal.setWallpaper')}
                             </Text>
                         </TouchableOpacity>
                         <View style={styles.actionRow}>
@@ -178,7 +207,7 @@ export default function FavoritesScreen() {
                 </View>
             </Modal>
 
-            <Toast message={toast} />
+            <Toast message={toast?.message ?? null} action={toast?.action} />
         </View>
     );
 }
@@ -187,9 +216,11 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#0a0a1a', paddingTop: 50 },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, marginBottom: 16 },
     title: { fontSize: 22, fontWeight: '700', color: '#fff' },
-    empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-    emptyText: { fontSize: 18, color: '#fff', fontWeight: '600' },
-    emptySub: { fontSize: 13, color: '#555', textAlign: 'center', paddingHorizontal: 40 },
+    empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 32 },
+    emptyText: { fontSize: 18, color: '#fff', fontWeight: '700', textAlign: 'center' },
+    emptySub: { fontSize: 13, color: '#7a7a90', textAlign: 'center', lineHeight: 19, paddingHorizontal: 8 },
+    emptyCta: { marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 22, borderRadius: 24, backgroundColor: '#534AB7', borderWidth: 1, borderColor: '#7F77DD' },
+    emptyCtaText: { color: '#fff', fontSize: 14, fontWeight: '700' },
     row: { paddingHorizontal: 12, gap: 12, marginBottom: 12 },
     photoCard: { borderRadius: 12, overflow: 'hidden' },
     photo: { width: IMG_SIZE, height: IMG_SIZE * 1.5, borderRadius: 12 },

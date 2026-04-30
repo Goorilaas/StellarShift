@@ -27,6 +27,27 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
     companion object {
         const val WORK_TAG = "WallpaperRotation"
 
+        /**
+         * Fire Unsplash download-tracking ping (required by API ToS for "use" events).
+         * Fire-and-forget: failures must not break wallpaper-set flow.
+         */
+        private fun trackUnsplashDownload(context: Context, downloadLocation: String?) {
+            if (downloadLocation.isNullOrBlank()) return
+            try {
+                val prefs = context.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+                val key = prefs.getString("unsplashKey", null) ?: return
+                val conn = URL(downloadLocation).openConnection() as HttpURLConnection
+                conn.connectTimeout = 8_000
+                conn.readTimeout = 8_000
+                conn.setRequestProperty("Authorization", "Client-ID $key")
+                conn.connect()
+                conn.inputStream.close()
+                conn.disconnect()
+            } catch (_: Exception) {
+                // Tracking failure must be silent.
+            }
+        }
+
         suspend fun applyFromUrl(context: Context, url: String, target: String) {
             withContext(Dispatchers.IO) {
                 val conn = URL(url).openConnection() as HttpURLConnection
@@ -61,9 +82,13 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
             if (pool.length() == 0) return false
 
             val index = prefs.getInt("poolIndex", 0)
-            val url = pool.getJSONObject(index % pool.length()).getString("url")
+            val item = pool.getJSONObject(index % pool.length())
+            val url = item.getString("url")
+            val downloadLocation = item.optString("downloadLocation", "").takeIf { it.isNotBlank() }
 
             applyFromUrl(context, url, target)
+            // Fire Unsplash download-tracking after successful apply.
+            trackUnsplashDownload(context, downloadLocation)
             prefs.edit().putInt("poolIndex", (index + 1) % pool.length()).apply()
             return true
         }

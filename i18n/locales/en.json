@@ -1,0 +1,246 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "close": "Close",
+    "done": "Done",
+    "undo": "Undo",
+    "delete": "Delete",
+    "confirm": "Confirm"
+  },
+  "settings": {
+    "title": "Settings",
+    "section": {
+      "language": "Language",
+      "autoChange": "Auto-change wallpapers",
+      "interval": "Change interval",
+      "applyTo": "Apply to",
+      "activeCategories": "Categories for auto-change",
+      "mixCategories": "What to mix",
+      "mixHint": "Categories that feed Mix in the catalog and rotation",
+      "whenChange": "When to change",
+      "history": "Wallpaper history",
+      "byo": "UNSPLASH API KEY",
+      "blocked": "Hidden photos",
+      "about": "About"
+    },
+    "language": {
+      "uk": "Ukrainian",
+      "en": "English"
+    },
+    "toggle": {
+      "autoChange": "Auto-change",
+      "autoChangeIdle": "Wallpaper rotates on its own",
+      "autoChangeLoading": "Loading photos...",
+      "wifi": "Wi-Fi only",
+      "charging": "While charging only"
+    },
+    "applyTo": {
+      "lock": "Lock screen",
+      "home": "Home screen",
+      "both": "Both"
+    },
+    "interval": {
+      "15m": "15 min",
+      "30m": "30 min",
+      "1h": "1 hour",
+      "2h": "2 hours",
+      "6h": "6 hours",
+      "24h": "24 hours"
+    },
+    "picker": {
+      "empty": "Nothing selected"
+    },
+    "changeNow": "Change now",
+    "history": {
+      "clear": "Clear"
+    },
+    "byo": {
+      "badgeCustom": "your key",
+      "badgeDemo": "demo",
+      "activeKey": "Active key",
+      "change": "Change",
+      "delete": "Delete key",
+      "intro": "The app uses a shared demo Unsplash key (50 req/h split across all users). Create your own — photos will load instantly.",
+      "placeholder": "Paste your Access Key here",
+      "status": {
+        "checking": "Checking...",
+        "ok": "✓ Key works",
+        "invalid": "✗ Invalid key",
+        "rate": "✗ This key already hit the rate limit",
+        "network": "✗ No internet or network error"
+      },
+      "check": "Check",
+      "save": "Save",
+      "cancelChange": "Cancel change",
+      "deleteAndDemo": "Delete key and return to demo",
+      "howToggle": "How to get a key?",
+      "step1": "1. Sign up at unsplash.com (free).",
+      "step2": "2. Open \"Your apps\" → \"New Application\".",
+      "step3": "3. Accept terms, name it (e.g. \"StellarShift personal\").",
+      "step4": "4. Copy \"Access Key\" and paste above ↑",
+      "stepHint": "It's free, 50 req/h limit just for you.",
+      "openUnsplash": "Open Unsplash page →"
+    },
+    "blocked": {
+      "title_one": "{{count}} photo hidden",
+      "title_other": "{{count}} photos hidden",
+      "sub": "Tap to review or restore"
+    },
+    "about": {
+      "version": "Version {{version}}",
+      "builtWith": "Made with",
+      "bratan": "from Ukraine",
+      "poweredBy": "Powered by Unsplash · WorkManager · Claude"
+    },
+    "toast": {
+      "checkFirst": "Check the key first",
+      "keySaved": "🌌 Key saved!",
+      "keyRemoved": "Key removed",
+      "poolEmptyFav": "💜 Add photos to favorites — they'll be in rotation",
+      "poolFail": "❌ Failed to load photo pool",
+      "poolReady": "✅ {{count}} photos ready",
+      "stopped": "⏹ Rotation stopped",
+      "applied": "✅ Wallpaper applied!",
+      "applyFail": "❌ Failed to apply",
+      "changed": "✅ Wallpaper changed!",
+      "enableFirst": "❌ Enable auto-change first",
+      "chaosUnlocked": "🌀 Chaos category unlocked!",
+      "chaosLocked": "🔒 Chaos hidden again",
+      "unblockedOne": "↺ Unblocked",
+      "unblockedAll": "🗑 Unblocked {{count}}",
+      "undone": "↺ Reverted"
+    },
+    "dialog": {
+      "reapplyTitle": "Apply again?",
+      "reapplyMsg": "Wallpaper will be set to \"{{target}}\"",
+      "reapplyConfirm": "Apply",
+      "clearHistTitle": "Clear history?",
+      "clearHistMsg": "All entries will be deleted",
+      "clearHistConfirm": "Clear",
+      "relockTitle": "Lock Chaos?",
+      "relockMsg": "The Chaos category will disappear from the catalog and settings. Unlock again — 7 logo taps.",
+      "relockConfirm": "Lock",
+      "byoDeleteTitle": "Delete your key?",
+      "byoDeleteMsg": "The app returns to the shared demo key. You can paste a key again any time.",
+      "clearBlockedTitle": "Unblock all?",
+      "clearBlockedMsg": "{{count}} hidden photos will appear in the catalog again.",
+      "clearBlockedConfirm": "Unblock all"
+    }
+  },
+  "catalog": {
+    "title": "StellarShift",
+    "searchPlaceholder": "Search wallpapers...",
+    "shuffle": "Shuffle",
+    "searchLabel": "🔍 Search",
+    "shareDialog": "Share wallpaper",
+    "modal": {
+      "addToFav": "Add to favorites",
+      "inFav": "In favorites",
+      "setWallpaper": "Set wallpaper",
+      "setting": "Setting..."
+    },
+    "toast": {
+      "applied": "✅ Wallpaper set!",
+      "applyFail": "❌ Failed to set wallpaper",
+      "needPermSave": "❌ Permission needed to save",
+      "downloading": "⏳ Downloading...",
+      "saved": "✅ Saved to gallery!",
+      "downloadFail": "❌ Failed to download",
+      "shareUnavailable": "❌ Sharing not available",
+      "preparing": "⏳ Preparing...",
+      "shareFail": "❌ Failed to share",
+      "blocked": "✓ Hidden from catalog"
+    },
+    "block": {
+      "title": "Hide this photo?",
+      "message": "This image will disappear from the catalog and rotation. You can restore it in Settings → Hidden photos.",
+      "confirm": "Hide"
+    },
+    "author": {
+      "fallbackDesc": "Photo from Unsplash",
+      "openProfile": "Author profile →",
+      "openPhoto": "Photo on Unsplash →"
+    }
+  },
+  "favorites": {
+    "title": "Favorites",
+    "empty": {
+      "title": "Your favorites will live here",
+      "sub": "Long-press a photo in the catalog or double-tap in preview — it lands here",
+      "cta": "Find beauty"
+    },
+    "modal": {
+      "setWallpaper": "Set",
+      "setting": "Setting..."
+    },
+    "toast": {
+      "applied": "✅ Wallpaper set!",
+      "applyFail": "❌ Failed to set",
+      "removed": "💔 Removed from favorites",
+      "needPermSave": "❌ Permission needed to save",
+      "downloading": "⏳ Downloading...",
+      "saved": "✅ Saved to gallery!",
+      "downloadFail": "❌ Failed to download",
+      "shareUnavailable": "❌ Sharing not available",
+      "preparing": "⏳ Preparing...",
+      "shareFail": "❌ Failed to share",
+      "undone": "↺ Reverted"
+    }
+  },
+  "byoReminder": {
+    "soft": {
+      "title": "Your own Unsplash key 🌌",
+      "message": "StellarShift is using a shared demo Unsplash key, which slows the catalog down. Create your own (free, 2 min) — photos will load instantly. We'll show you how ↓",
+      "confirm": "Set up",
+      "cancel": "Later"
+    },
+    "urgent": {
+      "title": "Rate limit reached ⚠️",
+      "message": "The demo Unsplash key is no longer responding (50 req/h shared across all users). Photos won't load without your own key. It takes 2 minutes and is free — tap \"Set up now\".",
+      "confirm": "Set up now",
+      "cancel": "Close"
+    }
+  },
+  "blockedSheet": {
+    "title": "Hidden photos",
+    "unblock": "Restore",
+    "clearAll": "Restore all ({{count}})",
+    "empty": {
+      "title": "Nothing hidden",
+      "sub": "Hidden photos will appear here — and you'll be able to bring them back"
+    }
+  },
+  "categoryPicker": {
+    "active": "Active",
+    "available": "Available"
+  },
+  "categories": {
+    "mix": "Mix",
+    "favorites": "Favorites",
+    "chaos": "Chaos",
+    "abstract": "Abstract",
+    "anime": "Anime",
+    "mountains": "Mountains",
+    "food": "Food",
+    "flowers": "Flowers",
+    "cyberpunk": "Cyberpunk",
+    "space": "Space",
+    "nature": "Nature",
+    "animals": "Animals",
+    "cities": "Cities",
+    "ocean": "Ocean",
+    "minimal": "Minimalism",
+    "seasons": "Seasons",
+    "bw": "B&W",
+    "cars": "Vehicles",
+    "yachts": "Yachts",
+    "architecture": "Architecture",
+    "forest": "Forest",
+    "travel": "Travel",
+    "mist": "Mist",
+    "noir": "Noir",
+    "rain": "Rain",
+    "rural": "Countryside",
+    "search": "🔍 Search"
+  }
+}

@@ -2,8 +2,8 @@
   "expo": {
     "name": "StellarShift",
     "slug": "StellarShift",
-    "version": "3.1.2",
-    "versionCode": 10,
+    "version": "3.7.1",
+    "versionCode": 21,
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "stellarshift",
@@ -44,7 +44,8 @@
             "backgroundColor": "#0a0a1a"
           }
         }
-      ]
+      ],
+      "@sentry/react-native"
     ],
     "experiments": {
       "typedRoutes": true,

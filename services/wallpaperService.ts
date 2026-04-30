@@ -1,8 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeModules } from 'react-native';
+import { trackDownload } from './unsplashTracking';
 
-export type PoolItem = { id: string; url: string };
-export type HistoryEntry = { id: string; url: string; small?: string; target: string; appliedAt: number };
+export type PoolItem = { id: string; url: string; downloadLocation?: string };
+export type HistoryEntry = { id: string; url: string; small?: string; target: string; appliedAt: number; downloadLocation?: string };
 
 const { WallpaperModule } = NativeModules;
 const HISTORY_KEY = 'wallpaper_history';
@@ -17,17 +18,22 @@ export const startWallpaperRotation = (
 ): Promise<void> =>
     WallpaperModule.startRotation(JSON.stringify(pool), intervalMinutes, target, wifiOnly, chargingOnly);
 
+export const setUnsplashKeyNative = (key: string): Promise<void> =>
+    WallpaperModule.setUnsplashKey(key);
+
 export const stopWallpaperRotation = (): Promise<void> =>
     WallpaperModule.stopRotation();
 
 export const setWallpaperFromUrl = async (
     url: string,
     target: string,
-    meta?: { id: string; small?: string }
+    meta?: { id: string; small?: string; downloadLocation?: string }
 ): Promise<boolean> => {
     const result = await WallpaperModule.setFromUrl(url, target);
     if (meta) {
-        await recordHistory({ id: meta.id, url, small: meta.small, target, appliedAt: Date.now() });
+        await recordHistory({ id: meta.id, url, small: meta.small, target, appliedAt: Date.now(), downloadLocation: meta.downloadLocation });
+        // Fire Unsplash download-tracking ping (required by API ToS for "use" events).
+        if (meta.downloadLocation) trackDownload(meta.downloadLocation);
     }
     return result;
 };
