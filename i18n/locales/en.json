@@ -123,7 +123,8 @@
       "version": "Version {{version}}",
       "builtWith": "Made with",
       "bratan": "from Ukraine",
-      "poweredBy": "Powered by Unsplash · WorkManager · Claude"
+      "poweredBy": "Powered by Unsplash · WorkManager · Claude",
+      "privacy": "Privacy Policy"
     },
     "toast": {
       "checkFirst": "Check the key first",

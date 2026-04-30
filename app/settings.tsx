@@ -208,6 +208,11 @@ export default function SettingsScreen() {
         Linking.openURL('https://unsplash.com/oauth/applications');
     };
 
+    const openPrivacyPolicy = () => {
+        const base = 'https://gorilas.github.io/StellarShift';
+        Linking.openURL(getAppLanguage() === 'uk' ? `${base}/privacy/` : `${base}/privacy-en/`);
+    };
+
     const handleShareApp = async () => {
         try {
             await Share.share({
@@ -947,6 +952,11 @@ export default function SettingsScreen() {
                     Powered by{' '}
                     <Text style={styles.aboutFooterLink} onPress={openUnsplashHome}>Unsplash</Text>
                     {' · WorkManager · Claude'}
+                </Text>
+                <Text style={[styles.aboutFooterSub, { marginTop: 8 }]}>
+                    <Text style={styles.aboutFooterLink} onPress={openPrivacyPolicy}>
+                        {t('settings.about.privacy')}
+                    </Text>
                 </Text>
             </View>
 

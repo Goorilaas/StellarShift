@@ -72,7 +72,7 @@
 - [x] Onboarding screen (3 слайди: Каталог → Улюблені → Автозміна) — first launch only
 - [x] Share app button у Settings (`Share.share` з Play Store URL)
 - [x] Rate app prompt через `expo-store-review` (після 10 успішних setWallpaper)
-- [ ] Privacy Policy (host на GitHub Pages, generated через termly.io)
+- [x] Privacy Policy (написана руками, у `docs/`, готово до GitHub Pages)
 - [x] Permission rationale dialogs (для READ_MEDIA_IMAGES — пояснити чому)
 - [ ] Store listing assets:
   - Назва: "StellarShift — Космічні шпалери" / "StellarShift — Cosmic wallpapers"
