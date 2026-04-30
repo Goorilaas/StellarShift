@@ -12,6 +12,7 @@ import {
     Image,
     Linking,
     ScrollView,
+    Share,
     StyleSheet,
     Switch,
     Text,
@@ -205,6 +206,18 @@ export default function SettingsScreen() {
 
     const openUnsplashRegister = () => {
         Linking.openURL('https://unsplash.com/oauth/applications');
+    };
+
+    const handleShareApp = async () => {
+        try {
+            await Share.share({
+                message: t('settings.share.message', {
+                    url: 'https://play.google.com/store/apps/details?id=com.gorilas.StellarShift',
+                }),
+            });
+        } catch {
+            // Користувач закрив share sheet — ігноруємо
+        }
     };
 
     const fireBlessing = () => {
@@ -866,6 +879,19 @@ export default function SettingsScreen() {
                     </TouchableOpacity>
                 </>
             )}
+
+            {/* Поділитися застосунком */}
+            <Text style={styles.sectionLabel}>{t('settings.section.share')}</Text>
+            <TouchableOpacity style={styles.blockedCard} onPress={handleShareApp} activeOpacity={0.75}>
+                <View style={styles.blockedIconWrap}>
+                    <SvgXml xml={ICON.share} width={22} height={22} />
+                </View>
+                <View style={{ flex: 1 }}>
+                    <Text style={styles.blockedTitle}>{t('settings.share.title')}</Text>
+                    <Text style={styles.blockedSub}>{t('settings.share.sub')}</Text>
+                </View>
+                <Text style={styles.pickerArrow}>›</Text>
+            </TouchableOpacity>
 
             {/* Про застосунок */}
             <Text style={styles.sectionLabel}>{t('settings.section.about')}</Text>

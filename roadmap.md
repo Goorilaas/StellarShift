@@ -70,7 +70,7 @@
 
 #### 🎨 v3.7.2 — Store assets + onboarding (3 дні)
 - [x] Onboarding screen (3 слайди: Каталог → Улюблені → Автозміна) — first launch only
-- [ ] Share app button у Settings (`Share.share` з Play Store URL)
+- [x] Share app button у Settings (`Share.share` з Play Store URL)
 - [ ] Rate app prompt через `expo-store-review` (після 10 успішних setWallpaper)
 - [ ] Privacy Policy (host на GitHub Pages, generated через termly.io)
 - [ ] Permission rationale dialogs (для READ_MEDIA_IMAGES — пояснити чому)

@@ -38,7 +38,13 @@
       "history": "Історія шпалер",
       "byo": "API КЛЮЧ UNSPLASH",
       "blocked": "Сховані фото",
+      "share": "Поділитися",
       "about": "Про застосунок"
+    },
+    "share": {
+      "title": "Поділитися застосунком",
+      "sub": "Розкажи друзям про StellarShift",
+      "message": "Космічні шпалери щодня — StellarShift 🌌\n{{url}}"
     },
     "language": {
       "uk": "Українська",

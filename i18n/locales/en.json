@@ -38,7 +38,13 @@
       "history": "Wallpaper history",
       "byo": "UNSPLASH API KEY",
       "blocked": "Hidden photos",
+      "share": "Share",
       "about": "About"
+    },
+    "share": {
+      "title": "Share the app",
+      "sub": "Tell your friends about StellarShift",
+      "message": "Cosmic wallpapers, daily — StellarShift 🌌\n{{url}}"
     },
     "language": {
       "uk": "Ukrainian",
