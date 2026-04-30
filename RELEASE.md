@@ -144,6 +144,12 @@ eas submit --platform android --latest
 
 Service account для `eas submit` — окрема історія, налаштуємо коли підемо в Phase 4 (LAUNCH 1, v3.8.0).
 
+> ⚠️ **Source maps в Sentry.** R8/ProGuard увімкнений у v3.7.2 (`gradle.properties`).
+> Це означає що JS stack traces у release будуть obfuscated. Перед першим production
+> build встанови expo Sentry plugin + EAS pre-build hook для upload source maps:
+> див. https://docs.expo.dev/guides/using-sentry/#source-maps. Без цього кроку
+> Sentry-репорти з продакшену будуть нечитабельні.
+
 ---
 
 ## 7. Чек-лист перед першою публікацією
