@@ -225,7 +225,6 @@
 
 ## ⚙️ Технічний борг / cleanup
 - [ ] Прибрати `app-example/` папку (boilerplate, шумить TS errors)
-- [ ] Fix `selectedPhoto.user.profile_image?.medium` — pre-existing TS error
 - [ ] Прибрати Wi-Fi-only / Charging-only toggles з Settings (друг каже зайве)
 - [ ] Unit tests для `services/blocked.ts`, `services/unsplashKey.ts`
 - [ ] E2E тести через Maestro / Detox
