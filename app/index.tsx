@@ -376,9 +376,12 @@ export default function HomeScreen() {
     try {
       const cat = CATEGORIES.find(c => c.query === query);
       const perPage = cat?.excludePeople ? 30 : 20;
+      // На першому завантаженні беремо рандомну сторінку 1-3, щоб одна категорія
+      // не була завжди тими ж 30 фото. Infinite scroll далі додає послідовно.
+      const apiPage = pageNum === 1 ? Math.ceil(Math.random() * 3) : pageNum;
       const key = await getUnsplashKey();
       const res = await axios.get('https://api.unsplash.com/search/photos', {
-        params: { query, page: pageNum, per_page: perPage, orientation: 'portrait' },
+        params: { query, page: apiPage, per_page: perPage, orientation: 'portrait' },
         headers: { Authorization: `Client-ID ${key}` },
         signal: abortRef.current?.signal,
       });
@@ -390,7 +393,7 @@ export default function HomeScreen() {
       } else {
         setPhotos(prev => [...prev, ...final]);
       }
-      setPage(pageNum);
+      setPage(apiPage);
     } catch (e: any) {
       if (e?.code === 'ERR_CANCELED') return;
       if (e?.response?.status === 403) { trigger403(); return; }
