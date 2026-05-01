@@ -91,7 +91,7 @@ StellarShift — це pet-проект, зроблений з душею в Ук
 ```
 🌌 The cosmos in your pocket — and beyond.
 
-StellarShift is an auto-rotating wallpaper app that makes every morning
+StellarShift is an auto-rotating wallpaper app that makes every day
 look different. While you sleep, your tea brews, or the bus rolls into
 the office — your phone quietly picks a fresh HD shot from the Unsplash
 universe. No ads, no sign-ups, no noise.

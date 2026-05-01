@@ -42,6 +42,15 @@ const IMG_SIZE = (width - 36) / 2;
 type LogoStar = { id: number; tx: number; ty: number; opacity: Animated.Value; translateX: Animated.Value; translateY: Animated.Value; scale: Animated.Value };
 
 // Fisher-Yates shuffle
+// Translates an axios fetch error into an i18n key for user-facing toast.
+// 403 не маплимо тут — це окремий BYO-rate-limit flow (trigger403 показує діалог).
+function mapFetchError(e: any): string {
+  if (e?.response?.status === 401) return 'catalog.toast.errKey';
+  if (e?.response?.status === 429) return 'catalog.toast.errRate';
+  if (!e?.response) return 'catalog.toast.errNet'; // axios ставить response=undefined для network/timeout
+  return 'catalog.toast.errLoad';
+}
+
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -310,7 +319,8 @@ export default function HomeScreen() {
       setPhotos(shuffle(filtered.length >= 8 ? filtered : flat));
     } catch (e: any) {
       if (e?.code === 'ERR_CANCELED') return;
-      if (e?.response?.status === 403) trigger403();
+      if (e?.response?.status === 403) { trigger403(); return; }
+      showToast(t(mapFetchError(e)));
     } finally {
       setLoading(false);
       setIsFetchingMore(false);
@@ -345,7 +355,8 @@ export default function HomeScreen() {
       setPhotos(shuffle(dedup));
     } catch (e: any) {
       if (e?.code === 'ERR_CANCELED') return;
-      if (e?.response?.status === 403) trigger403();
+      if (e?.response?.status === 403) { trigger403(); return; }
+      showToast(t(mapFetchError(e)));
     } finally {
       setLoading(false);
       setIsFetchingMore(false);
@@ -382,7 +393,8 @@ export default function HomeScreen() {
       setPage(pageNum);
     } catch (e: any) {
       if (e?.code === 'ERR_CANCELED') return;
-      if (e?.response?.status === 403) trigger403();
+      if (e?.response?.status === 403) { trigger403(); return; }
+      showToast(t(mapFetchError(e)));
     }
     setLoading(false);
     setIsFetchingMore(false);

@@ -182,7 +182,11 @@
       "shareUnavailable": "❌ Sharing not available",
       "preparing": "⏳ Preparing...",
       "shareFail": "❌ Failed to share",
-      "blocked": "✓ Hidden from catalog"
+      "blocked": "✓ Hidden from catalog",
+      "errKey": "❌ Unsplash API key invalid — check Settings",
+      "errRate": "❌ Unsplash rate limit hit — wait or add your own key",
+      "errNet": "❌ No internet connection",
+      "errLoad": "❌ Failed to load"
     },
     "block": {
       "title": "Hide this photo?",
