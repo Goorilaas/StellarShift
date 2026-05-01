@@ -96,10 +96,28 @@ export const FAVORITES_CATEGORY: Category = {
     icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 14s-5-3.2-5-7.5A3 3 0 0 1 8 4a3 3 0 0 1 5 2.5C13 10.8 8 14 8 14z" fill="#cc3355" stroke="#FFD9E8" stroke-width="0.6"/></svg>`,
 };
 
+// Запити для прихованої категорії «Хаос». Цілимось у візуальний chaos:
+// глічі, фрактали, ліминальні простори, eldritch horror, аналогова жуть,
+// дзеркальна симетрія. Не використовуємо одинокі слова на кшталт
+// "psychedelic" або "surreal dreamscape" — Unsplash повертає на них
+// канабіс / банальні дерева відповідно.
 export const CHAOS_QUERIES = [
-    'vaporwave aesthetic', 'glitch art', 'fractal pattern', 'surreal dreamscape',
-    'liquid metal', 'neon dreams', 'psychedelic', 'cosmic horror cthulhu',
-    'datamosh', 'retrowave synthwave', 'biopunk', 'iridescent holographic',
-    'ethereal mist', 'kaleidoscope', 'cyberdelic',
-    'abstract 3d sculpture dark', 'mystery occult ritual', 'horror dark eerie',
+    'glitch art digital corruption',
+    'fractal abstract dark',
+    'liminal space empty backrooms',
+    'analog horror static distortion',
+    'lovecraftian eldritch dark',
+    'liquid chrome iridescent abstract',
+    'vaporwave neon retro grid',
+    'kaleidoscope symmetry abstract',
+    'data moshing pixel corruption',
+    'occult esoteric symbol dark',
+    'feverdream surreal abstract',
+    'cosmic void dread abstract',
+    'broken shattered glass abstract',
+    'holographic iridescent metal abstract',
+    'crystal cave surreal abstract',
+    'glowing fractal pattern abstract',
+    'cyberdelic neon pink abstract',
+    'noise static analog texture',
 ];
