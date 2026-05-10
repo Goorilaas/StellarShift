@@ -33,7 +33,12 @@ export function filterNoPeople<T extends Photo>(photos: T[]): T[] {
 // Demo Unsplash Access Key. Production: read from .env (EXPO_PUBLIC_UNSPLASH_KEY).
 // Hardcoded fallback тут лишається на час перехідного періоду — щоб додаток не вмер
 // у юзерів, які оновляться без .env (вони через BYO key все одно ставлять свій).
-// Видалити після підтвердження від Unsplash production approval.
+//
+// TODO(v3.8.0): ВИДАЛИТИ ХАРДКОДЕД FALLBACK після Unsplash production approval.
+//   Інакше якщо .env поламається у юзера, додаток мовчки повернеться на shared demo →
+//   ліміт 50 req/h розпиляється на всіх юзерів → масовий 403. Замінити рядок на:
+//   export const UNSPLASH_KEY = process.env.EXPO_PUBLIC_UNSPLASH_KEY ?? '';
+//   Якщо ключ порожній — `unsplashKey.ts` уже коректно тригерить BYO dialog.
 export const UNSPLASH_KEY = process.env.EXPO_PUBLIC_UNSPLASH_KEY ?? 'iSQX5zC1pV52N6iXfn8SMajIdHJoR4J7SqNX67hEahI';
 
 // Порядок: Мікс — особлива категорія, завжди перша.
