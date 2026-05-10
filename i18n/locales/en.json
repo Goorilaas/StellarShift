@@ -9,7 +9,7 @@
   },
   "cheer": {
     "1": "✨ Great choice!",
-    "2": "✨ Good eye!",
+    "2": "✨ You see beauty!",
     "3": "✨ Beautiful pick!",
     "4": "✨ Magical!",
     "5": "✨ With taste!"
@@ -20,7 +20,7 @@
       "rationaleMsg": "StellarShift will save the wallpaper to your gallery. Access is used only at the moment of saving — we don't read or scan anything.",
       "allow": "Allow",
       "deniedTitle": "Access blocked",
-      "deniedMsg": "To save photos, turn on the «Photos and media» permission in app settings.",
+      "deniedMsg": "To save photos, turn on the «Photos and media» permission in app settings, then tap «Save» again.",
       "openSettings": "Open settings"
     }
   },

@@ -72,6 +72,7 @@ export default function FavoritesScreen() {
 
     const setAsWallpaper = async (photo: Photo) => {
         setSetting(true);
+        showToast(randomCheer(t));
         try {
             const s = await AsyncStorage.getItem('settings');
             const target = s ? (JSON.parse(s).applyTo ?? 'both') : 'both';

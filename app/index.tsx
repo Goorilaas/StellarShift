@@ -420,6 +420,7 @@ export default function HomeScreen() {
 
   const setAsWallpaper = async (photo: Photo) => {
     setSettingWallpaper(true);
+    showToast(randomCheer(t));
     try {
       const settings = await AsyncStorage.getItem('settings');
       const target = settings ? (JSON.parse(settings).applyTo ?? 'both') : 'both';
