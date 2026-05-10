@@ -698,6 +698,26 @@ export default function HomeScreen() {
               />
             }
             ListFooterComponent={isFetchingMore ? <ActivityIndicator color="#7F77DD" style={{ marginVertical: 16 }} /> : null}
+            ListEmptyComponent={
+              !loading ? (
+                <View style={styles.gridEmpty}>
+                  <SvgXml xml={ICON.search} width={56} height={56} />
+                  <Text style={styles.gridEmptyTitle}>{t('catalog.empty.title')}</Text>
+                  <Text style={styles.gridEmptySub}>{t('catalog.empty.sub')}</Text>
+                  <TouchableOpacity
+                    style={styles.gridEmptyCta}
+                    onPress={() => {
+                      if (activeCategory.id === 'mix') loadMix();
+                      else if (activeCategory.id === 'chaos') loadChaos();
+                      else loadPhotos(activeCategory.query, 1);
+                    }}
+                  >
+                    <SvgXml xml={ICON.refresh} width={16} height={16} />
+                    <Text style={styles.gridEmptyCtaText}>{t('catalog.empty.cta')}</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null
+            }
           />
         )}
       </View>
@@ -874,6 +894,11 @@ const styles = StyleSheet.create({
   chipTextActive: { color: '#fff' },
   photoGrid: { flex: 1 },
   skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, gap: 12, },
+  gridEmpty: { alignItems: 'center', justifyContent: 'center', paddingTop: 80, paddingHorizontal: 32, gap: 12 },
+  gridEmptyTitle: { color: '#fff', fontSize: 18, fontWeight: '700', marginTop: 8, textAlign: 'center' },
+  gridEmptySub: { color: '#7a7a90', fontSize: 13, lineHeight: 19, textAlign: 'center' },
+  gridEmptyCta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, paddingVertical: 12, paddingHorizontal: 20, backgroundColor: '#1a1a2e', borderRadius: 24, borderWidth: 1, borderColor: '#2a2a4e' },
+  gridEmptyCtaText: { color: '#FFD700', fontSize: 14, fontWeight: '700' },
   row: { paddingHorizontal: 12, gap: 12, marginBottom: 12 },
   photoCard: { borderRadius: 12, overflow: 'hidden', position: 'relative' },
   photo: { width: IMG_SIZE, height: IMG_SIZE * 1.5, borderRadius: 12 },

@@ -196,6 +196,11 @@
     "author": {
       "fallbackDesc": "Photo from Unsplash",
       "openProfile": "Author profile →"
+    },
+    "empty": {
+      "title": "Nothing here yet",
+      "sub": "Try a different search or refresh the category",
+      "cta": "Try again"
     }
   },
   "favorites": {
