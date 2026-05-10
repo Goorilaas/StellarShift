@@ -219,8 +219,11 @@
 - [ ] **Family sharing** колекцій
 
 ## 🎁 Easter eggs (low priority, fun)
-- [ ] Розширити пул благословень з 10 до 20-30 (для UA)
-- [ ] EN-варіанти благословень (короткий пул для англомовних)
+- [ ] **v3.7.4 — Soul wave** (всі три разом):
+  - [ ] Розширити blessing pool: UA 10 → 20, EN 6 → 20 (~14 нових EN-фраз)
+  - [ ] EN-набір включає `"Stand with Ukraine"` — бренд-сигнал, не агресивно політичний
+  - [ ] Кожна нова фраза = нова SVG-іконка в палітрі `#7F77DD / #AFA9EC / #FFD700 / #1D9E75 / #cc3355`
+  - [ ] **Launch greeting blessing** — при cold start після ≥6 годин від минулого показу: slide-from-top toast із blessing, auto-dismiss 5с. Settings toggle «Привітання при запуску» (default ON). НЕ кожен запуск — frequency fatigue. Ритуал «один раз на день» = м'яка магія + не задовбує.
 - [ ] Easter egg в LW (тап в певне місце шпалери = шторм зірок)
 - [ ] Holiday themes (24 грудня — снігопад в каталозі, 24 серпня — салют)
 - [ ] Hidden achievements ("100 шпалер змінено", "30 днів autoChange")
@@ -239,7 +242,7 @@
 - [ ] DTF / Habr стаття "Як я зробив live wallpaper з parallax"
 - [ ] TikTok / Instagram reels з демо LW
 - [ ] App Store Optimization (ASO) — keyword research для UA + EN
-- [ ] Localization PL/DE/ES (велика українська діаспора)
+- [ ] Localization PL/DE/ES (велика українська діаспора). Брати PL першою — найбільша діаспора, спільне коріння робить переклад швидшим. На момент 4-ї мови — i18n namespace splitting (settings.json / catalog.json / common.json) — поточні locales по 281 рядку стануть боляче рости.
 - [ ] iOS port (якщо успіх на Android)
 
 ## 🛡 Security / privacy
