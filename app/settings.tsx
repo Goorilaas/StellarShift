@@ -25,8 +25,6 @@ import { CATEGORIES, CHAOS_CATEGORY, CHAOS_QUERIES, FAVORITES_CATEGORY, filterNo
 import { BlockedPhoto, clearBlocked, getBlocked, getBlockedIds, setBlockedAll, unblockPhoto } from '../services/blocked';
 import { clearUserKey, getUnsplashKey, getUserKey, setUserKey, useUnsplashKey, validateKey } from '../services/unsplashKey';
 import { openUnsplashHome } from '../services/unsplashTracking';
-
-const DEFAULT_MIX = CATEGORIES.filter(c => c.id !== 'mix').map(c => c.id);
 import BlockedManagerSheet from '../components/BlockedManagerSheet';
 import CategoryPickerSheet from '../components/CategoryPickerSheet';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -34,9 +32,11 @@ import { ICON } from '../components/icons';
 import Toast, { ToastAction } from '../components/Toast';
 
 import { Blessing, nextBlessingFromQueue } from '../components/blessings';
+import { changeWallpaperNow, clearHistory, getHistory, HistoryEntry, isIgnoringBatteryOptimization, PoolItem, requestIgnoreBatteryOptimization, setUnsplashKeyNative, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation } from '../services/wallpaperService';
+
+const DEFAULT_MIX = CATEGORIES.filter(c => c.id !== 'mix').map(c => c.id);
 
 type Star = { id: number; tx: number; ty: number; opacity: Animated.Value; translateX: Animated.Value; translateY: Animated.Value; scale: Animated.Value };
-import { changeWallpaperNow, clearHistory, getHistory, HistoryEntry, isIgnoringBatteryOptimization, PoolItem, requestIgnoreBatteryOptimization, setUnsplashKeyNative, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation } from '../services/wallpaperService';
 
 const ABOUT_LOGO = `<svg width="56" height="56" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
   <circle cx="50" cy="50" r="50" fill="#0a0a1a"/>
