@@ -22,7 +22,7 @@ import { Photo } from '../components/categories';
 import { ICON } from '../components/icons';
 import Toast, { ToastAction } from '../components/Toast';
 import { setWallpaperFromUrl } from '../services/wallpaperService';
-import { trackDownload } from '../services/unsplashTracking';
+import { openAuthorProfile, trackDownload } from '../services/unsplashTracking';
 import { ensureGalleryPermission } from '../services/galleryPermission';
 
 const { width, height } = Dimensions.get('window');
@@ -35,7 +35,7 @@ export default function FavoritesScreen() {
     const [setting, setSetting] = useState<boolean>(false);
     const [toast, setToast] = useState<{ message: string; action?: ToastAction | null } | null>(null);
     const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const { bottom } = useSafeAreaInsets();
+    const { bottom, top } = useSafeAreaInsets();
     const router = useRouter();
 
     const showToast = (msg: string, action?: ToastAction | null, duration = 3000) => {
@@ -176,6 +176,29 @@ export default function FavoritesScreen() {
                         />
                     </TouchableWithoutFeedback>
 
+                    {selectedPhoto?.user && (
+                        <TouchableOpacity
+                            style={[styles.authorChip, { top: top + 12 }]}
+                            onPress={() => openAuthorProfile(selectedPhoto.user.username)}
+                            activeOpacity={0.85}
+                        >
+                            {selectedPhoto.user.profile_image?.small && (
+                                <Image
+                                    source={{ uri: selectedPhoto.user.profile_image.small }}
+                                    style={styles.authorChipAvatar}
+                                />
+                            )}
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.authorChipName} numberOfLines={1}>
+                                    {selectedPhoto.user.name}
+                                </Text>
+                                <Text style={styles.authorChipHandle} numberOfLines={1}>
+                                    @{selectedPhoto.user.username} · Unsplash ›
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
+                    )}
+
                     <View style={[styles.modalButtons, { bottom: bottom + 16 }]}>
                         <TouchableOpacity
                             style={[styles.modalBtn, styles.modalBtnPrimary, setting && { opacity: 0.6 }]}
@@ -230,4 +253,8 @@ const styles = StyleSheet.create({
     modalBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
     actionRow: { flexDirection: 'row', gap: 12, marginTop: 4 },
     iconBtn: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(0,0,0,0.6)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' },
+    authorChip: { position: 'absolute', left: 12, right: 60, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 22, paddingVertical: 6, paddingHorizontal: 8, paddingRight: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+    authorChipAvatar: { width: 32, height: 32, borderRadius: 16 },
+    authorChipName: { color: '#fff', fontSize: 13, fontWeight: '700' },
+    authorChipHandle: { color: '#bbb', fontSize: 11, marginTop: 1 },
 });
