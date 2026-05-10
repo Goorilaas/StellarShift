@@ -11,7 +11,7 @@ permalink: /privacy-en/
 **Developer:** Serhii Holubchuk
 **Contact:** [sergholubchuk@gmail.com](mailto:sergholubchuk@gmail.com)
 
-[Українська версія](/privacy/)
+[Українська версія]({{ '/privacy/' | relative_url }})
 
 ---
 

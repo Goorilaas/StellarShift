@@ -1,3 +1,9 @@
 title: StellarShift
 description: Cosmic wallpapers for Android
 theme: jekyll-theme-minimal
+
+# GitHub Pages serves a project repo at username.github.io/REPONAME/.
+# Without baseurl, absolute links like /privacy/ resolve to the root
+# domain instead of /StellarShift/privacy/. This makes Jekyll prefix all
+# generated URLs (and `relative_url` filter outputs) with /StellarShift.
+baseurl: /StellarShift
