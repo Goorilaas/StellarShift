@@ -1056,7 +1056,7 @@ const styles = StyleSheet.create({
     aboutName: { color: '#fff', fontSize: 18, fontWeight: '700' },
     aboutVersion: { color: '#7F77DD', fontSize: 13, fontWeight: '600' },
     aboutFooter: { marginTop: 12, alignItems: 'center', gap: 4, paddingBottom: 8 },
-    aboutFooterRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    aboutFooterRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     aboutFooterText: { color: '#aaa', fontSize: 14, fontWeight: '600' },
     aboutFooterSub: { color: '#444', fontSize: 11 },
     aboutFooterLink: { color: '#7F77DD', textDecorationLine: 'underline' },

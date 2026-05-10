@@ -121,7 +121,7 @@
     },
     "about": {
       "version": "Версія {{version}}",
-      "builtWith": "Зроблено з",
+      "builtWith": "Створено з",
       "bratan": "в Україні",
       "poweredBy": "Powered by Unsplash · WorkManager · Claude",
       "privacy": "Політика конфіденційності"
