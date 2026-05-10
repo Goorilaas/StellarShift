@@ -48,3 +48,25 @@ app-example
 .claude/
 android/build
 android/.gradle
+android/app/.cxx/
+
+# IDE
+**/.idea/
+
+# Build artefacts (local gradle assemble/bundle)
+*.aab
+*.apk
+
+# OS cruft
+Thumbs.db
+desktop.ini
+
+# Dev logs
+*.log
+
+# Local screenshot scratch (Play Store assets live elsewhere)
+img/
+
+# v3.6.0 Sauron-eye icon experiment — kept as reference long enough,
+# now lives in CHANGELOG history.
+blocked-preview.html

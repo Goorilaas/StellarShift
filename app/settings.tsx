@@ -54,13 +54,6 @@ const ABOUT_LOGO = `<svg width="56" height="56" viewBox="0 0 100 100" xmlns="htt
   <circle cx="50" cy="50" r="1.5" fill="white"/>
 </svg>`;
 
-const ICON_HANDSHAKE = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="6" cy="12" r="3" stroke="#7F77DD" stroke-width="1.5"/>
-  <circle cx="18" cy="12" r="3" stroke="#534AB7" stroke-width="1.5"/>
-  <path d="M9 12h6" stroke="#AFA9EC" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="2 1.5"/>
-  <circle cx="12" cy="12" r="1.5" fill="#AFA9EC"/>
-</svg>`;
-
 const INTERVALS = [
     { labelKey: 'settings.interval.15m', value: 15 },
     { labelKey: 'settings.interval.30m', value: 30 },
@@ -942,7 +935,7 @@ export default function SettingsScreen() {
             <View style={styles.aboutFooter}>
                 <View style={styles.aboutFooterRow}>
                     <Text style={styles.aboutFooterText}>{t('settings.about.builtWith')}</Text>
-                    <SvgXml xml={lang === 'uk' ? ICON_HANDSHAKE : ICON.heartFilled} width={20} height={20} />
+                    <SvgXml xml={ICON.heartFilled} width={20} height={20} />
                     <Text style={styles.aboutFooterText}>{t('settings.about.bratan')}</Text>
                 </View>
                 <Text style={styles.aboutFooterSub}>
