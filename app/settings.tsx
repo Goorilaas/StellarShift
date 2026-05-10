@@ -472,6 +472,13 @@ export default function SettingsScreen() {
         }
     };
 
+    // TODO(techdebt): race window — `loadPhotoPool` не абортить in-flight axios.
+    // Якщо юзер змінює settings двічі за ~2с і перший pool-fetch повертається
+    // ПІСЛЯ другого — native side тримає stale parameters (last-write-wins).
+    // Self-healing наступною свідомою зміною. Severity low. Розслідувано 2026-05-01,
+    // claim про stale closure через useEffect deps виявився false positive
+    // (cleanup pattern на line 372-376 коректно скасовує попередній таймер).
+    // Реальний фікс: AbortController у loadPhotoPool, reuse тут. Див. roadmap → Технічний борг.
     const loadAndStart = async () => {
         const pool = await loadPhotoPool(activeCategories);
         if (!pool) return;
