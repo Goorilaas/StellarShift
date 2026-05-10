@@ -23,7 +23,7 @@
     "start": "Let's go!",
     "s1": {
       "title": "A galaxy of beauty",
-      "body": "Tens of thousands of HD wallpapers from Unsplash. Nature, space, anime, cyberpunk, abstract."
+      "body": "Tens of thousands of HD wallpapers from Unsplash. Nature, space, cyberpunk, abstract."
     },
     "s2": {
       "title": "Favorites at hand",
@@ -260,7 +260,6 @@
     "favorites": "Favorites",
     "chaos": "Chaos",
     "abstract": "Abstract",
-    "anime": "Anime",
     "mountains": "Mountains",
     "food": "Food",
     "flowers": "Flowers",

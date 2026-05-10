@@ -337,7 +337,7 @@ URL: https://unsplash.com/oauth/applications → твій застосунок �
 ```
 StellarShift is an Android wallpaper app that lets users browse tens
 of thousands of HD photos from Unsplash across 20+ curated categories
-(Space, Nature, Anime, Cyberpunk, Architecture, etc.) and apply them
+(Space, Nature, Cyberpunk, Architecture, etc.) and apply them
 to home and lock screens with one tap. The app supports automatic
 wallpaper rotation on a schedule (15 min to daily) running through
 native Android WorkManager.
