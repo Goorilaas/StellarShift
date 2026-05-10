@@ -31,7 +31,7 @@ import { ensureGalleryPermission } from '../services/galleryPermission';
 import { getUnsplashKey, useUnsplashKey } from '../services/unsplashKey';
 import { ICON } from '../components/icons';
 import SkeletonCard from '../components/SkeletonCard';
-import Toast, { ToastAction } from '../components/Toast';
+import Toast, { useToastQueue } from '../components/Toast';
 import { blockPhoto as blockPhotoStore, getBlockedIds, unblockPhoto as unblockPhotoStore } from '../services/blocked';
 import { setWallpaperFromUrl } from '../services/wallpaperService';
 import { openAuthorProfile, trackDownload } from '../services/unsplashTracking';
@@ -113,8 +113,7 @@ export default function HomeScreen() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
   const [blockConfirm, setBlockConfirm] = useState<Photo | null>(null);
-  const [toast, setToast] = useState<{ message: string; action?: ToastAction | null } | null>(null);
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { toast, showToast, dismissToast } = useToastQueue();
   const [searchText, setSearchText] = useState('');
   const [settingWallpaper, setSettingWallpaper] = useState(false);
   const [chaosUnlocked, setChaosUnlocked] = useState(false);
@@ -232,16 +231,6 @@ export default function HomeScreen() {
   const loadFavorites = async () => {
     const saved = await AsyncStorage.getItem('favorites');
     if (saved) setFavorites(JSON.parse(saved));
-  };
-
-  const showToast = (message: string, action?: ToastAction | null, duration = 3000) => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToast({ message, action });
-    toastTimerRef.current = setTimeout(() => setToast(null), duration);
-  };
-  const dismissToast = () => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToast(null);
   };
 
   const triggerHeartAnim = () => {

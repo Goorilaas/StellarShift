@@ -29,7 +29,7 @@ import BlockedManagerSheet from '../components/BlockedManagerSheet';
 import CategoryPickerSheet from '../components/CategoryPickerSheet';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { ICON } from '../components/icons';
-import Toast, { ToastAction } from '../components/Toast';
+import Toast, { useToastQueue } from '../components/Toast';
 
 import { Blessing, nextBlessingFromQueue } from '../components/blessings';
 import { changeWallpaperNow, clearHistory, getHistory, HistoryEntry, isIgnoringBatteryOptimization, PoolItem, requestIgnoreBatteryOptimization, setUnsplashKeyNative, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation } from '../services/wallpaperService';
@@ -102,8 +102,7 @@ export default function SettingsScreen() {
     const [mixCategories, setMixCategories] = useState<string[]>(DEFAULT_MIX);
     const [autoChange, setAutoChange] = useState(false);
     const [poolLoading, setPoolLoading] = useState(false);
-    const [toast, setToast] = useState<{ message: string; action?: ToastAction | null } | null>(null);
-    const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const { toast, showToast, dismissToast } = useToastQueue();
     const [history, setHistory] = useState<HistoryEntry[]>([]);
     const [blocked, setBlocked] = useState<BlockedPhoto[]>([]);
     const [blockedSheetOpen, setBlockedSheetOpen] = useState(false);
@@ -331,16 +330,6 @@ export default function SettingsScreen() {
             });
         }, [])
     );
-
-    const showToast = (msg: string, action?: ToastAction | null, duration = 3000) => {
-        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-        setToast({ message: msg, action });
-        toastTimerRef.current = setTimeout(() => setToast(null), duration);
-    };
-    const dismissToast = () => {
-        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-        setToast(null);
-    };
 
     const loadSettings = async () => {
         try {

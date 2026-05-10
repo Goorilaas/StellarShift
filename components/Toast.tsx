@@ -1,7 +1,61 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 export type ToastAction = { label: string; onPress: () => void };
+
+type QueuedToast = { message: string; action?: ToastAction | null; duration: number };
+
+/**
+ * FIFO toast queue. Prevents new toasts from clobbering an active one with
+ * an action (e.g. Undo) — the user gets to see and interact with each in turn.
+ *
+ * - showToast() always enqueues; if nothing is playing, the new one starts immediately.
+ * - When the current one's duration elapses, the next in the queue plays.
+ * - dismissToast() clears the current AND drains the queue (use after Undo press
+ *   when you don't want stale follow-ups to surface).
+ */
+export function useToastQueue() {
+    const [current, setCurrent] = useState<QueuedToast | null>(null);
+    const queueRef = useRef<QueuedToast[]>([]);
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const playingRef = useRef(false);
+
+    const showNext = useCallback(() => {
+        const next = queueRef.current.shift();
+        if (!next) {
+            playingRef.current = false;
+            setCurrent(null);
+            return;
+        }
+        playingRef.current = true;
+        setCurrent(next);
+        timerRef.current = setTimeout(() => {
+            timerRef.current = null;
+            showNext();
+        }, next.duration);
+    }, []);
+
+    const showToast = useCallback((message: string, action?: ToastAction | null, duration = 3000) => {
+        queueRef.current.push({ message, action, duration });
+        if (!playingRef.current) showNext();
+    }, [showNext]);
+
+    const dismissToast = useCallback(() => {
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
+        }
+        queueRef.current = [];
+        playingRef.current = false;
+        setCurrent(null);
+    }, []);
+
+    useEffect(() => () => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+    }, []);
+
+    return { toast: current, showToast, dismissToast };
+}
 
 export default function Toast({
     message,

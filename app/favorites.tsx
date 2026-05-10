@@ -3,7 +3,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     Dimensions,
@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import { Photo } from '../components/categories';
 import { ICON } from '../components/icons';
-import Toast, { ToastAction } from '../components/Toast';
+import Toast, { useToastQueue } from '../components/Toast';
 import { setWallpaperFromUrl } from '../services/wallpaperService';
 import { openAuthorProfile, trackDownload } from '../services/unsplashTracking';
 import { ensureGalleryPermission } from '../services/galleryPermission';
@@ -33,20 +33,9 @@ export default function FavoritesScreen() {
     const [photos, setPhotos] = useState<Photo[]>([]);
     const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
     const [setting, setSetting] = useState<boolean>(false);
-    const [toast, setToast] = useState<{ message: string; action?: ToastAction | null } | null>(null);
-    const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const { toast, showToast, dismissToast } = useToastQueue();
     const { bottom, top } = useSafeAreaInsets();
     const router = useRouter();
-
-    const showToast = (msg: string, action?: ToastAction | null, duration = 3000) => {
-        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-        setToast({ message: msg, action });
-        toastTimerRef.current = setTimeout(() => setToast(null), duration);
-    };
-    const dismissToast = () => {
-        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-        setToast(null);
-    };
 
     useFocusEffect(
         useCallback(() => {
