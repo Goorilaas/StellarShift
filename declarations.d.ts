@@ -12,6 +12,7 @@ declare module 'react-native' {
             ): Promise<void>;
             stopRotation(): Promise<void>;
             setFromUrl(url: string, target: string): Promise<boolean>;
+            setUnsplashKey(key: string): Promise<void>;
             changeNow(): Promise<boolean>;
             isIgnoringBatteryOptimization(): Promise<boolean>;
             requestIgnoreBatteryOptimization(): Promise<void>;

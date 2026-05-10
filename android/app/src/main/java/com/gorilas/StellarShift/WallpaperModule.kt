@@ -55,6 +55,17 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
     }
 
     @ReactMethod
+    fun setUnsplashKey(key: String, promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+            prefs.edit().putString("unsplashKey", key).apply()
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("KEY_ERROR", e.message, e)
+        }
+    }
+
+    @ReactMethod
     fun setFromUrl(url: String, target: String, promise: Promise) {
         CoroutineScope(Dispatchers.IO).launch {
             try {

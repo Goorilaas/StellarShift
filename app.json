@@ -2,8 +2,8 @@
   "expo": {
     "name": "StellarShift",
     "slug": "StellarShift",
-    "version": "2.1.0",
-    "versionCode": 7,
+    "version": "3.7.3",
+    "versionCode": 23,
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "stellarshift",
@@ -24,9 +24,11 @@
       "package": "com.gorilas.StellarShift",
       "permissions": [
         "android.permission.SET_WALLPAPER",
-        "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.READ_MEDIA_IMAGES"
+      ],
+      "blockedPermissions": [
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_MEDIA_VIDEO"
       ]
     },
     "web": {
@@ -46,7 +48,8 @@
             "backgroundColor": "#0a0a1a"
           }
         }
-      ]
+      ],
+      "@sentry/react-native"
     ],
     "experiments": {
       "typedRoutes": true,
