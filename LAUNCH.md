@@ -197,7 +197,7 @@ Figma: новий файл 1024×500.
 3. Один центральний з підсвіткою #FFD700 (border 3px)
 4. Справа: текст
    - **StellarShift** — Inter ExtraBold, 88px, white
-   - **Космос у твоїй кишені і не тільки** — Inter Medium, 28px, opacity 0.7
+   - **Тисячі настроїв, що оновлюються самі** / **A thousand moods, refreshing themselves** — Inter Medium, 28px, opacity 0.7
 
 Export як PNG → `feature-graphic.png` (1024×500).
 

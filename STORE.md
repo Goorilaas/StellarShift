@@ -32,7 +32,7 @@
 ### Українська
 
 ```
-🌌 Космос у твоїй кишені і не тільки.
+🌌 Тисячі настроїв, що оновлюються самі.
 
 StellarShift — це автоматична зміна шпалер, яка робить твій день іншим.
 Поки ти спиш, чай заварюється, чи автобус везе на роботу — твій телефон
@@ -89,7 +89,7 @@ StellarShift — це pet-проект, зроблений з душею в Ук
 ### English
 
 ```
-🌌 The cosmos in your pocket — and beyond.
+🌌 A thousand moods, refreshing themselves.
 
 StellarShift is an auto-rotating wallpaper app that makes every day
 look different. While you sleep, your tea brews, or the bus rolls into
@@ -146,7 +146,7 @@ breaks or you have an idea — drop a line via the email in settings.
 
 **Концепт A — «Розкладена сітка»**
 
-Темно-космічний фон (gradient `#0a0a1a` → `#1a1a2e` → `#3a2a5e`). Зліва — невелика сітка з 4-6 wallpaper-thumbnail'ів (різні категорії: галактика, гори, океан, кіберпанк) із plus-1 «активною» в центрі сітки з підсвіткою #FFD700. Справа — назва **StellarShift** великим (Inter ExtraBold, 88px) + slogan «Космос у твоїй кишені і не тільки» (Inter Medium, 28px, opacity 0.7) + dot-pagination внизу.
+Темно-космічний фон (gradient `#0a0a1a` → `#1a1a2e` → `#3a2a5e`). Зліва — невелика сітка з 4-6 wallpaper-thumbnail'ів (різні категорії: галактика, гори, океан, кіберпанк) із plus-1 «активною» в центрі сітки з підсвіткою #FFD700. Справа — назва **StellarShift** великим (Inter ExtraBold, 88px) + slogan «Тисячі настроїв, що оновлюються самі» / «A thousand moods, refreshing themselves» (Inter Medium, 28px, opacity 0.7) + dot-pagination внизу.
 
 **Концепт B — «Phone mockup»**
 
@@ -169,7 +169,7 @@ breaks or you have an idea — drop a line via the email in settings.
 5. **Каталог з відкритим search** і пошуком «space». Підпис: «Шукай за настроєм»
 6. **Settings → Сховані фото** manager. Підпис: «Те що не подобається — зникає назавжди»
 7. **About-section** з easter egg (зірочки навколо логотипа). Підпис: «Зроблено з душею» 💛
-8. **Onboarding slide 1** як hero-shot. Підпис: «Космос у твоїй кишені»
+8. **Onboarding slide 1** як hero-shot. Підпис: «Тисячі настроїв» / «A thousand moods»
 
 **Формат:** Portrait 9:16 → 1080×1920 (або 1080×2400 для devices з вищим співвідношенням). Підписи робимо як окремий шар у Figma — НЕ скріним системний UI.
 
