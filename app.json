@@ -25,6 +25,10 @@
       "permissions": [
         "android.permission.SET_WALLPAPER",
         "android.permission.READ_MEDIA_IMAGES"
+      ],
+      "blockedPermissions": [
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_MEDIA_VIDEO"
       ]
     },
     "web": {
