@@ -14,7 +14,9 @@ import type { TFunction } from 'i18next';
  * Повертає true тільки коли в кінці маємо granted.
  */
 export async function ensureGalleryPermission(t: TFunction): Promise<boolean> {
-    const current = await MediaLibrary.getPermissionsAsync();
+    // Granular: запитуємо ТІЛЬКИ photo permission (не audio/video). Defense-in-depth
+    // на випадок якщо колись інший transitive lib потягне декларацію audio/video у манифест.
+    const current = await MediaLibrary.getPermissionsAsync(false, ['photo']);
     if (current.granted) return true;
 
     if (!current.canAskAgain) {
@@ -44,6 +46,6 @@ export async function ensureGalleryPermission(t: TFunction): Promise<boolean> {
     });
     if (!rationaleAccepted) return false;
 
-    const next = await MediaLibrary.requestPermissionsAsync();
+    const next = await MediaLibrary.requestPermissionsAsync(false, ['photo']);
     return next.granted;
 }

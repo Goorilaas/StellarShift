@@ -24,6 +24,7 @@ import Toast, { useToastQueue } from '../components/Toast';
 import { setWallpaperFromUrl } from '../services/wallpaperService';
 import { openAuthorProfile, trackDownload } from '../services/unsplashTracking';
 import { ensureGalleryPermission } from '../services/galleryPermission';
+import { randomCheer } from '../services/cheer';
 
 const { width, height } = Dimensions.get('window');
 const IMG_SIZE = (width - 36) / 2;
@@ -88,7 +89,7 @@ export default function FavoritesScreen() {
         try {
             const granted = await ensureGalleryPermission(t);
             if (!granted) return;
-            showToast(t('favorites.toast.downloading'));
+            showToast(randomCheer(t));
             const dest = (FileSystem.cacheDirectory ?? '') + `stellarshift_${photo.id}.jpg`;
             const { uri } = await FileSystem.downloadAsync(photo.urls.regular, dest);
             await MediaLibrary.saveToLibraryAsync(uri);

@@ -7,6 +7,13 @@
     "delete": "Delete",
     "confirm": "Confirm"
   },
+  "cheer": {
+    "1": "✨ Great choice!",
+    "2": "✨ Good eye!",
+    "3": "✨ Beautiful pick!",
+    "4": "✨ Magical!",
+    "5": "✨ With taste!"
+  },
   "perm": {
     "gallery": {
       "rationaleTitle": "Gallery access",
@@ -177,7 +184,6 @@
     "toast": {
       "applied": "✅ Wallpaper set!",
       "applyFail": "❌ Failed to set wallpaper",
-      "downloading": "⏳ Downloading...",
       "saved": "✅ Saved to gallery!",
       "downloadFail": "❌ Failed to download",
       "shareUnavailable": "❌ Sharing not available",
@@ -219,7 +225,6 @@
       "applied": "✅ Wallpaper set!",
       "applyFail": "❌ Failed to set",
       "removed": "💔 Removed from favorites",
-      "downloading": "⏳ Downloading...",
       "saved": "✅ Saved to gallery!",
       "downloadFail": "❌ Failed to download",
       "shareUnavailable": "❌ Sharing not available",

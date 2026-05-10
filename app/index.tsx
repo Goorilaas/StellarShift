@@ -28,6 +28,7 @@ import { Blessing, nextBlessingFromQueue } from '../components/blessings';
 import { Category, CATEGORIES, CHAOS_CATEGORY, CHAOS_QUERIES, filterNoPeople, Photo, sortCategoriesByLabel } from '../components/categories';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { ensureGalleryPermission } from '../services/galleryPermission';
+import { randomCheer } from '../services/cheer';
 import { getUnsplashKey, useUnsplashKey } from '../services/unsplashKey';
 import { ICON } from '../components/icons';
 import SkeletonCard from '../components/SkeletonCard';
@@ -436,7 +437,7 @@ export default function HomeScreen() {
     try {
       const granted = await ensureGalleryPermission(t);
       if (!granted) return;
-      showToast(t('catalog.toast.downloading'));
+      showToast(randomCheer(t));
       const dest = (FileSystem.cacheDirectory ?? '') + `stellarshift_${photo.id}.jpg`;
       const { uri } = await FileSystem.downloadAsync(photo.urls.regular, dest);
       await MediaLibrary.saveToLibraryAsync(uri);
