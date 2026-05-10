@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
+    BackHandler,
     Dimensions,
     FlatList,
     NativeScrollEvent,
@@ -57,6 +58,21 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
         const i = Math.round(e.nativeEvent.contentOffset.x / SCREEN_W);
         if (i !== index) setIndex(i);
     };
+
+    // Android system back button:
+    // - на слайдах 1+ — повертає на попередній слайд
+    // - на слайді 0 — поглинаємо подію щоб не закрити застосунок випадково
+    //   (юзер має кнопку «Пропустити» для явного виходу).
+    useEffect(() => {
+        const onBack = () => {
+            if (index > 0) {
+                listRef.current?.scrollToIndex({ index: index - 1, animated: true });
+            }
+            return true; // consumed
+        };
+        const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
+        return () => sub.remove();
+    }, [index]);
 
     const isLast = index === SLIDES.length - 1;
 

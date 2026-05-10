@@ -13,6 +13,7 @@
 - **Empty state на гриді.** Якщо після завантаження список фото порожній (помилка, нічого не знайдено) — замість мовчазного порожнього екрану показуємо центрований блок: search-іконка, «Тут поки порожньо», підказка, і кнопка «Спробувати ще» з refresh-іконкою. Кнопка тригерить правильний loader (mix / chaos / категорія). i18n UA + EN.
 - **Author attribution в Улюблених.** В preview-modal у favorites раніше не було жодної згадки автора фото — порушення Unsplash API ToS і ризик відмови від модерації. Тепер у top-left видно chip з аватаром, ім'ям та `@username · Unsplash ›`; тап → openAuthorProfile (UTM-tagged профіль).
 - **Запит дозволу на музику/відео прибрано.** При спробі зберегти фото в галерею Android запитував `READ_MEDIA_AUDIO` (бо `expo-media-library` декларує всі media-permission'и). Додано `blockedPermissions` у `app.json` для `READ_MEDIA_AUDIO` і `READ_MEDIA_VIDEO` — у манифесті залишається тільки `READ_MEDIA_IMAGES`. ⚠️ Потрібен native rebuild (`expo prebuild --clean` + `expo run:android` або `eas build`).
+- **Onboarding system-back handler.** Android system back на онбордингу раніше міг закрити застосунок замість попереднього слайду. Тепер на слайдах 1+ — повертає на попередній, на слайді 0 — поглинає подію щоб не закрити застосунок випадково (для явного виходу є кнопка «Пропустити»). `BackHandler.addEventListener('hardwareBackPress', ...)` з cleanup.
 
 ## 3.7.2 — 2026-04-30
 
