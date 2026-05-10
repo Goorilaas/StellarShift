@@ -11,8 +11,10 @@ import Onboarding, { ONBOARDING_KEY } from '../components/Onboarding';
 import { initI18n } from '../i18n';
 import { UnsplashKeyProvider, useUnsplashKey } from '../services/unsplashKey';
 
-// Dev-only шум від expo-keep-awake (тригериться при швидких state-переходах activity).
-// Не блокує функціонал, у release build не з'являється.
+// Dev-only шум від expo-keep-awake. Ми його НЕ викликаємо у власному коді —
+// warning приходить з expo internals (router / dev-client) під час hot-reload
+// state-переходів activity. У release build не зʼявляється. Suppress тут — це
+// рекомендований Expo workaround, не наш техдовг.
 LogBox.ignoreLogs(['Unable to activate keep awake']);
 
 // Sentry — ініціалізація на module-load перед будь-яким рендером.
