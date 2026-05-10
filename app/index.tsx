@@ -570,7 +570,7 @@ export default function HomeScreen() {
           }}>
             <SvgXml xml={LOGO_SVG} width={36} height={36} />
           </Animated.View>
-          <Text style={styles.title}>{t('catalog.title')}</Text>
+          <Text style={styles.title}>{t('catalog.brand')}</Text>
           {logoStars.map(s => (
             <Animated.View
               key={s.id}

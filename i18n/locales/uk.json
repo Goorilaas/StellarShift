@@ -163,6 +163,7 @@
   },
   "catalog": {
     "title": "Каталог",
+    "brand": "StellarShift",
     "searchPlaceholder": "Пошук шпалер...",
     "shuffle": "Перемішати",
     "searchLabel": "🔍 Пошук",

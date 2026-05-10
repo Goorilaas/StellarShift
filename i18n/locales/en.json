@@ -163,6 +163,7 @@
   },
   "catalog": {
     "title": "Catalog",
+    "brand": "StellarShift",
     "searchPlaceholder": "Search wallpapers...",
     "shuffle": "Shuffle",
     "searchLabel": "🔍 Search",
