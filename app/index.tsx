@@ -25,7 +25,7 @@ import {
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { Blessing, nextBlessingFromQueue } from '../components/blessings';
-import { Category, CATEGORIES, CHAOS_CATEGORY, CHAOS_QUERIES, filterNoPeople, Photo } from '../components/categories';
+import { Category, CATEGORIES, CHAOS_CATEGORY, CHAOS_QUERIES, filterNoPeople, Photo, sortCategoriesByLabel } from '../components/categories';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { ensureGalleryPermission } from '../services/galleryPermission';
 import { getUnsplashKey, useUnsplashKey } from '../services/unsplashKey';
@@ -101,7 +101,7 @@ const LOGO_SVG = `<svg width="100" height="100" viewBox="0 0 100 100" xmlns="htt
 </svg>`;
 
 export default function HomeScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { trigger403 } = useUnsplashKey();
   const [activeCategory, setActiveCategory] = useState<Category>(CATEGORIES[0]);
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -206,13 +206,17 @@ export default function HomeScreen() {
     }, [])
   );
 
-  const categoryList = chaosUnlocked
-    ? [
-        ...CATEGORIES.filter(c => c.id === 'mix'),
-        CHAOS_CATEGORY,
-        ...CATEGORIES.filter(c => c.id !== 'mix'),
-      ]
-    : CATEGORIES;
+  const categoryList = sortCategoriesByLabel(
+    chaosUnlocked
+      ? [
+          ...CATEGORIES.filter(c => c.id === 'mix'),
+          CHAOS_CATEGORY,
+          ...CATEGORIES.filter(c => c.id !== 'mix'),
+        ]
+      : CATEGORIES,
+    t,
+    i18n.language,
+  );
 
   useEffect(() => {
     return () => abortRef.current?.abort();

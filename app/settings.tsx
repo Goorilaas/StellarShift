@@ -21,7 +21,7 @@ import {
     View,
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
-import { CATEGORIES, CHAOS_CATEGORY, CHAOS_QUERIES, FAVORITES_CATEGORY, filterNoPeople } from '../components/categories';
+import { CATEGORIES, CHAOS_CATEGORY, CHAOS_QUERIES, FAVORITES_CATEGORY, filterNoPeople, sortCategoriesByLabel } from '../components/categories';
 import { BlockedPhoto, clearBlocked, getBlocked, getBlockedIds, setBlockedAll, unblockPhoto } from '../services/blocked';
 import { clearUserKey, getUnsplashKey, getUserKey, setUserKey, useUnsplashKey, validateKey } from '../services/unsplashKey';
 import { openUnsplashHome } from '../services/unsplashTracking';
@@ -79,7 +79,7 @@ const APPLY_TO = [
 type ValidStatus = 'idle' | 'checking' | 'ok' | 'invalid' | 'rate_limit' | 'network';
 
 export default function SettingsScreen() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const [lang, setLang] = useState<Lang>(getAppLanguage());
     const params = useLocalSearchParams<{ scrollTo?: string }>();
     const { hasUserKey, refresh: refreshKey } = useUnsplashKey();
@@ -126,19 +126,20 @@ export default function SettingsScreen() {
     const starIdRef = useRef(0);
     const blessingQueueRef = useRef<Blessing[]>([]);
 
-    // Mix перший. Потім Улюблені (спецкатегорія з AsyncStorage). Потім Chaos якщо розблокований. Далі решта.
-    const categoryList = [
+    // Mix перший. Потім Улюблені (спецкатегорія з AsyncStorage). Потім Chaos якщо розблокований.
+    // Решта — алфавіт за поточною locale (sortCategoriesByLabel залишає stable-id у вхідному порядку).
+    const categoryList = sortCategoriesByLabel([
         ...CATEGORIES.filter(c => c.id === 'mix'),
         FAVORITES_CATEGORY,
         ...(chaosUnlocked ? [CHAOS_CATEGORY] : []),
         ...CATEGORIES.filter(c => c.id !== 'mix'),
-    ];
+    ], t, i18n.language);
     // У "Що міксувати" Mix не показуємо, але Улюблені і Chaos (якщо розблокований) — показуємо
-    const mixCategoryList = [
+    const mixCategoryList = sortCategoriesByLabel([
         FAVORITES_CATEGORY,
         ...(chaosUnlocked ? [CHAOS_CATEGORY] : []),
         ...CATEGORIES.filter(c => c.id !== 'mix'),
-    ];
+    ], t, i18n.language);
 
     // ConfirmDialog для re-lock easter
     const [relockOpen, setRelockOpen] = useState(false);

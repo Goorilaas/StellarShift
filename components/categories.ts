@@ -69,12 +69,45 @@ const _CATEGORIES_RAW = [
     { id: 'rural', labelKey: 'categories.rural', label: 'Сільське', query: 'rural countryside village farm cottage field', icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2,8 L8,3 L14,8 L14,14 L2,14 Z" fill="#BA7517" opacity="0.95"/><path d="M2,8 L8,3 L14,8" stroke="#2C2C2A" stroke-width="0.6" fill="none"/><rect x="6.5" y="9.5" width="3" height="4.5" fill="#3B6D11" opacity="0.9"/><rect x="3.5" y="9.5" width="2" height="2" fill="#FFD700" opacity="0.85"/><rect x="10.5" y="9.5" width="2" height="2" fill="#FFD700" opacity="0.85"/><line x1="0" y1="14" x2="16" y2="14" stroke="#639922" stroke-width="1.5"/></svg>` },
 ];
 
+// Mix залишається першим. Решта — за declaration order у `_CATEGORIES_RAW`.
+// Алфавітне сортування виконується НЕ тут, а в кожному render-сайті через
+// `sortCategoriesByLabel(t, cats)` — щоб порядок відповідав поточній locale юзера
+// (UA-алфавіт для UA, EN-алфавіт для EN, etc.). Інакше EN-юзер бачить «Abstract,
+// Mountains, Architecture...» — UA-альфабет, що нічого не означає.
 export const CATEGORIES = [
     ..._CATEGORIES_RAW.filter(c => c.id === 'mix'),
-    ..._CATEGORIES_RAW
-        .filter(c => c.id !== 'mix')
-        .sort((a, b) => a.label.localeCompare(b.label, 'uk')),
+    ..._CATEGORIES_RAW.filter(c => c.id !== 'mix'),
 ];
+
+/**
+ * Sort categories by their localized label using the current i18n locale's
+ * collation rules. `mix` and any optional special categories (favorites, chaos)
+ * are kept in their original order — only the «regular» tail gets re-sorted.
+ *
+ * Pass the result of `useTranslation()`'s `t` function and the i18n.language.
+ * Special categories without `labelKey` (e.g. FAVORITES_CATEGORY) fall back to
+ * their hardcoded `label` field — those are stable across locales by design.
+ */
+export function sortCategoriesByLabel<T extends { id: string; labelKey?: string; label: string }>(
+    cats: T[],
+    t: (key: string) => string,
+    locale: string = 'uk',
+): T[] {
+    // Anything with a stable position (mix / favorites / chaos) should stay where it was —
+    // sort applies only to the «query-backed» tail.
+    const STABLE_IDS = new Set(['mix', 'favorites', 'chaos']);
+    const stable = cats.filter(c => STABLE_IDS.has(c.id));
+    const rest = cats.filter(c => !STABLE_IDS.has(c.id));
+    const collator = new Intl.Collator(locale, { sensitivity: 'base' });
+    rest.sort((a, b) => {
+        const la = a.labelKey ? t(a.labelKey) : a.label;
+        const lb = b.labelKey ? t(b.labelKey) : b.label;
+        return collator.compare(la, lb);
+    });
+    // Preserve original ordering of stable categories relative to each other —
+    // they're inserted in order they appear in input array.
+    return [...stable, ...rest];
+}
 
 // Прихована категорія — розблоковується через пасхалку (7 тапів по лого).
 // Не входить в CATEGORIES за замовчуванням; додається в каталог тільки
