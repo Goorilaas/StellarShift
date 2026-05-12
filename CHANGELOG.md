@@ -1,5 +1,42 @@
 # Changelog
 
+## 3.7.4 — 2026-05-12
+
+Polish-реліз після реального тесту на пристрої. Брендинг, контент, manifest — все що різало око при щоденному використанні. Без нових великих фіч; замість цього — десяток дрібних правок, кожна про увагу до деталей.
+
+### Додано
+- **Cheer toast** при збереженні в галерею і встановленні шпалери. Замість сухого «⏳ Завантажуємо…» — рандомна тепла фраза з пулу 5 (UA + EN) через `services/cheer.ts`. Set-wallpaper теж тепер cheer'ить миттєво при тапі, перед фінальним «✅ Красу встановлено». Брендова мікро-нагорода замість стерильного індикатора прогресу.
+- **[docs/feature-graphic-brief.md](docs/feature-graphic-brief.md)** — ТЗ для дизайнера / AI на Play Store feature graphic 1024×500: бренд-палітра, типографіка, 3 варіанти композиції (A/B/C), AI-prompts для Midjourney / Imagen / Leonardo, чек-лист перед export. Готове до paste.
+- **README.md** переписано з чотирьох правил розробки на справжній GitHub-readme: tagline, фічі, стек, dev-команди, структура, індекс документації. Правила лишились лише у [CLAUDE.md](CLAUDE.md).
+- **`scripts/regen-adaptive-foreground.js`** — sharp-скрипт для регенерації adaptive-icon foreground у всіх mipmap-щільностях. Ідемпотентний (через `.original.png` backup).
+
+### Змінено — бренд і копія
+- **Slogan rebrand.** «Космос у твоїй кишені і не тільки» був релікт з space-only концепту — суфікс «і не тільки» виглядав як вибачення за розширення каталогу. Заміна: **«Тисячі настроїв, що оновлюються самі»** / **«A thousand moods, refreshing themselves»** — симетричні 39 символів, схоплюють і variety, і автоматизм. Оновлено в `STORE.md` (UA + EN full descriptions + feature graphic + screenshot caption) і `LAUNCH.md`.
+- **About-footer** перебудовано на симетричні дзеркальні рядки: **«Зроблено з ❤️ в Україні»** / **«Made with ❤️ from Ukraine»**. Попереднє «Розроблено з 🤝 Братаном» було inside-joke для нашої розмови — milue для cold-reading stranger'а в Play Store. ICON_HANDSHAKE прибрано, серце — єдина іконка.
+- **«Зроблено» → «Створено»** на UA після перегляду живого рендеру: «Створено» читається як творчість, «Зроблено» — як виробництво. Gap між текстом і серцем затиснуто 8→4px (внутрішній padding SVG додавав фантомні 4px).
+- **Cheer phrase R2** після А/В: UA «Гарне око!» → «Бачиш красу!» (буквальна калька з англ. «good eye» не звучить природно укр), EN «Good eye!» → «You see beauty!» (м'якше, ближче до брендового тону).
+
+### Змінено — контент
+- **Категорія Anime прибрана.** Unsplash під query `anime` повертає переважно cosplay-портрети (відфільтровуються `excludePeople`, лишається крихітний пул) + низькоякісний AI-art. Тримали з v3.1.0 у надії на покращення queries — не сталось. Краще прибрати ніж розчаровувати. Юзери з anime в `mixCategories`/`activeCategories` тихо втратять цей вибір (CATEGORIES.find() для відсутнього id повертає undefined, ігнорується). Видалено з `components/categories.ts`, `i18n/locales/*`, `STORE.md`, `LAUNCH.md` Unsplash application.
+- **Catalog tab name** — «StellarShift» (бренд) → **«Каталог»** / **«Catalog»** (функція). При v3.7.0 i18n-міграції tab tab випадково ребрендовано — втратилась паралель з «Улюблені» / «Налаштування». Бренд лишається в title-row каталогу через нову окрему ключ `catalog.brand` (попередня правка `catalog.title` плутала tab і header — розділили на два ключі).
+- **Сортування категорій** тепер по локалі. Раніше `_CATEGORIES_RAW.sort(localeCompare('uk'))` запікав UA-алфавіт у module load — англомовний юзер бачив «Abstract / Architecture / Mountains / Rain / Food» (українська абетка спроєктована на англ. labels = безсенс). Helper `sortCategoriesByLabel(cats, t, locale)` робить sort на render-time через `Intl.Collator(i18n.language)`. Mix / Favorites / Chaos лишаються на семантичних позиціях (не алфавітних). Викликають: catalog top-bar, settings auto-change picker, settings mix picker. Автоматично покриває майбутні PL / DE / ES.
+
+### Змінено — UX
+- **Bug-2 hint:** після того як юзер дав permission через системні «Налаштування», JS не отримував callback'у — здавалось що нічого не сталось. Replacement: текст Alert'а тепер закінчується «…тоді натисни Зберегти ще раз». Дешевший fix ніж AppState listener + saved-intent state для краєвого випадку.
+- **`granularPermissions: ['photo']`** в `services/galleryPermission.ts` — defense-in-depth, навіть якщо майбутня lib потягне audio/video у manifest, наш runtime call просить тільки фото.
+
+### Виправлено
+- **Manifest cleanup.** `READ_MEDIA_AUDIO`, `READ_MEDIA_VIDEO`, `READ_MEDIA_VISUAL_USER_SELECTED` стирались з AndroidManifest.xml прямою surgical-правкою. `app.json blockedPermissions` був documentation-only бо `/android/` папка трекається (custom Kotlin) — `expo prebuild` skip'ається, manifest не регенерується. ⚠️ Потрібен повний rebuild (Gradle / EAS).
+- **Adaptive-icon foreground** перемасштабовано до 80% canvas (819×819 на прозорому 1024×1024). One UI / Pixel launcher squircle-mask обрізав ~17% — orbits + stars зникали, лишався тільки центральний blob. Регенерація через `scripts/regen-adaptive-foreground.js`; для всіх mipmap-щільностей webp. Picked up наступним EAS build автоматично.
+- **GitHub Pages 404.** `_config.yml baseurl: /StellarShift` + Liquid `{{ '/path/' | relative_url }}` у `docs/index.md`, `privacy.md`, `privacy-en.md`. Project repos на GH Pages серверять'ся під `/REPONAME/`, наші absolute paths `/privacy/` падали в root domain і давали 404. App-side URL у `settings.tsx` уже хардкодив повну форму — не торкався.
+
+### Інфраструктура
+- **`.gitignore` harden** — defensive patterns щоб майбутній `git add -A` не зловив: `**/.idea/`, `android/app/.cxx/`, `*.aab`, `*.apk`, `Thumbs.db`, `desktop.ini`, `*.log`, `img/`, `blocked-preview.html`.
+- **Untrack `img/`** (8 jpg-скріншотів) + видалено `blocked-preview.html` (Sauron icon variants — артефакт v3.6.0, рішення давно прийнято і в CHANGELOG записано). Scratch-папка лишається локально для re-edit'ів.
+
+### Не зроблено в цій версії (свідомо)
+- **Soul wave** (blessing pool 10→20 UA + 6→20 EN, launch-greeting toast, PL/DE/ES прогон) — план зафіксовано в roadmap (070bab2), але реалізація не входила в polish-sweep. Перенесено в наступну окрему версію.
+
 ## 3.7.3 — 2026-05-01
 
 Стабілізаційний реліз. Реальне тестування на пристрої виявило кілька больових точок — ловимо їх по черзі, з діагностикою першою.

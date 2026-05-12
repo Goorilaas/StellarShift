@@ -86,7 +86,22 @@
 - [→] Generate release keystore + backup в bitwarden — інструкція готова в [RELEASE.md](RELEASE.md), виконуєш сам коли підемо на launch
 - [x] ProGuard/R8 rules — minify+shrink ввімкнено, keep-rules для `com.gorilas.StellarShift.**`, WorkManager, Kotlin metadata, Sentry SourceFile
 
-#### 🧪 v3.7.3 — Beta + Unsplash submission (2 дні)
+#### 🪞 v3.7.4 — Polish wave ✅
+- [x] Slogan rebrand → «Тисячі настроїв, що оновлюються самі» / «A thousand moods, refreshing themselves»
+- [x] About-footer симетричне «Зроблено з ❤️ в Україні» / «Made with ❤️ from Ukraine»
+- [x] Cheer toast на save-to-gallery + set-wallpaper (рандомна фраза з пулу 5)
+- [x] Drop Anime category (Unsplash content mismatch — лишали з v3.1.0 даремно)
+- [x] Catalog tab «Каталог» / «Catalog» (бренд лишився в title через окремий ключ `catalog.brand`)
+- [x] Sort categories by current-locale alphabet (Intl.Collator замість хардкоду UA)
+- [x] Adaptive-icon foreground rescale 80% — launcher safe-zone fix
+- [x] Manifest cleanup: прибрано READ_MEDIA_AUDIO / VIDEO / VISUAL_USER_SELECTED через surgical edit (custom Kotlin folder bypass-ить expo prebuild)
+- [x] Bug-2 fix: Alert text підказує натиснути «Зберегти» знову після grant'а через системні налаштування
+- [x] [feature-graphic-brief.md](docs/feature-graphic-brief.md) ТЗ для дизайнера/AI
+- [x] README rewrite з rules-doc у справжній GitHub README
+- [x] GitHub Pages baseurl fix (404 на privacy URL до v3.7.4)
+- [→] Soul wave (blessing pool expansion + launch greeting + PL/DE/ES roadmap) — план у roadmap, реалізація в наступну окрему версію
+
+#### 🧪 v3.7.5 — Beta + Unsplash submission (2 дні)
 - [ ] Production build через EAS
 - [ ] Internal testing track в Play Console (20 тестерів)
 - [ ] Data Safety Form в Play Console
