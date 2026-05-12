@@ -244,7 +244,7 @@
 - [ ] Hidden achievements ("100 шпалер змінено", "30 днів autoChange")
 
 ## ⚙️ Технічний борг / cleanup
-- [ ] Прибрати `app-example/` папку (boilerplate, шумить TS errors)
+- [x] Прибрати `app-example/` папку (boilerplate, шумить TS errors) — папка вже не існує, запис у `.gitignore` лишився як no-op
 - [ ] Прибрати Wi-Fi-only / Charging-only toggles з Settings (друг каже зайве)
 - [ ] Unit tests для `services/blocked.ts`, `services/unsplashKey.ts`
 - [ ] E2E тести через Maestro / Detox
