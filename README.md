@@ -1,48 +1,87 @@
-1. Think Before Coding
-Don't assume. Don't hide confusion. Surface tradeoffs.
+# StellarShift
 
-Before implementing:
+> **Тисячі настроїв, що оновлюються самі.**
 
-State your assumptions explicitly. If uncertain, ask.
-If multiple interpretations exist, present them - don't pick silently.
-If a simpler approach exists, say so. Push back when warranted.
-If something is unclear, stop. Name what's confusing. Ask.
-2. Simplicity First
-Minimum code that solves the problem. Nothing speculative.
+Android-застосунок, який автоматично змінює шпалери на свіжі HD-фото з Unsplash. Без реклами, без акаунтів, без трекерів. Pet-проєкт, зроблений в Україні.
 
-No features beyond what was asked.
-No abstractions for single-use code.
-No "flexibility" or "configurability" that wasn't requested.
-No error handling for impossible scenarios.
-If you write 200 lines and it could be 50, rewrite it.
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+---
 
-3. Surgical Changes
-Touch only what you must. Clean up only your own mess.
+## ✨ Що вміє
 
-When editing existing code:
+- **Автозміна шпалер** за розкладом: 15 хвилин → день, на вибір.
+- **20+ категорій** HD-фото з Unsplash: космос, природа, кіберпанк, архітектура, океан, ч/б тощо.
+- **Улюблені** з подвійним тапом, окремий екран з обраним.
+- **Цільовий екран:** головний, локскрін або обидва.
+- **Сховати фото** яке не подобається — більше ніколи не з'явиться.
+- **BYO Unsplash API key** для зняття rate-limit'у.
+- **Wi-Fi / charging** фільтри для автозміни (опційно).
+- **i18n:** українська + англійська, авто-детект з override.
+- **Локально first:** усі дані тільки в AsyncStorage пристрою.
 
-Don't "improve" adjacent code, comments, or formatting.
-Don't refactor things that aren't broken.
-Match existing style, even if you'd do it differently.
-If you notice unrelated dead code, mention it - don't delete it.
-When your changes create orphans:
+---
 
-Remove imports/variables/functions that YOUR changes made unused.
-Don't remove pre-existing dead code unless asked.
-The test: Every changed line should trace directly to the user's request.
+## 🛠 Стек
 
-4. Goal-Driven Execution
-Define success criteria. Loop until verified.
+- **Expo SDK 54** + React Native + expo-router (file-based tabs).
+- **Native Kotlin module** — `WallpaperModule` + `WallpaperWorker` (CoroutineWorker) над `WorkManager` для фонової зміни шпалер. Прокидається після reboot через `BootReceiver`.
+- **i18next + react-i18next** — без `expo-localization`, детекція через вбудоване `Intl`.
+- **@sentry/react-native** — crash reporting через config plugin, DSN з `.env`.
+- **AsyncStorage** (JS) + `SharedPreferences` (Kotlin) — поділ стану між мовами.
+- **TypeScript** + ESLint.
 
-Transform tasks into verifiable goals:
+Тільки Android. iOS не планується.
 
-"Add validation" → "Write tests for invalid inputs, then make them pass"
-"Fix the bug" → "Write a test that reproduces it, then make it pass"
-"Refactor X" → "Ensure tests pass before and after"
-For multi-step tasks, state a brief plan:
+---
 
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+## 🚀 Розробка
+
+```bash
+npm install
+npx expo start            # JS-only зміни
+npx expo run:android      # повний rebuild (Kotlin / manifest / assets)
+npm run lint
+```
+
+`.env` (gitignored) — взяти з `.env.example`:
+
+```
+EXPO_PUBLIC_UNSPLASH_KEY=...
+EXPO_PUBLIC_SENTRY_DSN=...
+```
+
+Автоматичних тестів немає.
+
+---
+
+## 📂 Структура
+
+```
+app/                tabs (index / favorites / settings) + _layout
+app/components/     UI-компоненти, SVG-іконки, категорії, blessings
+app/services/       blocked, unsplashKey, unsplashTracking, galleryPermission
+i18n/               locales/{uk,en}.json + init
+android/.../com/gorilas/StellarShift/   native Kotlin
+docs/               Privacy Policy (UA+EN), feature-graphic brief
+```
+
+Архітектурні деталі та правила розробки — у [CLAUDE.md](CLAUDE.md).
+
+---
+
+## 📚 Документація
+
+- [CHANGELOG.md](CHANGELOG.md) — повна історія релізів.
+- [roadmap.md](roadmap.md) — куди йдемо: Phase 3 (Beta + Unsplash submit) → 3.8.0 public launch → 3.9.0 Premium → 4.0.0 Live Wallpaper.
+- [STORE.md](STORE.md) — тексти для Play Store listing (UA + EN).
+- [LAUNCH.md](LAUNCH.md) — submission-day runbook.
+- [RELEASE.md](RELEASE.md) — інструкція по keystore.
+- [docs/privacy.md](docs/privacy.md) — Політика конфіденційності (UA).
+- [docs/privacy-en.md](docs/privacy-en.md) — Privacy Policy (EN).
+
+---
+
+## 📧 Контакт
+
+[sergholubchuk@gmail.com](mailto:sergholubchuk@gmail.com)
+
+Зроблено з ❤️ в Україні.
