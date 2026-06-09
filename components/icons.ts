@@ -197,4 +197,104 @@ export const ICON = {
     <circle cx="32" cy="32" r="2.8" fill="#AFA9EC"/>
     <circle cx="32" cy="32" r="1.2" fill="white"/>
   </svg>`,
+
+  // ── Soul wave (v3.7.5) — нові blessing-іконки ──
+
+  // Зоряний пил — розсип частинок по діагоналі
+  stardust: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="5" cy="6" r="1.1" fill="#FFD700"/><circle cx="9" cy="4" r="0.7" fill="#AFA9EC"/>
+    <circle cx="13" cy="7" r="0.9" fill="#7F77DD"/><circle cx="7" cy="10" r="0.6" fill="#fff"/>
+    <circle cx="11" cy="11" r="1.2" fill="#FFD700"/><circle cx="15" cy="12" r="0.7" fill="#AFA9EC"/>
+    <circle cx="6" cy="14" r="0.8" fill="#7F77DD"/><circle cx="10" cy="15" r="0.6" fill="#fff"/>
+    <circle cx="14" cy="16" r="0.9" fill="#FFD700"/>
+  </svg>`,
+
+  // Місяць-колиска тримає зірку — "Всесвіт тримає тобі місце"
+  moonCradle: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M11 3 A7 7 0 1 0 11 17 A5.5 5.5 0 1 1 11 3 Z" fill="#7F77DD"/>
+    <path d="M13 8 L13.7 10 L15.7 10.3 L13.7 10.6 L13 12.6 L12.3 10.6 L10.3 10.3 L12.3 10 Z" fill="#FFD700"/>
+  </svg>`,
+
+  // Маяк — концентричні дуги світла назовні
+  beacon: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="10" cy="10" r="2" fill="#FFD700"/><circle cx="10" cy="10" r="1" fill="#fff"/>
+    <path d="M10 4 A6 6 0 0 1 16 10" stroke="#FFD700" stroke-width="1.1" stroke-linecap="round" opacity="0.7"/>
+    <path d="M10 1 A9 9 0 0 1 19 10" stroke="#AFA9EC" stroke-width="1" stroke-linecap="round" opacity="0.4"/>
+    <path d="M10 16 A6 6 0 0 1 4 10" stroke="#FFD700" stroke-width="1.1" stroke-linecap="round" opacity="0.7"/>
+    <path d="M10 19 A9 9 0 0 1 1 10" stroke="#AFA9EC" stroke-width="1" stroke-linecap="round" opacity="0.4"/>
+  </svg>`,
+
+  // Щит із зіркою — "Всесвіт за тебе"
+  cosmicShield: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M10 2 L17 5 V10 C17 14.5 13.5 17.5 10 18.5 C6.5 17.5 3 14.5 3 10 V5 Z" fill="#534AB7" stroke="#7F77DD" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M10 6.5 L11 9 L13.5 9.3 L11.6 11 L12.1 13.5 L10 12.2 L7.9 13.5 L8.4 11 L6.5 9.3 L9 9 Z" fill="#FFD700"/>
+  </svg>`,
+
+  // Пунктирна стежка до зірки — "ближче до мрії"
+  pathToStar: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3 17 L7 13 L10 14 L14 8" stroke="#7F77DD" stroke-width="1.2" stroke-linecap="round" stroke-dasharray="0.2 2.2" opacity="0.85"/>
+    <circle cx="3" cy="17" r="1" fill="#AFA9EC"/>
+    <path d="M15 3 L16 6 L19 6.5 L16.7 8.3 L17.3 11 L15 9.5 L12.7 11 L13.3 8.3 L11 6.5 L14 6 Z" fill="#FFD700"/>
+  </svg>`,
+
+  // Орбіта з сердечком — "орбіта лагідна"
+  gentleOrbit: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="10" cy="10" rx="8" ry="3.8" stroke="#7F77DD" stroke-width="1.1" transform="rotate(-20 10 10)" opacity="0.9"/>
+    <path d="M15.5 6.2 C15.5 5.3 14.2 5 14 6 C13.8 5 12.5 5.3 12.5 6.2 C12.5 7.1 14 8 14 8 C14 8 15.5 7.1 15.5 6.2 Z" fill="#cc3355"/>
+    <circle cx="10" cy="10" r="1.6" fill="#534AB7"/>
+  </svg>`,
+
+  // Сузір'я — з'єднані зорі
+  constellation: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3 5 L8 8 L13 4 L17 9 L11 13 L6 11" stroke="#7F77DD" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+    <circle cx="3" cy="5" r="1.1" fill="#AFA9EC"/><circle cx="8" cy="8" r="0.9" fill="#fff"/>
+    <circle cx="13" cy="4" r="1.2" fill="#FFD700"/><circle cx="17" cy="9" r="1" fill="#AFA9EC"/>
+    <circle cx="11" cy="13" r="1.3" fill="#FFD700"/><circle cx="6" cy="11" r="0.9" fill="#7F77DD"/>
+  </svg>`,
+
+  // Місяць над тихою водою — "тиша і світло"
+  stillness: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 3 A6 6 0 1 0 12 13 A4.7 4.7 0 1 1 12 3 Z" fill="#AFA9EC"/>
+    <line x1="3" y1="16" x2="17" y2="16" stroke="#7F77DD" stroke-width="1" stroke-linecap="round" opacity="0.7"/>
+    <line x1="5" y1="18.2" x2="15" y2="18.2" stroke="#7F77DD" stroke-width="0.8" stroke-linecap="round" opacity="0.4"/>
+  </svg>`,
+
+  // Зірка-годинник — "зорі звіряють час по тобі"
+  starClock: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="10" cy="11.5" r="6" stroke="#7F77DD" stroke-width="1.1" fill="#1a1050"/>
+    <path d="M10 11.5 L10 8.5" stroke="#fff" stroke-width="1" stroke-linecap="round"/>
+    <path d="M10 11.5 L12.5 12.5" stroke="#FFD700" stroke-width="1" stroke-linecap="round"/>
+    <path d="M10 1 L10.8 3.2 L13 3.5 L11.2 5 L11.7 7.2 L10 6 L8.3 7.2 L8.8 5 L7 3.5 L9.2 3.2 Z" fill="#FFD700"/>
+  </svg>`,
+
+  // Кругова стрілка + блиск — "добро повертається"
+  goodReturns: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M16 7 A7 7 0 1 0 17 11.5" stroke="#1D9E75" stroke-width="1.4" stroke-linecap="round" fill="none"/>
+    <path d="M15.6 2.8 L16.6 7 L12.6 6 Z" fill="#1D9E75"/>
+    <path d="M10 7 L10.8 9.2 L13 10 L10.8 10.8 L10 13 L9.2 10.8 L7 10 L9.2 9.2 Z" fill="#FFD700"/>
+  </svg>`,
+
+  // Зірка з сердечком — "зірка вболіває за тебе"
+  rootingStar: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M9 2 L10.6 6.5 L15.5 6.8 L11.7 9.8 L13 14.5 L9 11.8 L5 14.5 L6.3 9.8 L2.5 6.8 L7.4 6.5 Z" fill="#FFD700" stroke="#FFA500" stroke-width="0.6" stroke-linejoin="round"/>
+    <path d="M15.5 13 C15.5 12 14 11.7 14 12.8 C14 11.7 12.5 12 12.5 13 C12.5 14 14 15.2 14 15.2 C14 15.2 15.5 14 15.5 13 Z" fill="#cc3355"/>
+  </svg>`,
+
+  // Призма розкладає світло — "ти згинаєш світло"
+  prism: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M7 4 L13 15 L1 15 Z" fill="#1a1050" stroke="#AFA9EC" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M2 8 L7 9.5" stroke="#fff" stroke-width="1.1" stroke-linecap="round"/>
+    <path d="M11 10 L19 8.5" stroke="#cc3355" stroke-width="0.9" stroke-linecap="round"/>
+    <path d="M11.3 11 L19 11" stroke="#FFD700" stroke-width="0.9" stroke-linecap="round"/>
+    <path d="M11.5 12 L19 13.5" stroke="#1D9E75" stroke-width="0.9" stroke-linecap="round"/>
+    <path d="M11.7 13 L18.5 15.5" stroke="#7F77DD" stroke-width="0.9" stroke-linecap="round"/>
+  </svg>`,
+
+  // Сонце на орбіті — "сьогодні твоя орбіта"
+  dayOrbit: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="10" cy="10" rx="8.5" ry="3.5" stroke="#7F77DD" stroke-width="1" transform="rotate(-18 10 10)" opacity="0.8"/>
+    <circle cx="10" cy="10" r="3" fill="#FFD700" stroke="#FFA500" stroke-width="0.7"/>
+    <path d="M10 4.5v-2M10 17.5v-2M3.5 10h-2M18.5 10h-2" stroke="#FFD700" stroke-width="1.3" stroke-linecap="round"/>
+    <circle cx="2.5" cy="8" r="1" fill="#AFA9EC"/>
+  </svg>`,
 };
