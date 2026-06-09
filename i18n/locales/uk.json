@@ -45,6 +45,7 @@
     "title": "Налаштування",
     "section": {
       "language": "Мова",
+      "greeting": "Привітання",
       "autoChange": "Автозміна шпалер",
       "interval": "Інтервал зміни",
       "applyTo": "Застосувати до",
@@ -69,7 +70,9 @@
     "toggle": {
       "autoChange": "Автозміна",
       "autoChangeIdle": "Шпалери міняються самі",
-      "autoChangeLoading": "Завантажуємо фото..."
+      "autoChangeLoading": "Завантажуємо фото...",
+      "greeting": "Привітання при запуску",
+      "greetingSub": "Благословення раз на день"
     },
     "applyTo": {
       "lock": "Заставка",

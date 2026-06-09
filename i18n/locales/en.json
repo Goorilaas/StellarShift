@@ -45,6 +45,7 @@
     "title": "Settings",
     "section": {
       "language": "Language",
+      "greeting": "Greeting",
       "autoChange": "Auto-change wallpapers",
       "interval": "Change interval",
       "applyTo": "Apply to",
@@ -69,7 +70,9 @@
     "toggle": {
       "autoChange": "Auto-change",
       "autoChangeIdle": "Wallpaper rotates on its own",
-      "autoChangeLoading": "Loading photos..."
+      "autoChangeLoading": "Loading photos...",
+      "greeting": "Launch greeting",
+      "greetingSub": "A blessing once a day"
     },
     "applyTo": {
       "lock": "Lock screen",

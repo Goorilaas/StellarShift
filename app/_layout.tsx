@@ -7,6 +7,7 @@ import { ActivityIndicator, LogBox, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useTranslation } from 'react-i18next';
 import ByoReminderDialog from '../components/ByoReminderDialog';
+import LaunchGreeting from '../components/LaunchGreeting';
 import Onboarding, { ONBOARDING_KEY } from '../components/Onboarding';
 import { initI18n } from '../i18n';
 import { UnsplashKeyProvider, useUnsplashKey } from '../services/unsplashKey';
@@ -126,6 +127,7 @@ function TabLayout() {
         <GestureHandlerRootView style={{ flex: 1 }}>
             <UnsplashKeyProvider>
                 <TabsInner />
+                <LaunchGreeting active={!showOnboarding} />
                 {showOnboarding && <Onboarding onDone={() => setShowOnboarding(false)} />}
             </UnsplashKeyProvider>
         </GestureHandlerRootView>

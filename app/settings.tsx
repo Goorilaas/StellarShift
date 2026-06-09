@@ -32,6 +32,7 @@ import { ICON } from '../components/icons';
 import Toast, { useToastQueue } from '../components/Toast';
 
 import { Blessing, nextBlessingFromQueue } from '../components/blessings';
+import { GREETING_ENABLED_KEY } from '../components/LaunchGreeting';
 import { changeWallpaperNow, clearHistory, getHistory, HistoryEntry, isIgnoringBatteryOptimization, PoolItem, requestIgnoreBatteryOptimization, setUnsplashKeyNative, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation } from '../services/wallpaperService';
 
 const DEFAULT_MIX = CATEGORIES.filter(c => c.id !== 'mix').map(c => c.id);
@@ -93,6 +94,7 @@ export default function SettingsScreen() {
     const [mixCategories, setMixCategories] = useState<string[]>(DEFAULT_MIX);
     const [autoChange, setAutoChange] = useState(false);
     const [poolLoading, setPoolLoading] = useState(false);
+    const [greetingEnabled, setGreetingEnabled] = useState(true);
     const { toast, showToast, dismissToast } = useToastQueue();
     const [history, setHistory] = useState<HistoryEntry[]>([]);
     const [blocked, setBlocked] = useState<BlockedPhoto[]>([]);
@@ -141,6 +143,7 @@ export default function SettingsScreen() {
         AsyncStorage.getItem('easter_unlocked').then(v => {
             if (v === '1') setChaosUnlocked(true);
         });
+        AsyncStorage.getItem(GREETING_ENABLED_KEY).then(v => setGreetingEnabled(v !== '0'));
         // Load saved BYO key into UI
         getUserKey().then(k => {
             setByoSavedKey(k);
@@ -576,6 +579,23 @@ export default function SettingsScreen() {
                         </Text>
                     </TouchableOpacity>
                 ))}
+            </View>
+
+            <Text style={styles.sectionLabel}>{t('settings.section.greeting')}</Text>
+            <View style={styles.card}>
+                <View style={styles.toggleRow}>
+                    <View style={styles.toggleLabelRow}>
+                        <SvgXml xml={ICON.sparkle} width={18} height={18} />
+                        <Text style={styles.toggleLabel}>{t('settings.toggle.greeting')}</Text>
+                        <Text style={styles.toggleSub}>{t('settings.toggle.greetingSub')}</Text>
+                    </View>
+                    <Switch
+                        value={greetingEnabled}
+                        onValueChange={(v) => { setGreetingEnabled(v); AsyncStorage.setItem(GREETING_ENABLED_KEY, v ? '1' : '0'); }}
+                        trackColor={{ false: '#333', true: '#534AB7' }}
+                        thumbColor={greetingEnabled ? '#fff' : '#888'}
+                    />
+                </View>
             </View>
 
             <Text style={styles.sectionLabel}>{t('settings.section.autoChange')}</Text>
