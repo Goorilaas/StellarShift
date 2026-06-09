@@ -99,9 +99,17 @@
 - [x] [feature-graphic-brief.md](docs/feature-graphic-brief.md) ТЗ для дизайнера/AI
 - [x] README rewrite з rules-doc у справжній GitHub README
 - [x] GitHub Pages baseurl fix (404 на privacy URL до v3.7.4)
-- [→] Soul wave (blessing pool expansion + launch greeting + PL/DE/ES roadmap) — план у roadmap, реалізація в наступну окрему версію
+- [x] Soul wave — реалізовано окремо у v3.7.5 (див. нижче)
 
-#### 🧪 v3.7.5 — Beta + Unsplash submission (2 дні)
+#### 🌟 v3.7.5 — Soul wave ✅
+- [x] Blessing pool: UA 10→20, EN 6→20 (EN-набір з «Stand with Ukraine»)
+- [x] 13 нових унікальних SVG-іконок (тематичні пари UA/EN ділять іконку)
+- [x] Launch-greeting: благословення раз на ≥6 год при cold start, slide-from-top, auto-dismiss 5с, Settings-toggle (default ON), гейт проти onboarding
+- [x] Tech-debt разом: прибрано Wi-Fi/charging toggles, untrack `debug.keystore`
+- [→] BYO key encryption (`expo-secure-store`) — відкладено, plaintext поки ок (особистий ключ на власному пристрої)
+- [→] PL/DE/ES — лишається в IDEAS BANK
+
+#### 🧪 v3.7.6 — Beta + Unsplash submission (2 дні)
 - [ ] Production build через EAS
 - [ ] Internal testing track в Play Console (20 тестерів)
 - [ ] Data Safety Form в Play Console
@@ -234,18 +242,18 @@
 - [ ] **Family sharing** колекцій
 
 ## 🎁 Easter eggs (low priority, fun)
-- [ ] **v3.7.4 — Soul wave** (всі три разом):
-  - [ ] Розширити blessing pool: UA 10 → 20, EN 6 → 20 (~14 нових EN-фраз)
-  - [ ] EN-набір включає `"Stand with Ukraine"` — бренд-сигнал, не агресивно політичний
-  - [ ] Кожна нова фраза = нова SVG-іконка в палітрі `#7F77DD / #AFA9EC / #FFD700 / #1D9E75 / #cc3355`
-  - [ ] **Launch greeting blessing** — при cold start після ≥6 годин від минулого показу: slide-from-top toast із blessing, auto-dismiss 5с. Settings toggle «Привітання при запуску» (default ON). НЕ кожен запуск — frequency fatigue. Ритуал «один раз на день» = м'яка магія + не задовбує.
+- [x] **Soul wave** ✅ (зроблено у v3.7.5):
+  - [x] Розширено blessing pool: UA 10 → 20, EN 6 → 20
+  - [x] EN-набір включає `"Stand with Ukraine"` — бренд-сигнал, не агресивно політичний
+  - [x] 13 нових унікальних SVG-іконок у бренд-палітрі (тематичні пари UA/EN ділять іконку)
+  - [x] **Launch greeting blessing** — cold start після ≥6 год: slide-from-top банер, auto-dismiss 5с, Settings toggle (default ON). Ритуал «один раз на день».
 - [ ] Easter egg в LW (тап в певне місце шпалери = шторм зірок)
 - [ ] Holiday themes (24 грудня — снігопад в каталозі, 24 серпня — салют)
 - [ ] Hidden achievements ("100 шпалер змінено", "30 днів autoChange")
 
 ## ⚙️ Технічний борг / cleanup
 - [x] Прибрати `app-example/` папку (boilerplate, шумить TS errors) — папка вже не існує, запис у `.gitignore` лишився як no-op
-- [ ] Прибрати Wi-Fi-only / Charging-only toggles з Settings (друг каже зайве)
+- [x] Прибрати Wi-Fi-only / Charging-only toggles з Settings (друг каже зайве) — зроблено у v3.7.5
 - [ ] Unit tests для `services/blocked.ts`, `services/unsplashKey.ts`
 - [ ] E2E тести через Maestro / Detox
 - [ ] Bundle size audit (видалити неюзані deps)
