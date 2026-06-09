@@ -15,6 +15,7 @@
 ### Прибирання
 - **`android/app/debug.keystore` untracked** — був закомічений до появи `*.keystore` у `.gitignore`. Файл лишається на диску для локальних debug-білдів, з git прибраний.
 - **`app-example/`** позначено виконаним у roadmap — папки давно немає, лишався тільки no-op запис у `.gitignore`.
+- **Синхронізація документації** після видалення Wi-Fi/charging: прибрано стале згадки про фільтри з README, STORE.md (UA + EN описи Play Store), `docs/privacy.md` + `docs/privacy-en.md`. Виправлено неправильні шляхи в README (`app/components` → `components`, `app/services` → `services` — вони в корені репо).
 
 ### Не зроблено (свідомо)
 - **Шифрування BYO ключа** (`expo-secure-store`) — лишили plaintext: це особистий Unsplash dev-ключ на власному пристрої юзера, ризик мінімальний. Хешування неможливе (ключ треба слати в API). Відкладено.

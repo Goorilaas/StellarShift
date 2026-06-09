@@ -31,7 +31,7 @@ permalink: /privacy-en/
 Through `AsyncStorage` (Android local storage) we keep:
 
 - the IDs of your favorite wallpapers and their thumbnails;
-- auto-rotation settings (interval, target screen, Wi-Fi / charging filters);
+- auto-rotation settings (interval, target screen);
 - the list of categories you've selected;
 - the last 20 applied wallpapers as history (ID + URL + timestamp);
 - the list of «hidden» wallpapers you don't want to see again;
