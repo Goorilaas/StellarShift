@@ -67,9 +67,9 @@ StellarShift is an Expo (React Native) wallpaper app targeting **Android only**.
 **Three tabs:**
 - `app/index.tsx` — Catalog: Unsplash API, category filtering, search (SVG icon), infinite scroll, long-press (grid) or double-tap (modal, `Pressable`) to **add** to favorites with heart animation (`Animated` spring+fade). Double-tap only adds, never removes. Set wallpaper button with loading state, closes modal + toast "Красу встановлено!" on success. All buttons use SVG icons from `ICON`.
 - `app/favorites.tsx` — Favorites: reads from AsyncStorage, full-screen preview (absoluteFill), buttons absolutely positioned at bottom via `useSafeAreaInsets`. [wallpaper SVG Встановити] + [heartBroken SVG Зняти з улюблених]. Title row uses SVG heart.
-- `app/settings.tsx` — Settings: auto-change toggle (triggers pool load + WorkManager), interval, target screen (SVG icons: lock/phone/both), Wi-Fi/charging (SVG wifi/battery). **No save button — auto-saves.** Battery optimization on first enable. "Про застосунок" section at bottom with logo SVG + version + "Розроблено з 🤝 Братаном".
+- `app/settings.tsx` — Settings: language switcher, launch-greeting toggle, auto-change toggle (triggers pool load + WorkManager), interval, target screen (SVG icons: lock/phone/both). **No save button — auto-saves.** Battery optimization on first enable. "Про застосунок" section at bottom with logo SVG + version + "Зроблено з ❤️ в Україні".
 
-**`app/wallpaperService.ts`** — Thin bridge to the native `WallpaperModule`. Exports:
+**`services/wallpaperService.ts`** — Thin bridge to the native `WallpaperModule`. Exports:
 - `startWallpaperRotation(pool, intervalMinutes, target, wifiOnly, chargingOnly)`
 - `stopWallpaperRotation()`
 - `setWallpaperFromUrl(url, target)`
@@ -77,11 +77,13 @@ StellarShift is an Expo (React Native) wallpaper app targeting **Android only**.
 - `isIgnoringBatteryOptimization()`
 - `requestIgnoreBatteryOptimization()`
 
-**`app/components/categories.ts`** — Single source of truth for `CATEGORIES`, `MIX_QUERIES`, `UNSPLASH_KEY`, `Photo` type.
+**`components/categories.ts`** — Single source of truth for `CATEGORIES`, `MIX_QUERIES`, `UNSPLASH_KEY` (reads `EXPO_PUBLIC_UNSPLASH_KEY` from env, hardcoded demo fallback), `Photo` type.
 
-**`app/components/icons.ts`** — All UI SVG icons as string constants (`ICON.*`). No emoji in UI — everything is SVG. Keys: `heartFilled`, `heartOutline`, `heartBroken`, `search`, `wallpaper`, `refresh`, `wifi`, `battery`, `lock`, `phone`, `both`, `gear`, `galaxy`.
+**`components/icons.ts`** — All UI + blessing SVG icons as string constants (`ICON.*`), viewBox 20×20, brand palette. No emoji in UI — everything is SVG. The blessing/easter icon set grows over releases (e.g. +13 in v3.7.5 Soul wave).
 
-**`app/components/SkeletonCard.tsx`** — Shimmer loading placeholder for the 2-column photo grid.
+**`components/blessings.ts`** — Blessing phrase pools (UA 20 / EN 20) + `nextBlessingFromQueue` shuffle-without-repeats helper. Shared by settings/catalog easter eggs and the launch greeting.
+
+**`components/SkeletonCard.tsx`** — Shimmer loading placeholder for the 2-column photo grid.
 
 ## Native Kotlin modules (`android/app/src/main/java/com/gorilas/StellarShift/`)
 
@@ -95,7 +97,7 @@ StellarShift is an Expo (React Native) wallpaper app targeting **Android only**.
 - `photoPool` — JSON array of `{id, url}`
 - `poolIndex` — current position in pool
 - `target` — `"home"` | `"lock"` | `"both"`
-- `intervalMinutes`, `wifiOnly`, `chargingOnly`
+- `intervalMinutes`, `wifiOnly`, `chargingOnly` (last two always `false` since v3.7.5 — UI toggles removed, native signature kept)
 
 ## AsyncStorage keys (JS side)
 
@@ -114,7 +116,6 @@ StellarShift is an Expo (React Native) wallpaper app targeting **Android only**.
 - **Favorites modal buttons** use `position: absolute` + `useSafeAreaInsets` to stay above nav bar.
 - **Android launcher icons** are `.webp` in `mipmap-*` — regenerate with `sharp` script (replacing `icon.png` alone is not enough).
 - `reactCompiler: true` — avoid mutating refs during render.
-- **Pending idea:** remove Wi-Fi-only and charging-only toggles from Settings.
 
 ## Version history
 
