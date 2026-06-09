@@ -51,7 +51,6 @@
       "activeCategories": "Categories for auto-change",
       "mixCategories": "What to mix",
       "mixHint": "Categories that feed Mix in the catalog and rotation",
-      "whenChange": "When to change",
       "history": "Wallpaper history",
       "byo": "UNSPLASH API KEY",
       "blocked": "Hidden photos",
@@ -70,9 +69,7 @@
     "toggle": {
       "autoChange": "Auto-change",
       "autoChangeIdle": "Wallpaper rotates on its own",
-      "autoChangeLoading": "Loading photos...",
-      "wifi": "Wi-Fi only",
-      "charging": "While charging only"
+      "autoChangeLoading": "Loading photos..."
     },
     "applyTo": {
       "lock": "Lock screen",

@@ -89,8 +89,6 @@ export default function SettingsScreen() {
 
     const [interval, setIntervalVal] = useState(30);
     const [applyTo, setApplyTo] = useState('both');
-    const [wifiOnly, setWifiOnly] = useState(true);
-    const [chargingOnly, setChargingOnly] = useState(false);
     const [activeCategories, setActiveCategories] = useState(['space']);
     const [mixCategories, setMixCategories] = useState<string[]>(DEFAULT_MIX);
     const [autoChange, setAutoChange] = useState(false);
@@ -332,8 +330,6 @@ export default function SettingsScreen() {
                 const p = JSON.parse(s);
                 setIntervalVal(p.interval ?? 30);
                 setApplyTo(p.applyTo ?? 'both');
-                setWifiOnly(p.wifiOnly ?? true);
-                setChargingOnly(p.chargingOnly ?? false);
                 setActiveCategories(p.activeCategories ?? ['space']);
                 setMixCategories(p.mixCategories ?? DEFAULT_MIX);
                 setAutoChange(p.autoChange ?? false);
@@ -347,9 +343,9 @@ export default function SettingsScreen() {
     useEffect(() => {
         if (!loaded.current) return;
         AsyncStorage.setItem('settings', JSON.stringify({
-            interval, applyTo, wifiOnly, chargingOnly, activeCategories, mixCategories, autoChange,
+            interval, applyTo, activeCategories, mixCategories, autoChange,
         }));
-    }, [interval, applyTo, wifiOnly, chargingOnly, activeCategories, mixCategories, autoChange]);
+    }, [interval, applyTo, activeCategories, mixCategories, autoChange]);
 
     // When rotation settings change while autoChange is ON → debounced reload
     useEffect(() => {
@@ -357,7 +353,7 @@ export default function SettingsScreen() {
         if (reloadTimer.current) clearTimeout(reloadTimer.current);
         reloadTimer.current = setTimeout(() => loadAndStart(), 1500);
         return () => { if (reloadTimer.current) clearTimeout(reloadTimer.current); };
-    }, [activeCategories, mixCategories, interval, applyTo, wifiOnly, chargingOnly]);
+    }, [activeCategories, mixCategories, interval, applyTo]);
 
     const loadPhotoPool = async (categories: string[]): Promise<PoolItem[] | null> => {
         setPoolLoading(true);
@@ -468,7 +464,9 @@ export default function SettingsScreen() {
         // Sync current Unsplash key into native prefs so WallpaperWorker can fire
         // download-tracking pings on each rotation tick (required by Unsplash ToS).
         try { await setUnsplashKeyNative(await getUnsplashKey()); } catch { /* non-fatal */ }
-        await startWallpaperRotation(pool, interval, applyTo, wifiOnly, chargingOnly);
+        // wifiOnly / chargingOnly removed as a feature (redundant for users) — pass false,
+        // false so WorkManager has no network/charging constraints (rotate always).
+        await startWallpaperRotation(pool, interval, applyTo, false, false);
         showToast(t('settings.toast.poolReady', { count: pool.length }));
     };
 
@@ -681,34 +679,6 @@ export default function SettingsScreen() {
                 </View>
                 <Text style={styles.pickerArrow}>›</Text>
             </TouchableOpacity>
-
-            <Text style={styles.sectionLabel}>{t('settings.section.whenChange')}</Text>
-            <View style={styles.card}>
-                <View style={styles.toggleRow}>
-                    <View style={styles.toggleLabelRow}>
-                        <SvgXml xml={ICON.wifi} width={18} height={18} />
-                        <Text style={styles.toggleLabel}>{t('settings.toggle.wifi')}</Text>
-                    </View>
-                    <Switch
-                        value={wifiOnly}
-                        onValueChange={setWifiOnly}
-                        trackColor={{ false: '#333', true: '#534AB7' }}
-                        thumbColor={wifiOnly ? '#fff' : '#888'}
-                    />
-                </View>
-                <View style={styles.toggleRow}>
-                    <View style={styles.toggleLabelRow}>
-                        <SvgXml xml={ICON.battery} width={18} height={18} />
-                        <Text style={styles.toggleLabel}>{t('settings.toggle.charging')}</Text>
-                    </View>
-                    <Switch
-                        value={chargingOnly}
-                        onValueChange={setChargingOnly}
-                        trackColor={{ false: '#333', true: '#534AB7' }}
-                        thumbColor={chargingOnly ? '#fff' : '#888'}
-                    />
-                </View>
-            </View>
 
             {autoChange && (
                 <TouchableOpacity
