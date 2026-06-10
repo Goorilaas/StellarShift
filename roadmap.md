@@ -257,7 +257,7 @@
 - [x] Прибрати Wi-Fi-only / Charging-only toggles з Settings (друг каже зайве) — зроблено у v3.7.5
 - [ ] Unit tests для `services/blocked.ts`, `services/unsplashKey.ts`
 - [ ] E2E тести через Maestro / Detox
-- [ ] Bundle size audit (видалити неюзані deps)
+- [x] Bundle size audit (видалити неюзані deps) — 2026-06-10: −9 пакетів (expo-image, reanimated+worklets, expo-network, expo-web-browser, expo-symbols, react-native-web, react-dom, expo-status-bar). Native-частина ~2-4 MB з APK. Лишили expo-linking/font/system-ui — peer-залежності router/icons/userInterfaceStyle
 - [x] **`loadAndStart` race window у settings.tsx** — закрито 2026-06-10: AbortController у `loadPhotoPool`, останній виклик абортить попередній in-flight fetch. Stale-пул більше не може дійти до `startWallpaperRotation`; abort — тихий (без error-toast), спінер гаситься тільки актуальним викликом.
 
 ## 💼 Бізнес / маркетинг
