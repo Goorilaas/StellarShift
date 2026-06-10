@@ -34,7 +34,7 @@ import Toast, { useToastQueue } from '../components/Toast';
 
 import { Blessing, nextBlessingFromQueue } from '../components/blessings';
 import { GREETING_ENABLED_KEY } from '../components/LaunchGreeting';
-import { changeWallpaperNow, clearHistory, getHistory, HistoryEntry, isIgnoringBatteryOptimization, PoolItem, requestIgnoreBatteryOptimization, setUnsplashKeyNative, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation } from '../services/wallpaperService';
+import { changeWallpaperNow, clearHistory, getHistory, HistoryEntry, isIgnoringBatteryOptimization, PoolItem, requestIgnoreBatteryOptimization, setUnsplashKeyNative, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation, syncNativeHistory } from '../services/wallpaperService';
 
 const DEFAULT_MIX = CATEGORIES.filter(c => c.id !== 'mix').map(c => c.id);
 
@@ -316,7 +316,8 @@ export default function SettingsScreen() {
     useFocusEffect(
         useCallback(() => {
             loadSettings();
-            getHistory().then(setHistory);
+            // спершу зливаємо native-буфер (WorkManager-тіки), тоді читаємо
+            syncNativeHistory().then(() => getHistory().then(setHistory));
             getBlocked().then(setBlocked);
             AsyncStorage.getItem('hidden_categories').then(v => setHiddenCats(v ? JSON.parse(v) : [])).catch(() => { });
             // Якщо catalog заблокував фото — пул автозміни треба перебудувати
