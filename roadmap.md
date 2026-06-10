@@ -257,7 +257,7 @@
 - [ ] Unit tests для `services/blocked.ts`, `services/unsplashKey.ts`
 - [ ] E2E тести через Maestro / Detox
 - [ ] Bundle size audit (видалити неюзані deps)
-- [ ] **`loadAndStart` race window у settings.tsx** — `loadPhotoPool` не абортить in-flight axios при повторному виклику. Якщо юзер змінює дві настройки протягом ~2с і перший pool-fetch повертається після другого — native side тримає stale parameters. Self-healing наступною свідомою зміною. Severity: low. Fix: AbortController у `loadPhotoPool` + reuse у `loadAndStart`. Розслідувано в session 2026-05-01, claim про stale closure через deps виявився false positive (cleanup pattern працює). Деталі — TODO-коментар біля `loadAndStart`.
+- [x] **`loadAndStart` race window у settings.tsx** — закрито 2026-06-10: AbortController у `loadPhotoPool`, останній виклик абортить попередній in-flight fetch. Stale-пул більше не може дійти до `startWallpaperRotation`; abort — тихий (без error-toast), спінер гаситься тільки актуальним викликом.
 
 ## 💼 Бізнес / маркетинг
 - [ ] ProductHunt запуск після v4.0.0
