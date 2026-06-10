@@ -269,12 +269,12 @@ export default function HomeScreen() {
     ]).start(() => setShowHeart(false));
   };
 
-  const handleModalImageTap = () => {
+  const handleModalImageTap = (photo: Photo) => {
     const now = Date.now();
     if (now - lastTapRef.current < 350) {
       lastTapRef.current = 0;
-      if (selectedPhoto && !favorites.includes(selectedPhoto.id)) {
-        toggleFavorite(selectedPhoto);
+      if (!favorites.includes(photo.id)) {
+        toggleFavorite(photo);
         triggerHeartAnim();
       }
       // вже в улюблених — ігноруємо, без анімації
@@ -749,14 +749,36 @@ export default function HomeScreen() {
           />
           <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.4)' }]} />
 
-          {/* Фото з подвійним тапом */}
-          <Pressable onPress={handleModalImageTap} style={StyleSheet.absoluteFill}>
-            <Image
-              source={{ uri: selectedPhoto?.urls?.regular }}
-              style={styles.fullImage}
-              resizeMode="cover"
-            />
-          </Pressable>
+          {/* Пейджер фото: swipe вліво/вправо гортає каталог без закриття модалки.
+              Подвійний тап на сторінці — в улюблені, як і раніше. */}
+          <FlatList
+            data={visiblePhotos}
+            keyExtractor={p => p.id}
+            extraData={favorites}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            initialScrollIndex={Math.max(0, visiblePhotos.findIndex(p => p.id === selectedPhoto?.id))}
+            getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
+            onMomentumScrollEnd={e => {
+              const idx = Math.round(e.nativeEvent.contentOffset.x / width);
+              const next = visiblePhotos[idx];
+              if (next && next.id !== selectedPhoto?.id) setSelectedPhoto(next);
+            }}
+            initialNumToRender={1}
+            windowSize={3}
+            maxToRenderPerBatch={2}
+            style={StyleSheet.absoluteFill}
+            renderItem={({ item }) => (
+              <Pressable onPress={() => handleModalImageTap(item)}>
+                <Image
+                  source={{ uri: item.urls.regular }}
+                  style={styles.fullImage}
+                  resizeMode="cover"
+                />
+              </Pressable>
+            )}
+          />
 
           {/* Серце анімація (модалка) */}
           {showHeart && (
