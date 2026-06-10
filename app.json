@@ -31,10 +31,6 @@
         "android.permission.READ_MEDIA_VIDEO"
       ]
     },
-    "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
-    },
     "plugins": [
       "expo-router",
       [
