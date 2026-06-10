@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
+import axios, { isCancel } from 'axios';
 import Constants from 'expo-constants';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -103,6 +103,7 @@ export default function SettingsScreen() {
     const loaded = useRef(false);
     const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const autoChangeRef = useRef(false);
+    const poolAbortRef = useRef<AbortController | null>(null);
 
     // Reapply / clear-history dialogs
     const [reapplyEntry, setReapplyEntry] = useState<HistoryEntry | null>(null);
@@ -359,6 +360,11 @@ export default function SettingsScreen() {
     }, [activeCategories, mixCategories, interval, applyTo]);
 
     const loadPhotoPool = async (categories: string[]): Promise<PoolItem[] | null> => {
+        // Останній виклик виграє: абортимо попередній in-flight fetch, щоб stale-пул
+        // не дійшов до startWallpaperRotation і не перезаписав свіжіший у native prefs.
+        poolAbortRef.current?.abort();
+        const abort = new AbortController();
+        poolAbortRef.current = abort;
         setPoolLoading(true);
         try {
             const queryJobs: { query: string; excludePeople: boolean }[] = [];
@@ -412,6 +418,7 @@ export default function SettingsScreen() {
                             axios.get('https://api.unsplash.com/search/photos', {
                                 params: { query: job.query, page, per_page: 30, orientation: 'portrait' },
                                 headers: { Authorization: `Client-ID ${key}` },
+                                signal: abort.signal,
                             }).then(r => ({ data: r.data.results, excludePeople: job.excludePeople }))
                         );
                     })
@@ -437,6 +444,9 @@ export default function SettingsScreen() {
                 [pool[i], pool[j]] = [pool[j], pool[i]];
             }
 
+            // За час фетчу стартував новіший виклик — цей результат застарів, тихо виходимо
+            if (abort.signal.aborted) return null;
+
             if (pool.length === 0) {
                 if (wantsFavorites && queryJobs.length === 0) {
                     showToast(t('settings.toast.poolEmptyFav'));
@@ -446,21 +456,17 @@ export default function SettingsScreen() {
                 return null;
             }
             return pool;
-        } catch {
+        } catch (e) {
+            // Abort — не помилка: нас суперсіднув новіший виклик, без toast
+            if (isCancel(e) || abort.signal.aborted) return null;
             showToast(t('settings.toast.poolFail'));
             return null;
         } finally {
-            setPoolLoading(false);
+            // Не гасимо спінер, якщо вже крутиться новіший виклик
+            if (poolAbortRef.current === abort) setPoolLoading(false);
         }
     };
 
-    // TODO(techdebt): race window — `loadPhotoPool` не абортить in-flight axios.
-    // Якщо юзер змінює settings двічі за ~2с і перший pool-fetch повертається
-    // ПІСЛЯ другого — native side тримає stale parameters (last-write-wins).
-    // Self-healing наступною свідомою зміною. Severity low. Розслідувано 2026-05-01,
-    // claim про stale closure через useEffect deps виявився false positive
-    // (cleanup pattern на line 372-376 коректно скасовує попередній таймер).
-    // Реальний фікс: AbortController у loadPhotoPool, reuse тут. Див. roadmap → Технічний борг.
     const loadAndStart = async () => {
         const pool = await loadPhotoPool(activeCategories);
         if (!pool) return;
