@@ -424,6 +424,7 @@ export default function HomeScreen() {
       setFavorites(newIds);
       await AsyncStorage.setItem('favorites', JSON.stringify(newIds));
       await AsyncStorage.setItem('favorites_data', JSON.stringify(newData));
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     }
   };
 
@@ -435,6 +436,7 @@ export default function HomeScreen() {
       const target = settings ? (JSON.parse(settings).applyTo ?? 'both') : 'both';
       await setWallpaperFromUrl(photo.urls.regular, target, { id: photo.id, small: photo.urls.small, downloadLocation: photo.links?.download_location });
       setSelectedPhoto(null);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
       showToast(t('catalog.toast.applied'));
     } catch {
       showToast(t('catalog.toast.applyFail'));
@@ -545,6 +547,7 @@ export default function HomeScreen() {
     const photo = blockConfirm;
     setBlockConfirm(null);
     if (!photo) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => { });
     const wasFav = favorites.includes(photo.id);
     // Add to blocked store
     await blockPhotoStore({ id: photo.id, small: photo.urls.small });
