@@ -1,337 +1,175 @@
-# 🗺 StellarShift — Roadmap
+# 🗺 StellarShift — Roadmap 2.0
 
-> Повна дорожня карта: де були → де зараз → куди йдемо.
+> **Продукт для себе і друзів.** Без store-дедлайнів, без черг модерації.
+> Дистрибуція: APK-лінки з EAS + локальний `gradlew assembleRelease` (production-підпис — взаємозамінні).
+> Ключі: demo + BYO. Play Store — заморожений трек, повернемось свідомо (секція 🧊 внизу).
 > Документ живий — оновлюємо разом з кожним релізом.
 
 ---
 
 ## ✅ DONE — Що вже зроблено
 
-### Фундамент (v1.0.x — v2.0.0)
+### Фундамент (v1.0.x — v2.1.0)
 | v | Що |
 |---|---|
 | 1.0.x | Expo-only прототип |
-| 1.1.0 | Перший Kotlin rewrite |
-| 1.2.0 | Native WallpaperModule + WorkManager (заміна expo-background-fetch). Auto-save settings. Favorites UX overhaul. Іконки через sharp |
-| 2.0.0 | 🎯 **Milestone:** background wallpaper rotation працює на Samsung. "Про застосунок", heart animation, double-tap favorites, swipe-back fix, crop fix, battery optimization exemption |
-| 2.0.1 | Toast "Красу встановлено", double-tap fix |
-| 2.1.0 | Full SVG UI — emoji → SVG іконки (`icons.ts`), double-tap тільки додає в улюблені |
+| 1.1.0–1.2.0 | Kotlin rewrite: WallpaperModule + WorkManager, auto-save settings, favorites UX |
+| 2.0.0 | 🎯 **Milestone:** background rotation працює на Samsung. Battery exemption, double-tap favorites |
+| 2.1.0 | Full SVG UI — emoji → власні іконки |
 
-### Easter eggs + UX (v3.x)
+### Розквіт (v3.x)
 | v | Що |
 |---|---|
-| 3.2.0 | Easter egg на логотипі (благословення, спін на 3 тапах, розблокування "Хаос" на 7), themed `ConfirmDialog`, heart anim |
-| 3.2.1 | 10 фраз благословень, SVG прапор України, shuffle-без-повторів, fix серця у модалці (180px), keep-awake warning |
-| 3.3.0 | (детальніше в CHANGELOG) |
-| 3.4.0 | **BYO Unsplash key** — юзер може вставити свій |
-| 3.4.1 | **Улюблені як категорія** для autoChange |
-| 3.5.0 | **Bottom-sheet picker категорій** з 2 секціями (active + inactive) |
-| 3.5.1 | Прибрали drag-to-reorder (не працює в RN Modal) |
-| 3.6.0 ✅ | **Block photos** — Sauron eye, AsyncStorage, manager в Settings, cross-screen sync |
-| 3.6.1 ✅ | **Polish:** Undo toasts (block / unfavorite / clear-blocked), кращі empty states (Favorites CTA + Blocked icon), gold-tinted pull-to-refresh |
-| 3.7.0 ✅ | **i18n EN+UK** — i18next + react-i18next, Intl-детекція без rebuild'а, language switcher у Settings, всі екрани і компоненти перекладено, EN-пул blessings (6 фраз), варіантний about-footer (UA: «з Братаном» / EN: «from Ukraine») |
-| **3.7.1** ✅ | **Unsplash compliance + Sentry + .env** — `services/unsplashTracking.ts`, download tracking (catalog/favorites/settings/WorkManager), UTM на всіх лінках Unsplash, clickable author profile + photo, «Powered by Unsplash» link в About. API key переїхав у `.env` (EXPO_PUBLIC_UNSPLASH_KEY). Sentry crash reporting через config plugin |
+| 3.2.x–3.3.0 | Easter eggs (благословення, Хаос), +11 категорій, ConfirmDialog |
+| 3.4.x | BYO Unsplash key, Улюблені як категорія автозміни |
+| 3.5.x | Bottom-sheet picker категорій |
+| 3.6.x | Block photos (Sauron), Undo toasts, empty states |
+| 3.7.0 | 🌍 i18n EN+UK |
+| 3.7.1 | 🦄 Unsplash compliance (download tracking, UTM, attribution) + Sentry + .env |
+| 3.7.2 | Onboarding, Share app, Rate prompt, Privacy Policy, ProGuard/R8, store-асети |
+| 3.7.3 | Стабілізація: Хаос-запити, fetch-помилки в toast, variety, author в Улюблених, toast queue |
+| 3.7.4 | Polish: slogan rebrand, About-footer, cheer toasts, drop Anime, locale-sort, adaptive icon fix |
+| 3.7.5 | 🌌 **Soul wave:** blessings 20+20, 13 нових іконок, launch greeting |
+| 3.7.6 | 🤲 **Catalog in-hand:** фото-пейджер у модалці, категорійний свайп, search history, haptics, race fix, −9 deps (**APK 90→75 MB!**) |
+| 3.7.7 | 📌 **Catalog yours:** pin/hide категорій + Settings restore, search suggestions, локальний production-підпис |
+| 3.7.8 | 🖼 **Wallpaper control:** картка «Зараз на екрані», історія з WorkManager-тіків, «Гидоту прибрано» |
 
 ---
 
-## 🚀 NEXT — Шлях до Play Store
+## 🚀 NEXT — Нові версії
 
-### Phase 1: Стабілізація і compliance (~5 днів)
+### v3.8.0 — 🔔 Notification companion
+Продовження wallpaper control: керуй шпалерами **не відкриваючи застосунок**.
+- [ ] Нотифікація при автозміні: поточне фото (BigPictureStyle) + дії **❤️ В улюблені / 🚫 Більше ніколи / ⏭ Далі** прямо в шторці
+- [ ] Kotlin: NotificationChannel + BroadcastReceiver на дії, оновлення на кожен тік Worker'а
+- [ ] **Settings toggle «Сповіщення автозміни»** (default ON) — можна повністю вимкнути
+- [ ] Дії синхронні з застосунком: ❤️ → favorites (через pendingHistory-патерн), 🚫 → block + перебудова пулу + наступна шпалера
+- 💎 *Premium-кандидат при поверненні в Store*
 
-#### 🔧 v3.6.1 — Stability + polish ✅
-- [x] Undo toast для destructive дій (block, unfavorite, clear-all-blocked, unblock single) — 5 сек, золота «Скасувати»
-- [x] Кращі empty states для Favorites (CTA «Знайти красу») і Blocked (Sauron icon + текст)
-- [x] Pull-to-refresh — забарвлений у бренд-палітру (#FFD700 + #534AB7 + #7F77DD на темному фоні)
-- [→] **Sentry перенесено в v3.7.1** разом з `.env` для Unsplash compliance — один rebuild замість двох
-- [→] Кастомний SVG-spinner у RefreshControl — Android API не дозволяє, не робимо
+### v3.9.0 — 😴 Sleep hours + розклад
+Шпалери, що поважають твій сон. **Функціонал обміркувати детально перед стартом — нічого не втратити.**
+- [ ] Тихі години: не міняти у заданому вікні (default 23:00–07:00, налаштовується)
+- [ ] **Settings toggle** (default OFF) + пікери часу
+- [ ] Kotlin: Worker перевіряє вікно перед apply (тік пропускається, не скасовується)
+- [ ] 🤔 Обміркувати: розклад по часу доби (ранок=сонячне, ніч=зоряне — категорії за слотами)? Едж-кейси: вікно через північ, зміна таймзони
+- 💎 *Premium-кандидат при поверненні в Store*
 
-#### 🌍 v3.7.0 — i18n EN+UK ✅
-- [x] `i18next` + `react-i18next` (без `expo-localization` — використали вбудоване `Intl` для детекції, без rebuild'а)
-- [x] Структура `i18n/locales/{en,uk}.json` — повний набір ключів
-- [x] Витягнули ~120 hardcoded строк → JSON (3 чанки: Settings → Catalog+Categories → Favorites+Components)
-- [x] Language switcher в Settings (перша секція)
-- [x] Auto-detect locale (uk/ru → uk, інакше en), fallback EN, persist через AsyncStorage
-- [x] Категорії: додано `labelKey?: string` на типі (label лишається як UA fallback)
-- [x] Easter eggs: BLESSINGS_EN — короткий пул (6 фраз), UA-only прапор лишається
-- [→] Категорії досі сортуються UA-алфавітом — render-time sort через `t()` перенесено в техдовг (не блокер)
+### v4.0.0 — 🌌 Live Wallpaper: tilt parallax
+**R&D пройдено** (гілка `experiment/live-wallpaper-rnd`, 2026-06-09): One UI приймає наш WallpaperService, tilt плавний на 60fps, батарея ок. Killer-фіча розблокована — store її більше не тримає.
+- [ ] **Bitmap з власного файлу**: Worker кешує застосоване фото в `filesDir/current_wallpaper.jpg`, LW читає звідти (системний bitmap заблокований на Android 14+ — головна знахідка R&D). autoChange продовжує працювати: Worker оновлює файл → LW підхоплює нову базу
+- [ ] **Choreographer vsync-рендер** замість фіксованих 16ms — фікс 120Гц-шиммера
+- [ ] Slider інтенсивності (maxShift) + tilt on/off у Settings
+- [ ] Battery: sensor off при невидимості (вже є), FPS-стратегія
+- [ ] Перевірити на **One UI 8.5** (S23 Ultra оновлено) — можливо, з тілтом стало простіше
+- [ ] Scroll parallax (`onOffsetsChanged`) — перевірити чи live-режим отримує offset events на One UI
+- [ ] Fade-переходи між шпалерами
+- 💎 *Premium-headliner при поверненні в Store*
 
-#### 🦄 v3.7.1 — Unsplash Production compliance + Sentry ✅
-- [x] **Sentry** через `@sentry/react-native` config plugin, DSN з `.env`, debug у dev / 10% traces у release
-- [x] **Download tracking**: GET `photo.links.download_location` при setWallpaper / save / share / WallpaperWorker tick (Kotlin)
-- [x] `PoolItem` + `HistoryEntry` розширено `downloadLocation` (опціонально, переходить до native prefs)
-- [x] **UTM-параметри** на всіх Unsplash-лінках через `withUtm()` helper
-- [x] **Clickable author** → попап у каталозі з кнопками «Профіль автора →» / «Фото на Unsplash →»
-- [x] **API key в `.env`** через нативний `EXPO_PUBLIC_UNSPLASH_KEY` (Expo SDK 54), fallback на hardcoded для перехідного періоду
-- [x] **«Powered by Unsplash»** в About-footer — клікабельний
-- [→] «Photo by X on Unsplash» окремим рядком — наразі через author-row + попап. Додамо якщо Unsplash review запросить explicit credit
-- [→] Source maps upload до Sentry — техдовг, при першому EAS release
-
-### Phase 2: Store-готовність (~5 днів)
-
-#### 🎨 v3.7.2 — Store assets + onboarding (3 дні)
-- [x] Onboarding screen (3 слайди: Каталог → Улюблені → Автозміна) — first launch only
-- [x] Share app button у Settings (`Share.share` з Play Store URL)
-- [x] Rate app prompt через `expo-store-review` (після 10 успішних setWallpaper)
-- [x] Privacy Policy (написана руками, у `docs/`, готово до GitHub Pages)
-- [x] Permission rationale dialogs (для READ_MEDIA_IMAGES — пояснити чому)
-- [→] Store listing assets — тексти готові в [STORE.md](STORE.md):
-  - [x] App name: `StellarShift` (UA + EN, 12 chars)
-  - [x] Short description: «Свіжі шпалери кожні 15 хвилин. Космос, природа — на ваш вибір.» (UA + EN)
-  - [x] Full description (UA + EN, ~1700 chars кожна)
-  - [ ] Feature graphic 1024×500 — концепт A/B описано, треба намалювати у Figma або згенерити
-  - [ ] 8 скріншотів 1080×2400 — список кадрів є, треба зняти на emulator'і
-  - [x] Іконка через `app.json` adaptive-icon
-  - [x] ASO keywords UA + EN
-  - [x] Data Safety form — відповіді готові
-- [→] Generate release keystore + backup в bitwarden — інструкція готова в [RELEASE.md](RELEASE.md), виконуєш сам коли підемо на launch
-- [x] ProGuard/R8 rules — minify+shrink ввімкнено, keep-rules для `com.gorilas.StellarShift.**`, WorkManager, Kotlin metadata, Sentry SourceFile
-
-#### 🪞 v3.7.4 — Polish wave ✅
-- [x] Slogan rebrand → «Тисячі настроїв, що оновлюються самі» / «A thousand moods, refreshing themselves»
-- [x] About-footer симетричне «Зроблено з ❤️ в Україні» / «Made with ❤️ from Ukraine»
-- [x] Cheer toast на save-to-gallery + set-wallpaper (рандомна фраза з пулу 5)
-- [x] Drop Anime category (Unsplash content mismatch — лишали з v3.1.0 даремно)
-- [x] Catalog tab «Каталог» / «Catalog» (бренд лишився в title через окремий ключ `catalog.brand`)
-- [x] Sort categories by current-locale alphabet (Intl.Collator замість хардкоду UA)
-- [x] Adaptive-icon foreground rescale 80% — launcher safe-zone fix
-- [x] Manifest cleanup: прибрано READ_MEDIA_AUDIO / VIDEO / VISUAL_USER_SELECTED через surgical edit (custom Kotlin folder bypass-ить expo prebuild)
-- [x] Bug-2 fix: Alert text підказує натиснути «Зберегти» знову після grant'а через системні налаштування
-- [x] [feature-graphic-brief.md](docs/feature-graphic-brief.md) ТЗ для дизайнера/AI
-- [x] README rewrite з rules-doc у справжній GitHub README
-- [x] GitHub Pages baseurl fix (404 на privacy URL до v3.7.4)
-- [x] Soul wave — реалізовано окремо у v3.7.5 (див. нижче)
-
-#### 🌟 v3.7.5 — Soul wave ✅
-- [x] Blessing pool: UA 10→20, EN 6→20 (EN-набір з «Stand with Ukraine»)
-- [x] 13 нових унікальних SVG-іконок (тематичні пари UA/EN ділять іконку)
-- [x] Launch-greeting: благословення раз на ≥6 год при cold start, slide-from-top, auto-dismiss 5с, Settings-toggle (default ON), гейт проти onboarding
-- [x] Tech-debt разом: прибрано Wi-Fi/charging toggles, untrack `debug.keystore`
-- [→] BYO key encryption (`expo-secure-store`) — відкладено, plaintext поки ок (особистий ключ на власному пристрої)
-- [→] PL/DE/ES — лишається в IDEAS BANK
-
-#### 🤲 v3.7.6 — Catalog in-hand polish ✅
-- [x] Swipe між фото в модалці (FlatList-пейджер, double-tap зберігся)
-- [x] Swipe по гриду → сусідня категорія (порядок чіпів, стоп на краях, haptic, авто-скрол чіпа, off у пошуку)
-- [x] Search history — 5 останніх запитів чіпами під полем
-- [x] Haptics: улюблені (light) / шпалера встановлена (success) / блокування (warning)
-- [x] Pool-fetch race закрито — AbortController, останній виклик виграє
-- [x] Deps trim: −9 пакетів (37→28), ~2-4 MB з APK (expo-image, reanimated+worklets, network, web-browser, symbols, web+dom, status-bar)
-
-#### 📌 v3.7.7 — Catalog yours ✅
-- [x] Long-press на чіп → закріпити (шпилька, після Mix) / приховати (зникає з ряду і свайпу)
-- [x] Settings → «Сховані категорії»: лічильник + sheet з поверненням по одній / всіх
-- [x] Search suggestions: рандомні 6 з 12 EN-запитів, коли історія порожня
-- [x] Local release signing: `assembleRelease` підписується production-ключем через глобальні gradle.properties — локальні і EAS APK взаємозамінні
-- [x] Crop preview закрито свідомо (модалка вже показує кроп)
-
-#### 🧪 v3.7.8 — Beta + Unsplash submission (2 дні)
-- [ ] Production build через EAS
-- [ ] Internal testing track в Play Console (20 тестерів)
-- [ ] Data Safety Form в Play Console
-- [ ] **Submit to Unsplash for Production approval**
-  - Demo video 30-60 сек (YouTube unlisted)
-  - App description (~150 слів англ)
-  - How API used (~100 слів)
-  - Live URL = internal track
-  - Screenshots
-  - Privacy policy URL
-- [ ] Bug-полювання від тестерів
-
-### Phase 3: ⏳ Чекання (1-2 тижні)
-- ⏳ Unsplash review (типово 5-14 днів)
-- ⏳ Internal QA (паралельно)
-- 🛠 **Паралельна робота:** Premium foundation R&D, RevenueCat setup, LW prototype experiments
-
-### Phase 4: 🚀 LAUNCH 1 (1 день)
-
-#### v3.8.0 — Public Play Store release
-- [ ] Production Unsplash API key → в `.env`
-- [ ] BYO стає **optional** ("Розширені налаштування → Свій ключ Unsplash")
-- [ ] Final QA на trio devices (Samsung Android 12, Pixel 14, бюджетник 11)
-- [ ] Production rollout staged: 10% → 50% → 100%
-- [ ] 🎉 Public!
+### v4.1.0 — 🎨 Collections + favorites UX
+- [ ] **Колекції / mood-паки** — référенс Walpy: куровані добірки hero-картками (велике фото + «N Photos» + назва + куратор), всередині — грид. Наші: «Шлях чумацький», «Неонова ніч», «Тиша гір»…
+- [ ] **Серце прямо на тайлах гриду** (каталог) — улюблені без відкриття модалки. Référенс Walpy: анімація — контур серця обводиться і заповнюється
+- [ ] Smart shuffle: пул автозміни вчиться на лайках (улюблені категорії отримують більшу вагу)
 
 ---
 
-## 💰 Phase 5: Монетизація
+## 💡 IDEAS BANK
 
-### v3.9.0 — Premium foundation (1 тиждень)
-- [ ] RevenueCat setup + `react-native-purchases`
-- [ ] Play Console — створити IAP product (₴99 одноразово)
-- [ ] Paywall screen дизайн
-- [ ] **Premium фічі (валідуємо funnel):**
-  - [ ] Sleep hours (не міняти 23:00-7:00)
-  - [ ] Collections / mood packs (3-5 curated)
-  - [ ] Backup/restore (export/import JSON)
-  - [ ] 15 хв інтервал
-  - [ ] Кілька BYO ключів з ротацією
-- [ ] Премі-індикатор в Settings ("⭐ StellarShift Premium")
-- [ ] Restore purchases flow
+> Без зобов'язань. Дописуємо щоразу як приходить нова ідея.
 
-### v3.9.1 — Premium production launch (2 дні)
-- [ ] Beta тестування Premium з 5-10 юзерами
-- [ ] Update store listing з premium згадкою
-- [ ] 🎉 Premium live!
-
----
-
-## 🌌 Phase 6: KILLER FEATURE
-
-### v4.0.0 — Live Wallpaper (2 тижні)
-- [ ] **R&D prototype** (1-2 дні ПЕРЕД full scope) — підтвердити технічну здійсненність на Samsung One UI
-- [ ] Custom Android `WallpaperService` (Kotlin)
-- [ ] **Tilt parallax** через gyroscope (~3 дні)
-- [ ] **Scroll parallax** через `onOffsetsChanged` (~2 дні) — Nova/Lawnchair/Pixel
-- [ ] Samsung One UI fallback на tilt-only
-- [ ] **Smooth transitions** між шпалерами (fade) — 1 день
-- [ ] Battery optimization (`onVisibilityChanged`, FPS cap 30) — 1 день
-- [ ] Settings: інтенсивність ефекту (slider), tilt/scroll on/off — 1 день
-- [ ] Performance test на 5 девайсах
-- [ ] **Demo video** для Play Store (15 сек, продає сам себе)
-- [ ] **Підняти ціну Premium до ₴199**
-- [ ] Update store listing — LW як headliner
-- [ ] PR-event: announce в дев-спільнотах, можливо прес-реліз
-
----
-
-## 🔮 Phase 7+: Beyond v4
-
-### v4.1.x — LW polish (ongoing)
-- [ ] Easter egg в LW (тап у певне місце шпалери = шторм зірок)
-- [ ] Анімовані переходи між пулом (різні стилі: zoom, slide, dissolve)
-- [ ] Custom intensity presets (Subtle / Normal / Intense)
-
-### v4.2+ — Tier S фічі
-- [ ] Шпалера дня (curated, push о 8:00)
-- [ ] Smart shuffle (адаптується під лайки)
-- [ ] Колекції grow (10+ mood packs)
-- [ ] Weather-based (інтеграція з weather API)
-
-### v5.0 — Major rethink
-- [ ] iOS port? (якщо userbase виправдає)
-- [ ] Multi-device sync (Firebase/Supabase)
-- [ ] AI-generated wallpapers (Stable Diffusion / Replicate)
-- [ ] Web version для preview
-
----
-
-# 💡 IDEAS BANK
-
-> Окремий блок — все що ми обговорили + додатково. Без зобов'язань зробити.
-> Сюди дописуємо щоразу як приходить нова ідея.
-
-## 🎨 UI/UX дрібниці (швидкі, 1-2 год кожна)
-- [x] Swipe між фото в модалці (left/right через каталог) — зроблено 2026-06-10, FlatList-пейджер
-- [x] Swipe по гриду → сусідня категорія (порядок чіпів, стоп на краях, haptic, вимкнено в пошуку) — зроблено 2026-06-10
-- [ ] Pinch-to-zoom + pan у модалці — відкладено свідомо: конфлікт жестів зі swipe-пейджером (зум ≠ scale 1 має блокувати гортання), робити окремим заходом
-- [x] Long-press на категорію в каталозі → швидке меню "закріпити / приховати" — зроблено 2026-06-10. Pinned одразу після Mix зі шпилькою; hidden зникають з ряду і свайпу, повертаються через Settings → «Сховані категорії»
-- [x] Search history — останні 5 запитів під полем — зроблено 2026-06-10, чіпи при фокусі
-- [x] Search suggestions (популярні запити) — зроблено 2026-06-10: рандомні 6 з пулу 12 EN-запитів, коли історія порожня
-- [ ] Кращі error states (карточка з причиною + retry, не emoji-toast)
+### 🎨 UI/UX
+- [ ] Pinch-to-zoom + pan у модалці — відкладено свідомо: конфлікт жестів зі swipe-пейджером, робити scale-aware жестом окремим заходом
 - [ ] Color palette extraction з фото (3 домінуючі кольори)
-- [ ] Dark/light theme switcher (хоча додаток зараз dark-only by design)
-- [ ] Haptic feedback на ключові дії (вже частково через expo-haptics)
+- [ ] Кращі error states — карточка з причиною (частково є з v3.7.3)
+- [ ] Dark/light theme switcher (зараз dark-only by design)
 
-## 🚀 Середні фічі (півдня)
-- [ ] Bulk actions у Favorites (multi-select → mass delete/share/setWallpaper)
-- [ ] Permission rationale screens (custom UI перед system prompt)
-- [ ] Photo info screen — full credit + Open on Unsplash
-- [x] ~~Crop preview перед setWallpaper~~ — закрито свідомо 2026-06-10: модалка вже показує фото cover-кропом на весь екран, лишався б тільки мок-лаунчер поверх — не вартий півдня роботи
-- [ ] "Wallpaper of the day" — головний екран запропонує 1 photo
+### 🚀 Середні
+- [ ] Bulk actions у Favorites (multi-select → mass delete/share)
+- [ ] Photo info screen — full credit + EXIF-вайби
+- [ ] "Wallpaper of the day" — головний екран пропонує 1 фото
 
-## 🔥 Великі фічі (день+)
-- [ ] **Quick Settings Tile** (Android) — кнопка "Наступні шпалери" в шторці
-- [ ] **Home screen widget** — поточні шпалери + Skip button
-- [ ] **Notification з поточним фото** для autoChange + Like/Skip/Block
+### 🔥 Великі
+- [ ] **Quick Settings Tile** — «Наступна шпалера» в шторці
+- [ ] **Home screen widget** — поточна шпалера + Skip
 - [ ] **TalkBack accessibility** + WCAG AA контрастність
-- [ ] **Sleep hours** ⭐ (Premium)
-- [ ] **Колекції / mood packs** ⭐ (Premium)
-- [ ] **Backup/restore** ⭐ (Premium)
-- [ ] **Smart shuffle** (адаптується під лайки)
-- [ ] **Розклад по часу доби** (ранок=сонце, ніч=зорі)
-- [ ] **Pixabay/Pexels fallback** API коли Unsplash впав у ліміт
-- [ ] **Локальна папка як джерело** ("Мої фото" як категорія)
+- [ ] **Backup/restore** (export/import JSON) — 💎 Premium-кандидат
+- [ ] **Розклад по часу доби** (може злитись із v3.9.0)
+- [ ] **Pixabay/Pexels fallback** коли Unsplash у ліміті
+- [ ] **Локальна папка як джерело** («Мої фото» як категорія)
 - [ ] **Weather-based** (дощ → ноктюрни)
 - [ ] **AI-generated** через Replicate / Stable Diffusion
-- [ ] **Multi-device sync** улюблених (Firebase / Supabase)
+- [ ] **Multi-device sync** (Firebase / Supabase)
 - [ ] **Tasker / Macrodroid** integration
-- [ ] **Family sharing** колекцій
 
-## 🎁 Easter eggs (low priority, fun)
-- [x] **Soul wave** ✅ (зроблено у v3.7.5):
-  - [x] Розширено blessing pool: UA 10 → 20, EN 6 → 20
-  - [x] EN-набір включає `"Stand with Ukraine"` — бренд-сигнал, не агресивно політичний
-  - [x] 13 нових унікальних SVG-іконок у бренд-палітрі (тематичні пари UA/EN ділять іконку)
-  - [x] **Launch greeting blessing** — cold start після ≥6 год: slide-from-top банер, auto-dismiss 5с, Settings toggle (default ON). Ритуал «один раз на день».
-- [ ] Easter egg в LW (тап в певне місце шпалери = шторм зірок)
-- [ ] Holiday themes (24 грудня — снігопад в каталозі, 24 серпня — салют)
-- [ ] Hidden achievements ("100 шпалер змінено", "30 днів autoChange")
+### 🎁 Easter eggs
+- [ ] Easter egg в LW (тап у певне місце шпалери = шторм зірок)
+- [ ] Holiday themes (24 грудня — снігопад, 24 серпня — салют)
+- [ ] Hidden achievements («100 шпалер змінено», «30 днів autoChange»)
 
-## ⚙️ Технічний борг / cleanup
-- [x] Прибрати `app-example/` папку (boilerplate, шумить TS errors) — папка вже не існує, запис у `.gitignore` лишився як no-op
-- [x] Прибрати Wi-Fi-only / Charging-only toggles з Settings (друг каже зайве) — зроблено у v3.7.5
-- [ ] Unit tests для `services/blocked.ts`, `services/unsplashKey.ts`
-- [ ] E2E тести через Maestro / Detox
-- [x] Bundle size audit (видалити неюзані deps) — 2026-06-10: −9 пакетів (expo-image, reanimated+worklets, expo-network, expo-web-browser, expo-symbols, react-native-web, react-dom, expo-status-bar). Native-частина ~2-4 MB з APK. Лишили expo-linking/font/system-ui — peer-залежності router/icons/userInterfaceStyle
-- [x] **`loadAndStart` race window у settings.tsx** — закрито 2026-06-10: AbortController у `loadPhotoPool`, останній виклик абортить попередній in-flight fetch. Stale-пул більше не може дійти до `startWallpaperRotation`; abort — тихий (без error-toast), спінер гаситься тільки актуальним викликом.
+### ⚙️ Технічний борг
+- [ ] Unit tests для `services/blocked.ts`, `services/unsplashKey.ts` (jest з нуля)
+- [ ] E2E через Maestro / Detox
+- [ ] i18n namespace splitting — на момент 4-ї мови (locales по ~300 рядків стануть боляче рости)
+- [ ] Localization PL/DE/ES — PL першою (найбільша діаспора)
 
-## 💼 Бізнес / маркетинг
-- [ ] ProductHunt запуск після v4.0.0
-- [ ] Reddit r/Android запуск
-- [ ] DTF / Habr стаття "Як я зробив live wallpaper з parallax"
-- [ ] TikTok / Instagram reels з демо LW
-- [ ] App Store Optimization (ASO) — keyword research для UA + EN
-- [ ] Localization PL/DE/ES (велика українська діаспора). Брати PL першою — найбільша діаспора, спільне коріння робить переклад швидшим. На момент 4-ї мови — i18n namespace splitting (settings.json / catalog.json / common.json) — поточні locales по 281 рядку стануть боляче рости.
-- [ ] iOS port (якщо успіх на Android)
-
-## 🛡 Security / privacy
-- [ ] Hash BYO ключа в AsyncStorage (зараз plain text)
-- [ ] Опціональний PIN-lock на додаток (для приватних колекцій)
-- [ ] GDPR compliance audit (для EU юзерів)
+### 🛡 Security / privacy
+- [ ] BYO ключ: `expo-secure-store` замість plaintext — відкладено свідомо (особистий ключ на власному пристрої, ризик мінімальний)
+- [ ] Опціональний PIN-lock на застосунок
 - [ ] Audit network requests — нічого зайвого не іде
-
-## 📊 Analytics (опційно, після Sentry)
-- [ ] PostHog або Plausible для product analytics
-- [ ] Funnel: install → first wallpaper → first favorite → autoChange enabled → premium
-- [ ] Heatmap які категорії популярні
-- [ ] Conversion rate Free → Premium
 
 ---
 
-## 📅 Зведена timeline
+## 🧊 ЗАМОРОЖЕНО — Play Store трек
+
+> Свідомо на паузі (2026-06-10): спершу продукт для себе і друзів. Повернення = розморозити цю секцію, все готове.
+
+**Готові асети (нічого не робити повторно):**
+- ✅ Release keystore (E:\Coding_Projects\Secrets\ + Bitwarden + EAS)
+- ✅ Production-підпис локально і в EAS — взаємозамінний
+- ✅ STORE.md (повний листинг UA+EN), LAUNCH.md (runbook), RELEASE.md (keystore-гайд)
+- ✅ Feature graphic ×3, 8 скріншотів (img/), Privacy Policy live на GH Pages
+- ✅ Unsplash compliance в коді (download tracking, UTM, attribution)
+- ✅ ProGuard/R8, Sentry
+
+**Кроки при розморозці (за [LAUNCH.md](LAUNCH.md)):**
+1. Дочекатись/перевірити Play Console identity verification
+2. Demo video 15–30 сек (єдиний відсутній артефакт!)
+3. `eas build --profile production` (AAB) → Internal Testing track
+4. Unsplash production application (STEP 8 LAUNCH.md)
+5. ⏳ Unsplash review 5–14 днів → production key у `.env` → видалити hardcoded fallback (`components/categories.ts`)
+6. Staged rollout 10% → 50% → 100%
+
+**Монетизація (тільки після Store):**
+- RevenueCat + `react-native-purchases`, IAP product
+- 💎 Premium-набір уже росте органічно: Notification companion (v3.8.0), Sleep hours (v3.9.0), **LW як headliner (v4.0.0)**, Backup/restore, Collections
+- Ціна: ₴99 → ₴199 з LW
+- ProductHunt / Reddit / TikTok — після LW
+
+---
+
+## 📅 Зведена timeline (без дедлайнів)
 
 ```
-            3.6.0  ✅ Block photos
-            3.6.1  ✅ Undo toasts, empty states, gold refresh
-            3.7.0  ✅ i18n EN+UK
-            3.7.1  ✅ Unsplash compliance + Sentry + .env
-NOW →       3.7.2  Onboarding, store assets, Privacy Policy
-+3 дні      3.7.2  Onboarding, store assets
-+2 дні      3.7.3  Beta + Unsplash submit
-+1-2 тижні  ⏳     Чекаємо Unsplash review
-+1 день     3.8.0  🚀 PUBLIC LAUNCH (free)
-+1 тиждень  3.9.0  💰 Premium foundation
-+2 дні      3.9.1  Premium launch (₴99)
-+2 тижні    4.0.0  🌌 Live Wallpaper (₴199)
-                   = killer feature
+NOW →  3.7.8  ✅ Wallpaper control (картка + історія тіків)
+next   3.8.0  🔔 Notification companion
+потім  3.9.0  😴 Sleep hours
+потім  4.0.0  🌌 Live Wallpaper (tilt parallax)
+потім  4.1.0  🎨 Collections + favorites UX
+…      🧊 Store — коли самі захочемо
 ```
-
-**До public launch:** ~3 тижні роботи + 2 тижні чекання = **~5 тижнів календарно**
-**До монетизації:** +1 тиждень = **~6-7 тижнів**
-**До killer-feature LW:** +2 тижні = **~8-9 тижнів**
 
 ---
 
 ## 🎯 Принципи
 
-1. **Дедлайнів немає.** Це не спринт, це ремесло.
-2. **Якість > швидкість.** Кожна версія має почуватись cared for.
-3. **Друзі — основний фідбек-канал.** Якщо їм заходить — заходить всім.
-4. **Easter eggs зберігаємо.** Це душа додатку.
-5. **Українська ідентичність — частина бренду.** Прапор у благословеннях, "Розроблено з 🤝 Братаном".
-6. **Premium має давати магію, не просто QoL.** Тому LW = headliner.
+1. **Продукт для себе і друзів перш за все.** Store — коли дозріємо, не навпаки.
+2. **Дедлайнів немає.** Це не спринт, це ремесло.
+3. **Якість > швидкість.** Кожна версія має почуватись cared for.
+4. **Друзі — основний фідбек-канал.** Якщо їм заходить — заходить всім.
+5. **Easter eggs зберігаємо.** Це душа застосунку.
+6. **Українська ідентичність — частина бренду.** Прапор у благословеннях, «Зроблено з ❤️ в Україні».
+7. **Premium має давати магію, не просто QoL.** Тому LW = headliner. Premium-кандидати позначаємо 💎 уже зараз.
 
 ---
 
-*Last updated: 2026-04-30 (v3.7.2 — onboarding done)*
-*Next update: після завершення v3.7.2 (Share/Rate/Privacy/Permission rationale/Store assets)*
+*Last updated: 2026-06-11 (Roadmap 2.0 — без store-дедлайнів, v3.7.8 закрито)*
+*Next update: після v3.8.0 Notification companion*
