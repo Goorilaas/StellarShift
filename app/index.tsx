@@ -28,7 +28,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { SvgXml } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { Blessing, nextBlessingFromQueue } from '../components/blessings';
-import { Category, CATEGORIES, CHAOS_CATEGORY, CHAOS_QUERIES, filterNoPeople, Photo, sortCategoriesByLabel } from '../components/categories';
+import { Category, CATEGORIES, CHAOS_CATEGORY, CHAOS_QUERIES, filterNoPeople, Photo, SEARCH_SUGGESTIONS, sortCategoriesByLabel } from '../components/categories';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { ensureGalleryPermission } from '../services/galleryPermission';
 import { randomCheer } from '../services/cheer';
@@ -121,6 +121,10 @@ export default function HomeScreen() {
   const [searchText, setSearchText] = useState('');
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [searchFocused, setSearchFocused] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [pinnedCats, setPinnedCats] = useState<string[]>([]);
+  const [hiddenCats, setHiddenCats] = useState<string[]>([]);
+  const [catMenuTarget, setCatMenuTarget] = useState<Category | null>(null);
   const [settingWallpaper, setSettingWallpaper] = useState(false);
   const [chaosUnlocked, setChaosUnlocked] = useState(false);
   const [showHeart, setShowHeart] = useState(false);
@@ -213,10 +217,13 @@ export default function HomeScreen() {
     useCallback(() => {
       AsyncStorage.getItem('easter_unlocked').then(v => setChaosUnlocked(v === '1'));
       getBlockedIds().then(setBlockedIds);
+      // pin/hide перечитуємо на focus — Settings міг повернути приховані
+      AsyncStorage.getItem('pinned_categories').then(v => setPinnedCats(v ? JSON.parse(v) : [])).catch(() => { });
+      AsyncStorage.getItem('hidden_categories').then(v => setHiddenCats(v ? JSON.parse(v) : [])).catch(() => { });
     }, [])
   );
 
-  const categoryList = sortCategoriesByLabel(
+  const sortedList = sortCategoriesByLabel(
     chaosUnlocked
       ? [
           ...CATEGORIES.filter(c => c.id === 'mix'),
@@ -227,6 +234,12 @@ export default function HomeScreen() {
     t,
     i18n.language,
   );
+  // Порядок ряду: Mix → закріплені (в порядку закріплення) → решта мінус приховані
+  const categoryList = [
+    ...sortedList.filter(c => c.id === 'mix'),
+    ...pinnedCats.map(id => sortedList.find(c => c.id === id)).filter((c): c is Category => !!c),
+    ...sortedList.filter(c => c.id !== 'mix' && !pinnedCats.includes(c.id) && !hiddenCats.includes(c.id)),
+  ];
 
   useEffect(() => {
     return () => abortRef.current?.abort();
@@ -516,6 +529,36 @@ export default function HomeScreen() {
     setPhotos([]);
   };
 
+  const persistPinned = (next: string[]) => {
+    setPinnedCats(next);
+    AsyncStorage.setItem('pinned_categories', JSON.stringify(next)).catch(() => { });
+  };
+  const persistHidden = (next: string[]) => {
+    setHiddenCats(next);
+    AsyncStorage.setItem('hidden_categories', JSON.stringify(next)).catch(() => { });
+  };
+
+  // Pin і hide взаємовиключні: закріплення знімає приховання і навпаки
+  const togglePinCategory = (cat: Category) => {
+    const isPinned = pinnedCats.includes(cat.id);
+    persistPinned(isPinned ? pinnedCats.filter(id => id !== cat.id) : [...pinnedCats, cat.id]);
+    if (!isPinned && hiddenCats.includes(cat.id)) {
+      persistHidden(hiddenCats.filter(id => id !== cat.id));
+    }
+    Haptics.selectionAsync().catch(() => { });
+    setCatMenuTarget(null);
+  };
+
+  const hideCategory = (cat: Category) => {
+    if (!hiddenCats.includes(cat.id)) persistHidden([...hiddenCats, cat.id]);
+    if (pinnedCats.includes(cat.id)) persistPinned(pinnedCats.filter(id => id !== cat.id));
+    // ховаємо активну → стрибок на Mix
+    if (activeCategory.id === cat.id) handleCategory(CATEGORIES[0]);
+    Haptics.selectionAsync().catch(() => { });
+    setCatMenuTarget(null);
+    showToast(t('catalog.toast.catHidden'));
+  };
+
   // Swipe по гриду гортає категорії в порядку чіп-рядка. Стоп на краях, без wrap.
   // У режимі пошуку вимкнено — активна «категорія» там синтетична.
   const swipeCategory = (dir: 1 | -1) => {
@@ -666,7 +709,11 @@ export default function HomeScreen() {
             value={searchText}
             onChangeText={setSearchText}
             onSubmitEditing={() => handleSearch()}
-            onFocus={() => setSearchFocused(true)}
+            onFocus={() => {
+              setSearchFocused(true);
+              // свіжа порція підказок на кожен фокус
+              setSuggestions(shuffle(SEARCH_SUGGESTIONS).slice(0, 6));
+            }}
             onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
             returnKeyType="search"
           />
@@ -697,6 +744,23 @@ export default function HomeScreen() {
         </ScrollView>
       )}
 
+      {/* Підказки пошуку: коли історії ще нема — рандомні 5-6 з пулу */}
+      {searchFocused && searchText.length === 0 && searchHistory.length === 0 && suggestions.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          style={styles.historyRow}
+        >
+          {suggestions.map(q => (
+            <TouchableOpacity key={q} style={[styles.historyChip, styles.suggestionChip]} onPress={() => handleSearch(q)}>
+              <SvgXml xml={ICON.sparkle} width={11} height={11} />
+              <Text style={styles.historyChipText}>{q}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+
       {/* Категорії */}
       <FlatList
         ref={catListRef}
@@ -717,11 +781,19 @@ export default function HomeScreen() {
               activeCategory.id === item.id && item.id === 'mix' && styles.chipMixActive,
             ]}
             onPress={() => handleCategory(item)}
+            onLongPress={() => {
+              if (item.id === 'mix') return; // Mix — якір, не чіпаємо
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
+              setCatMenuTarget(item);
+            }}
           >
             <SvgXml xml={item.icon} width={16} height={16} />
             <Text style={[styles.chipText, activeCategory.id === item.id && styles.chipTextActive]}>
               {item.labelKey ? t(item.labelKey) : item.label}
             </Text>
+            {pinnedCats.includes(item.id) && (
+              <SvgXml xml={ICON.pin} width={10} height={10} />
+            )}
           </TouchableOpacity>
         )}
       />
@@ -932,6 +1004,35 @@ export default function HomeScreen() {
         onCancel={() => setBlockConfirm(null)}
       />
 
+      {/* Long-press меню категорії: закріпити / приховати */}
+      <Modal visible={!!catMenuTarget} transparent animationType="fade" onRequestClose={() => setCatMenuTarget(null)}>
+        <Pressable style={styles.catMenuBackdrop} onPress={() => setCatMenuTarget(null)}>
+          {catMenuTarget && (
+            <Pressable style={styles.catMenuCard} onPress={() => { }}>
+              <View style={styles.catMenuHeader}>
+                <SvgXml xml={catMenuTarget.icon} width={18} height={18} />
+                <Text style={styles.catMenuTitle}>
+                  {catMenuTarget.labelKey ? t(catMenuTarget.labelKey) : catMenuTarget.label}
+                </Text>
+              </View>
+              <TouchableOpacity style={styles.catMenuRow} onPress={() => togglePinCategory(catMenuTarget)}>
+                <SvgXml xml={ICON.pin} width={16} height={16} />
+                <Text style={styles.catMenuRowText}>
+                  {pinnedCats.includes(catMenuTarget.id) ? t('catalog.catMenu.unpin') : t('catalog.catMenu.pin')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.catMenuRow} onPress={() => hideCategory(catMenuTarget)}>
+                <SvgXml xml={ICON.blocked} width={16} height={16} />
+                <Text style={styles.catMenuRowText}>{t('catalog.catMenu.hide')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.catMenuCancel} onPress={() => setCatMenuTarget(null)}>
+                <Text style={styles.catMenuCancelText}>{t('common.cancel')}</Text>
+              </TouchableOpacity>
+            </Pressable>
+          )}
+        </Pressable>
+      </Modal>
+
       <Modal visible={authorInfoOpen && !!selectedPhoto} transparent animationType="fade" onRequestClose={() => setAuthorInfoOpen(false)}>
         <Pressable style={styles.authorInfoBackdrop} onPress={() => setAuthorInfoOpen(false)}>
           <Pressable style={styles.authorInfoCard} onPress={(e) => e.stopPropagation()}>
@@ -985,6 +1086,21 @@ const styles = StyleSheet.create({
     borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6, marginRight: 8,
   },
   historyChipText: { color: '#9b96d0', fontSize: 13 },
+  suggestionChip: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  catMenuBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
+  catMenuCard: {
+    backgroundColor: '#15152a', borderRadius: 18, borderWidth: 1, borderColor: '#232347',
+    paddingVertical: 8, width: 260,
+  },
+  catMenuHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 18, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: '#232347',
+  },
+  catMenuTitle: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  catMenuRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 13 },
+  catMenuRowText: { color: '#e8e6f5', fontSize: 14 },
+  catMenuCancel: { alignItems: 'center', paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#232347' },
+  catMenuCancelText: { color: '#9b96d0', fontSize: 14, fontWeight: '600' },
   historyClearBtn: { justifyContent: 'center', paddingHorizontal: 6 },
   historyClearText: { color: '#555', fontSize: 14 },
   catList: { paddingHorizontal: 12, marginBottom: 12, flexGrow: 0 },

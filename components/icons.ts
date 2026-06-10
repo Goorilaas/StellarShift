@@ -174,6 +174,12 @@ export const ICON = {
     <path d="M8 6 L9 9 L11 9 L12 6" stroke="#FFA500" stroke-width="0.8" stroke-linecap="round" fill="none"/>
   </svg>`,
 
+  // Шпилька — закріплена категорія в каталозі (рендериться ~10px на чіпі)
+  pin: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="13" cy="7" r="3.6" fill="#FFD700" stroke="#FFA500" stroke-width="0.8"/>
+    <path d="M10.4 9.6 L4 16" stroke="#AFA9EC" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>`,
+
   // "Не показувати" — око з рискою, viewBox 20x20 (як save/share)
   blocked: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M1.5 10 C3.5 6 6.5 4.2 10 4.2 C13.5 4.2 16.5 6 18.5 10 C16.5 14 13.5 15.8 10 15.8 C6.5 15.8 3.5 14 1.5 10 Z" fill="none" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
