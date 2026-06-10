@@ -109,7 +109,15 @@
 - [→] BYO key encryption (`expo-secure-store`) — відкладено, plaintext поки ок (особистий ключ на власному пристрої)
 - [→] PL/DE/ES — лишається в IDEAS BANK
 
-#### 🧪 v3.7.6 — Beta + Unsplash submission (2 дні)
+#### 🤲 v3.7.6 — Catalog in-hand polish ✅
+- [x] Swipe між фото в модалці (FlatList-пейджер, double-tap зберігся)
+- [x] Swipe по гриду → сусідня категорія (порядок чіпів, стоп на краях, haptic, авто-скрол чіпа, off у пошуку)
+- [x] Search history — 5 останніх запитів чіпами під полем
+- [x] Haptics: улюблені (light) / шпалера встановлена (success) / блокування (warning)
+- [x] Pool-fetch race закрито — AbortController, останній виклик виграє
+- [x] Deps trim: −9 пакетів (37→28), ~2-4 MB з APK (expo-image, reanimated+worklets, network, web-browser, symbols, web+dom, status-bar)
+
+#### 🧪 v3.7.7 — Beta + Unsplash submission (2 дні)
 - [ ] Production build через EAS
 - [ ] Internal testing track в Play Console (20 тестерів)
 - [ ] Data Safety Form в Play Console
