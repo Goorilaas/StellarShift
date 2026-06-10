@@ -158,3 +158,20 @@ export const CHAOS_QUERIES = [
     'cyberdelic neon pink abstract',
     'noise static analog texture',
 ];
+
+// Підказки пошуку — показуються рандомні 5-6, коли історія пошуку порожня.
+// EN-запити: Unsplash шукає англійською найкраще (категорійні query теж EN).
+export const SEARCH_SUGGESTIONS = [
+    'milky way',
+    'northern lights',
+    'rainy window',
+    'pastel sky',
+    'dark moody forest',
+    'neon signs',
+    'lavender field',
+    'ocean waves',
+    'autumn road',
+    'minimal architecture',
+    'starry night',
+    'desert dunes',
+];

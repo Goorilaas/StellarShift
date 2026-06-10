@@ -28,7 +28,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { SvgXml } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { Blessing, nextBlessingFromQueue } from '../components/blessings';
-import { Category, CATEGORIES, CHAOS_CATEGORY, CHAOS_QUERIES, filterNoPeople, Photo, sortCategoriesByLabel } from '../components/categories';
+import { Category, CATEGORIES, CHAOS_CATEGORY, CHAOS_QUERIES, filterNoPeople, Photo, SEARCH_SUGGESTIONS, sortCategoriesByLabel } from '../components/categories';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { ensureGalleryPermission } from '../services/galleryPermission';
 import { randomCheer } from '../services/cheer';
@@ -121,6 +121,7 @@ export default function HomeScreen() {
   const [searchText, setSearchText] = useState('');
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [searchFocused, setSearchFocused] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [settingWallpaper, setSettingWallpaper] = useState(false);
   const [chaosUnlocked, setChaosUnlocked] = useState(false);
   const [showHeart, setShowHeart] = useState(false);
@@ -666,7 +667,11 @@ export default function HomeScreen() {
             value={searchText}
             onChangeText={setSearchText}
             onSubmitEditing={() => handleSearch()}
-            onFocus={() => setSearchFocused(true)}
+            onFocus={() => {
+              setSearchFocused(true);
+              // свіжа порція підказок на кожен фокус
+              setSuggestions(shuffle(SEARCH_SUGGESTIONS).slice(0, 6));
+            }}
             onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
             returnKeyType="search"
           />
@@ -694,6 +699,23 @@ export default function HomeScreen() {
           <TouchableOpacity style={styles.historyClearBtn} onPress={clearSearchHistory} hitSlop={8}>
             <Text style={styles.historyClearText}>✕</Text>
           </TouchableOpacity>
+        </ScrollView>
+      )}
+
+      {/* Підказки пошуку: коли історії ще нема — рандомні 5-6 з пулу */}
+      {searchFocused && searchText.length === 0 && searchHistory.length === 0 && suggestions.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          style={styles.historyRow}
+        >
+          {suggestions.map(q => (
+            <TouchableOpacity key={q} style={[styles.historyChip, styles.suggestionChip]} onPress={() => handleSearch(q)}>
+              <SvgXml xml={ICON.sparkle} width={11} height={11} />
+              <Text style={styles.historyChipText}>{q}</Text>
+            </TouchableOpacity>
+          ))}
         </ScrollView>
       )}
 
@@ -985,6 +1007,7 @@ const styles = StyleSheet.create({
     borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6, marginRight: 8,
   },
   historyChipText: { color: '#9b96d0', fontSize: 13 },
+  suggestionChip: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   historyClearBtn: { justifyContent: 'center', paddingHorizontal: 6 },
   historyClearText: { color: '#555', fontSize: 14 },
   catList: { paddingHorizontal: 12, marginBottom: 12, flexGrow: 0 },
