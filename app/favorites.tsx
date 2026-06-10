@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as Haptics from 'expo-haptics';
 import * as MediaLibrary from 'expo-media-library';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
@@ -78,6 +79,7 @@ export default function FavoritesScreen() {
             const target = s ? (JSON.parse(s).applyTo ?? 'both') : 'both';
             await setWallpaperFromUrl(photo.urls.regular, target, { id: photo.id, small: photo.urls.small, downloadLocation: photo.links?.download_location });
             setSelectedPhoto(null);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
             showToast(t('favorites.toast.applied'));
         } catch {
             showToast(t('favorites.toast.applyFail'));
