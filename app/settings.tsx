@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { isCancel } from 'axios';
 import Constants from 'expo-constants';
+import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +12,8 @@ import {
     Easing,
     Image,
     Linking,
+    Modal,
+    Pressable,
     ScrollView,
     Share,
     StyleSheet,
@@ -22,7 +25,7 @@ import {
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { CATEGORIES, Category, CHAOS_CATEGORY, CHAOS_QUERIES, FAVORITES_CATEGORY, filterNoPeople, sortCategoriesByLabel } from '../components/categories';
-import { BlockedPhoto, clearBlocked, getBlocked, getBlockedIds, setBlockedAll, unblockPhoto } from '../services/blocked';
+import { blockPhoto, BlockedPhoto, clearBlocked, getBlocked, getBlockedIds, setBlockedAll, unblockPhoto } from '../services/blocked';
 import { clearUserKey, getUnsplashKey, getUserKey, setUserKey, useUnsplashKey, validateKey } from '../services/unsplashKey';
 import { openUnsplashHome } from '../services/unsplashTracking';
 import BlockedManagerSheet from '../components/BlockedManagerSheet';
@@ -34,7 +37,7 @@ import Toast, { useToastQueue } from '../components/Toast';
 
 import { Blessing, nextBlessingFromQueue } from '../components/blessings';
 import { GREETING_ENABLED_KEY } from '../components/LaunchGreeting';
-import { changeWallpaperNow, clearHistory, getHistory, HistoryEntry, isIgnoringBatteryOptimization, PoolItem, requestIgnoreBatteryOptimization, setUnsplashKeyNative, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation } from '../services/wallpaperService';
+import { changeWallpaperNow, clearHistory, getHistory, HistoryEntry, isIgnoringBatteryOptimization, PoolItem, requestIgnoreBatteryOptimization, setUnsplashKeyNative, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation, syncNativeHistory } from '../services/wallpaperService';
 
 const DEFAULT_MIX = CATEGORIES.filter(c => c.id !== 'mix').map(c => c.id);
 
@@ -102,6 +105,8 @@ export default function SettingsScreen() {
     const [blockedSheetOpen, setBlockedSheetOpen] = useState(false);
     const [hiddenCats, setHiddenCats] = useState<string[]>([]);
     const [hiddenCatsSheetOpen, setHiddenCatsSheetOpen] = useState(false);
+    const [favIds, setFavIds] = useState<string[]>([]);
+    const [histMenuTarget, setHistMenuTarget] = useState<HistoryEntry | null>(null);
     const [clearBlockedOpen, setClearBlockedOpen] = useState(false);
     const loaded = useRef(false);
     const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -316,8 +321,10 @@ export default function SettingsScreen() {
     useFocusEffect(
         useCallback(() => {
             loadSettings();
-            getHistory().then(setHistory);
+            // спершу зливаємо native-буфер (WorkManager-тіки), тоді читаємо
+            syncNativeHistory().then(() => getHistory().then(setHistory));
             getBlocked().then(setBlocked);
+            AsyncStorage.getItem('favorites').then(v => setFavIds(v ? JSON.parse(v) : [])).catch(() => { });
             AsyncStorage.getItem('hidden_categories').then(v => setHiddenCats(v ? JSON.parse(v) : [])).catch(() => { });
             // Якщо catalog заблокував фото — пул автозміни треба перебудувати
             AsyncStorage.getItem('pool_dirty').then(async dirty => {
@@ -521,6 +528,79 @@ export default function SettingsScreen() {
         setClearHistoryOpen(false);
         await clearHistory();
         setHistory([]);
+    };
+
+    // ── Керування шпалерами з історії (включно з «Зараз на екрані») ──
+
+    const timeAgo = (ts: number): string => {
+        const m = Math.floor((Date.now() - ts) / 60000);
+        if (m < 1) return t('settings.current.justNow');
+        if (m < 60) return t('settings.current.minAgo', { count: m });
+        const h = Math.floor(m / 60);
+        if (h < 24) return t('settings.current.hourAgo', { count: h });
+        return new Date(ts).toLocaleDateString();
+    };
+
+    // В улюблені треба ПОВНЕ фото (автор, лінки) — історія має лише id+url,
+    // тому тягнемо метадані одним запитом GET /photos/:id.
+    const favoriteFromHistory = async (h: HistoryEntry) => {
+        setHistMenuTarget(null);
+        if (favIds.includes(h.id)) {
+            showToast(t('settings.toast.favExists'));
+            return;
+        }
+        try {
+            const key = await getUnsplashKey();
+            const r = await axios.get(`https://api.unsplash.com/photos/${h.id}`, {
+                headers: { Authorization: `Client-ID ${key}` },
+            });
+            const photo = r.data;
+            const raw = await AsyncStorage.getItem('favorites_data');
+            const data: any[] = raw ? JSON.parse(raw) : [];
+            if (!data.some(p => p.id === photo.id)) {
+                const newData = [...data, photo];
+                await AsyncStorage.setItem('favorites_data', JSON.stringify(newData));
+                await AsyncStorage.setItem('favorites', JSON.stringify(newData.map(p => p.id)));
+            }
+            setFavIds(prev => [...prev, h.id]);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
+            showToast(t('settings.toast.favAdded'));
+        } catch {
+            showToast(t('settings.toast.favFetchFail'));
+        }
+    };
+
+    const blockFromHistory = async (h: HistoryEntry) => {
+        setHistMenuTarget(null);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => { });
+        await blockPhoto({ id: h.id, small: h.small ?? h.url });
+        setBlocked(await getBlocked());
+        // silent з улюблених, як у каталозі
+        if (favIds.includes(h.id)) {
+            const raw = await AsyncStorage.getItem('favorites_data');
+            const data: any[] = raw ? JSON.parse(raw) : [];
+            const newData = data.filter(p => p.id !== h.id);
+            await AsyncStorage.setItem('favorites_data', JSON.stringify(newData));
+            await AsyncStorage.setItem('favorites', JSON.stringify(newData.map(p => p.id)));
+            setFavIds(prev => prev.filter(id => id !== h.id));
+        }
+        const isCurrent = history[0]?.id === h.id;
+        if (autoChangeRef.current) {
+            // перебудувати пул БЕЗ заблокованого перед зміною, щоб воно не випало знову
+            await loadAndStart();
+            if (isCurrent) {
+                // «Прибрати гидоту»: заблокував поточну → вона зникає з екрана негайно
+                try {
+                    await changeWallpaperNow();
+                    showToast(t('settings.toast.nastyGone'));
+                } catch { /* порожній пул — нічого міняти */ }
+                syncNativeHistory().then(() => getHistory().then(setHistory));
+            } else {
+                showToast(t('catalog.toast.blocked'));
+            }
+        } else {
+            showToast(t('catalog.toast.blocked'));
+        }
     };
 
     // Сховані категорії каталогу: повернення. Каталог перечитує на focus.
@@ -747,8 +827,37 @@ export default function SettingsScreen() {
                 </TouchableOpacity>
             )}
 
-            {/* Історія */}
+            {/* Зараз на екрані: history[0] після злиття з native-буфером */}
             {history.length > 0 && (
+                <>
+                    <Text style={styles.sectionLabel}>{t('settings.current.title')}</Text>
+                    <View style={styles.currentCard}>
+                        <Image source={{ uri: history[0].small ?? history[0].url }} style={styles.currentImg} />
+                        <View style={styles.currentInfo}>
+                            <Text style={styles.currentSub}>
+                                {timeAgo(history[0].appliedAt)} · {t(`settings.applyTo.${history[0].target}`)}
+                            </Text>
+                            <View style={styles.currentActions}>
+                                <TouchableOpacity
+                                    style={styles.currentActionBtn}
+                                    onPress={() => favoriteFromHistory(history[0])}
+                                >
+                                    <SvgXml xml={favIds.includes(history[0].id) ? ICON.heartFilled : ICON.heartOutline} width={20} height={20} />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.currentActionBtn}
+                                    onPress={() => blockFromHistory(history[0])}
+                                >
+                                    <SvgXml xml={ICON.blocked} width={20} height={20} />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+                </>
+            )}
+
+            {/* Історія (без поточної — вона в картці зверху). Long-press → меню */}
+            {history.length > 1 && (
                 <>
                     <View style={styles.historyHeader}>
                         <Text style={styles.sectionLabel}>{t('settings.section.history')}</Text>
@@ -757,13 +866,17 @@ export default function SettingsScreen() {
                         </TouchableOpacity>
                     </View>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.historyRow}>
-                        {history.map(h => (
-                            <TouchableOpacity key={`${h.id}-${h.appliedAt}`} style={styles.historyCard} onPress={() => handleReapply(h)}>
-                                {h.small ? (
-                                    <Image source={{ uri: h.small }} style={styles.historyImg} />
-                                ) : (
-                                    <View style={[styles.historyImg, { backgroundColor: '#1a1a2e' }]} />
-                                )}
+                        {history.slice(1).map(h => (
+                            <TouchableOpacity
+                                key={`${h.id}-${h.appliedAt}`}
+                                style={styles.historyCard}
+                                onPress={() => handleReapply(h)}
+                                onLongPress={() => {
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
+                                    setHistMenuTarget(h);
+                                }}
+                            >
+                                <Image source={{ uri: h.small ?? h.url }} style={styles.historyImg} />
                                 <View style={styles.historyOverlay}>
                                     <SvgXml xml={ICON.refresh} width={14} height={14} />
                                 </View>
@@ -1046,6 +1159,31 @@ export default function SettingsScreen() {
             onClearAll={() => { setBlockedSheetOpen(false); setClearBlockedOpen(true); }}
             onClose={() => setBlockedSheetOpen(false)}
         />
+        {/* Long-press меню запису історії: улюблені / більше ніколи / застосувати */}
+        <Modal visible={!!histMenuTarget} transparent animationType="fade" onRequestClose={() => setHistMenuTarget(null)}>
+            <Pressable style={styles.histMenuBackdrop} onPress={() => setHistMenuTarget(null)}>
+                {histMenuTarget && (
+                    <Pressable style={styles.histMenuCard} onPress={() => { }}>
+                        <Image source={{ uri: histMenuTarget.small ?? histMenuTarget.url }} style={styles.histMenuPreview} />
+                        <TouchableOpacity style={styles.histMenuRow} onPress={() => favoriteFromHistory(histMenuTarget)}>
+                            <SvgXml xml={favIds.includes(histMenuTarget.id) ? ICON.heartFilled : ICON.heartOutline} width={16} height={16} />
+                            <Text style={styles.histMenuRowText}>{t('settings.histMenu.favorite')}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.histMenuRow} onPress={() => blockFromHistory(histMenuTarget)}>
+                            <SvgXml xml={ICON.blocked} width={16} height={16} />
+                            <Text style={styles.histMenuRowText}>{t('settings.histMenu.block')}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.histMenuRow} onPress={() => { const h = histMenuTarget; setHistMenuTarget(null); handleReapply(h); }}>
+                            <SvgXml xml={ICON.refresh} width={16} height={16} />
+                            <Text style={styles.histMenuRowText}>{t('settings.histMenu.reapply')}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.histMenuCancel} onPress={() => setHistMenuTarget(null)}>
+                            <Text style={styles.histMenuCancelText}>{t('common.cancel')}</Text>
+                        </TouchableOpacity>
+                    </Pressable>
+                )}
+            </Pressable>
+        </Modal>
         <HiddenCategoriesSheet
             visible={hiddenCatsSheetOpen}
             hidden={hiddenCats
@@ -1094,6 +1232,28 @@ const styles = StyleSheet.create({
     historyCard: { width: 70, height: 105, borderRadius: 10, overflow: 'hidden', position: 'relative' },
     historyImg: { width: 70, height: 105, borderRadius: 10 },
     historyOverlay: { position: 'absolute', bottom: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 10, padding: 4 },
+    currentCard: {
+        flexDirection: 'row', gap: 14, backgroundColor: '#15152a', borderRadius: 14,
+        borderWidth: 1, borderColor: '#232347', padding: 12, alignItems: 'center',
+    },
+    currentImg: { width: 84, height: 126, borderRadius: 10, backgroundColor: '#1a1a2e' },
+    currentInfo: { flex: 1, gap: 12 },
+    currentSub: { color: '#7a7a90', fontSize: 13 },
+    currentActions: { flexDirection: 'row', gap: 14 },
+    currentActionBtn: {
+        width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: '#2a2a4e',
+        backgroundColor: '#1a1a2e', alignItems: 'center', justifyContent: 'center',
+    },
+    histMenuBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
+    histMenuCard: {
+        backgroundColor: '#15152a', borderRadius: 18, borderWidth: 1, borderColor: '#232347',
+        paddingVertical: 8, width: 260, overflow: 'hidden',
+    },
+    histMenuPreview: { width: 260, height: 130, marginTop: -8, marginBottom: 4 },
+    histMenuRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 13 },
+    histMenuRowText: { color: '#e8e6f5', fontSize: 14 },
+    histMenuCancel: { alignItems: 'center', paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#232347' },
+    histMenuCancelText: { color: '#9b96d0', fontSize: 14, fontWeight: '600' },
     aboutCard: { flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: '#1a1a2e', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#2a2a4e' },
     aboutInfo: { gap: 4 },
     aboutName: { color: '#fff', fontSize: 18, fontWeight: '700' },

@@ -95,6 +95,17 @@
     "history": {
       "clear": "Clear"
     },
+    "current": {
+      "title": "On your screen now",
+      "justNow": "just now",
+      "minAgo": "{{count}} min ago",
+      "hourAgo": "{{count}} h ago"
+    },
+    "histMenu": {
+      "favorite": "Add to favorites",
+      "block": "Never again",
+      "reapply": "Apply again"
+    },
     "byo": {
       "badgeCustom": "your key",
       "badgeDemo": "demo",
@@ -153,6 +164,10 @@
       "enableFirst": "❌ Enable auto-change first",
       "chaosUnlocked": "🌀 Chaos category unlocked!",
       "chaosLocked": "🔒 Chaos hidden again",
+      "favAdded": "💜 Added to favorites",
+      "favExists": "Already in favorites",
+      "favFetchFail": "❌ Couldn't fetch photo data",
+      "nastyGone": "🧹 Nasty one is gone!",
       "unblockedOne": "↺ Unblocked",
       "unblockedAll": "🗑 Unblocked {{count}}",
       "undone": "↺ Reverted"

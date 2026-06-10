@@ -95,6 +95,17 @@
     "history": {
       "clear": "Очистити"
     },
+    "current": {
+      "title": "Зараз на екрані",
+      "justNow": "щойно",
+      "minAgo": "{{count}} хв тому",
+      "hourAgo": "{{count}} год тому"
+    },
+    "histMenu": {
+      "favorite": "В улюблені",
+      "block": "Більше ніколи",
+      "reapply": "Застосувати знову"
+    },
     "byo": {
       "badgeCustom": "свій ключ",
       "badgeDemo": "демо",
@@ -155,6 +166,10 @@
       "enableFirst": "❌ Спочатку увімкни автозміну",
       "chaosUnlocked": "🌀 Категорію «Хаос» розблоковано!",
       "chaosLocked": "🔒 Хаос знову прихований",
+      "favAdded": "💜 Додано в улюблені",
+      "favExists": "Вже в улюблених",
+      "favFetchFail": "❌ Не вдалось отримати дані фото",
+      "nastyGone": "🧹 Гидоту прибрано!",
       "unblockedOne": "↺ Розблоковано",
       "unblockedAll": "🗑 Розблоковано {{count}}",
       "undone": "↺ Повернули"

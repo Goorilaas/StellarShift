@@ -14,6 +14,7 @@ declare module 'react-native' {
             setFromUrl(url: string, target: string): Promise<boolean>;
             setUnsplashKey(key: string): Promise<void>;
             changeNow(): Promise<boolean>;
+            drainPendingHistory(): Promise<string>;
             isIgnoringBatteryOptimization(): Promise<boolean>;
             requestIgnoreBatteryOptimization(): Promise<void>;
         };

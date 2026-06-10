@@ -57,6 +57,31 @@ export const getHistory = async (): Promise<HistoryEntry[]> => {
     return raw ? JSON.parse(raw) : [];
 };
 
+/**
+ * Зливає native-буфер (WorkManager-тіки + changeNow, пишуться в Kotlin)
+ * у AsyncStorage-історію. Викликати перед getHistory() на focus екрана.
+ * Після drain native-буфер порожній — AsyncStorage лишається єдиним
+ * джерелом правди для відображення.
+ */
+export const syncNativeHistory = async (): Promise<void> => {
+    try {
+        const raw: string = await WallpaperModule.drainPendingHistory();
+        const pending: { id: string; url: string; target: string; appliedAt: number }[] = JSON.parse(raw || '[]');
+        if (pending.length === 0) return;
+        const existing = await getHistory();
+        // native-записи новіші за однаковим id → перезаписують; сортуємо за часом
+        const byId = new Map<string, HistoryEntry>();
+        for (const e of existing) byId.set(e.id, e);
+        for (const p of pending) byId.set(p.id, { id: p.id, url: p.url, target: p.target, appliedAt: p.appliedAt });
+        const merged = [...byId.values()]
+            .sort((a, b) => b.appliedAt - a.appliedAt)
+            .slice(0, HISTORY_LIMIT);
+        await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(merged));
+    } catch {
+        // історія — best effort, не ламаємо екран
+    }
+};
+
 export const recordHistory = async (entry: HistoryEntry): Promise<void> => {
     const existing = await getHistory();
     const filtered = existing.filter(e => e.id !== entry.id);
