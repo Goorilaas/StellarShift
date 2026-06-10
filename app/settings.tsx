@@ -21,11 +21,12 @@ import {
     View,
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
-import { CATEGORIES, CHAOS_CATEGORY, CHAOS_QUERIES, FAVORITES_CATEGORY, filterNoPeople, sortCategoriesByLabel } from '../components/categories';
+import { CATEGORIES, Category, CHAOS_CATEGORY, CHAOS_QUERIES, FAVORITES_CATEGORY, filterNoPeople, sortCategoriesByLabel } from '../components/categories';
 import { BlockedPhoto, clearBlocked, getBlocked, getBlockedIds, setBlockedAll, unblockPhoto } from '../services/blocked';
 import { clearUserKey, getUnsplashKey, getUserKey, setUserKey, useUnsplashKey, validateKey } from '../services/unsplashKey';
 import { openUnsplashHome } from '../services/unsplashTracking';
 import BlockedManagerSheet from '../components/BlockedManagerSheet';
+import HiddenCategoriesSheet from '../components/HiddenCategoriesSheet';
 import CategoryPickerSheet from '../components/CategoryPickerSheet';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { ICON } from '../components/icons';
@@ -99,6 +100,8 @@ export default function SettingsScreen() {
     const [history, setHistory] = useState<HistoryEntry[]>([]);
     const [blocked, setBlocked] = useState<BlockedPhoto[]>([]);
     const [blockedSheetOpen, setBlockedSheetOpen] = useState(false);
+    const [hiddenCats, setHiddenCats] = useState<string[]>([]);
+    const [hiddenCatsSheetOpen, setHiddenCatsSheetOpen] = useState(false);
     const [clearBlockedOpen, setClearBlockedOpen] = useState(false);
     const loaded = useRef(false);
     const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -315,6 +318,7 @@ export default function SettingsScreen() {
             loadSettings();
             getHistory().then(setHistory);
             getBlocked().then(setBlocked);
+            AsyncStorage.getItem('hidden_categories').then(v => setHiddenCats(v ? JSON.parse(v) : [])).catch(() => { });
             // Якщо catalog заблокував фото — пул автозміни треба перебудувати
             AsyncStorage.getItem('pool_dirty').then(async dirty => {
                 if (dirty === '1' && autoChangeRef.current) {
@@ -517,6 +521,23 @@ export default function SettingsScreen() {
         setClearHistoryOpen(false);
         await clearHistory();
         setHistory([]);
+    };
+
+    // Сховані категорії каталогу: повернення. Каталог перечитує на focus.
+    const persistHiddenCats = (next: string[]) => {
+        setHiddenCats(next);
+        AsyncStorage.setItem('hidden_categories', JSON.stringify(next)).catch(() => { });
+    };
+
+    const restoreHiddenCat = (id: string) => {
+        const next = hiddenCats.filter(c => c !== id);
+        persistHiddenCats(next);
+        if (next.length === 0) setHiddenCatsSheetOpen(false);
+    };
+
+    const restoreAllHiddenCats = () => {
+        persistHiddenCats([]);
+        setHiddenCatsSheetOpen(false);
     };
 
     const handleUnblock = async (id: string) => {
@@ -854,6 +875,23 @@ export default function SettingsScreen() {
                 )}
             </View>
 
+            {/* Сховані категорії (long-press на чіп у каталозі) */}
+            {hiddenCats.length > 0 && (
+                <>
+                    <Text style={styles.sectionLabel}>{t('settings.section.hiddenCats')}</Text>
+                    <TouchableOpacity style={styles.blockedCard} onPress={() => setHiddenCatsSheetOpen(true)} activeOpacity={0.75}>
+                        <View style={styles.blockedIconWrap}>
+                            <SvgXml xml={ICON.blocked} width={22} height={22} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.blockedTitle}>{t('settings.hiddenCats.title', { count: hiddenCats.length })}</Text>
+                            <Text style={styles.blockedSub}>{t('settings.hiddenCats.sub')}</Text>
+                        </View>
+                        <Text style={styles.pickerArrow}>›</Text>
+                    </TouchableOpacity>
+                </>
+            )}
+
             {/* Сховані фото */}
             {blocked.length > 0 && (
                 <>
@@ -1007,6 +1045,15 @@ export default function SettingsScreen() {
             onUnblock={handleUnblock}
             onClearAll={() => { setBlockedSheetOpen(false); setClearBlockedOpen(true); }}
             onClose={() => setBlockedSheetOpen(false)}
+        />
+        <HiddenCategoriesSheet
+            visible={hiddenCatsSheetOpen}
+            hidden={hiddenCats
+                .map(id => (id === 'chaos' ? CHAOS_CATEGORY : CATEGORIES.find(c => c.id === id)))
+                .filter((c): c is Category => !!c)}
+            onRestore={restoreHiddenCat}
+            onRestoreAll={restoreAllHiddenCats}
+            onClose={() => setHiddenCatsSheetOpen(false)}
         />
         <ConfirmDialog
             visible={relockOpen}
