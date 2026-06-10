@@ -117,7 +117,14 @@
 - [x] Pool-fetch race закрито — AbortController, останній виклик виграє
 - [x] Deps trim: −9 пакетів (37→28), ~2-4 MB з APK (expo-image, reanimated+worklets, network, web-browser, symbols, web+dom, status-bar)
 
-#### 🧪 v3.7.7 — Beta + Unsplash submission (2 дні)
+#### 📌 v3.7.7 — Catalog yours ✅
+- [x] Long-press на чіп → закріпити (шпилька, після Mix) / приховати (зникає з ряду і свайпу)
+- [x] Settings → «Сховані категорії»: лічильник + sheet з поверненням по одній / всіх
+- [x] Search suggestions: рандомні 6 з 12 EN-запитів, коли історія порожня
+- [x] Local release signing: `assembleRelease` підписується production-ключем через глобальні gradle.properties — локальні і EAS APK взаємозамінні
+- [x] Crop preview закрито свідомо (модалка вже показує кроп)
+
+#### 🧪 v3.7.8 — Beta + Unsplash submission (2 дні)
 - [ ] Production build через EAS
 - [ ] Internal testing track в Play Console (20 тестерів)
 - [ ] Data Safety Form в Play Console

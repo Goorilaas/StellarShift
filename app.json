@@ -2,8 +2,8 @@
   "expo": {
     "name": "StellarShift",
     "slug": "StellarShift",
-    "version": "3.7.6",
-    "versionCode": 26,
+    "version": "3.7.7",
+    "versionCode": 27,
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "stellarshift",
