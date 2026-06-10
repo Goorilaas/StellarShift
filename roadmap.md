@@ -217,9 +217,9 @@
 - [x] Swipe між фото в модалці (left/right через каталог) — зроблено 2026-06-10, FlatList-пейджер
 - [x] Swipe по гриду → сусідня категорія (порядок чіпів, стоп на краях, haptic, вимкнено в пошуку) — зроблено 2026-06-10
 - [ ] Pinch-to-zoom + pan у модалці — відкладено свідомо: конфлікт жестів зі swipe-пейджером (зум ≠ scale 1 має блокувати гортання), робити окремим заходом
-- [ ] Long-press на категорію в каталозі → швидке меню "закріпити / приховати"
+- [x] Long-press на категорію в каталозі → швидке меню "закріпити / приховати" — зроблено 2026-06-10. Pinned одразу після Mix зі шпилькою; hidden зникають з ряду і свайпу, повертаються через Settings → «Сховані категорії»
 - [x] Search history — останні 5 запитів під полем — зроблено 2026-06-10, чіпи при фокусі
-- [ ] Search suggestions (популярні запити)
+- [x] Search suggestions (популярні запити) — зроблено 2026-06-10: рандомні 6 з пулу 12 EN-запитів, коли історія порожня
 - [ ] Кращі error states (карточка з причиною + retry, не emoji-toast)
 - [ ] Color palette extraction з фото (3 домінуючі кольори)
 - [ ] Dark/light theme switcher (хоча додаток зараз dark-only by design)
@@ -229,7 +229,7 @@
 - [ ] Bulk actions у Favorites (multi-select → mass delete/share/setWallpaper)
 - [ ] Permission rationale screens (custom UI перед system prompt)
 - [ ] Photo info screen — full credit + Open on Unsplash
-- [ ] Crop preview перед setWallpaper (показати як саме обріжеться)
+- [x] ~~Crop preview перед setWallpaper~~ — закрито свідомо 2026-06-10: модалка вже показує фото cover-кропом на весь екран, лишався б тільки мок-лаунчер поверх — не вартий півдня роботи
 - [ ] "Wallpaper of the day" — головний екран запропонує 1 photo
 
 ## 🔥 Великі фічі (день+)
