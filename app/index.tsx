@@ -16,6 +16,7 @@ import {
   Modal,
   Pressable,
   RefreshControl,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -118,6 +119,8 @@ export default function HomeScreen() {
   const [blockConfirm, setBlockConfirm] = useState<Photo | null>(null);
   const { toast, showToast, dismissToast } = useToastQueue();
   const [searchText, setSearchText] = useState('');
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [searchFocused, setSearchFocused] = useState(false);
   const [settingWallpaper, setSettingWallpaper] = useState(false);
   const [chaosUnlocked, setChaosUnlocked] = useState(false);
   const [showHeart, setShowHeart] = useState(false);
@@ -201,6 +204,9 @@ export default function HomeScreen() {
 
   useEffect(() => {
     loadFavorites();
+    AsyncStorage.getItem('search_history')
+      .then(raw => { if (raw) setSearchHistory(JSON.parse(raw)); })
+      .catch(() => { });
   }, []);
 
   useFocusEffect(
@@ -470,11 +476,24 @@ export default function HomeScreen() {
     }
   };
 
-  const handleSearch = () => {
-    if (!searchText.trim()) return;
-    setActiveCategory({ id: 'search', labelKey: 'categories.search', label: t('categories.search'), query: searchText, icon: '' });
+  const handleSearch = (q?: string) => {
+    const query = (q ?? searchText).trim();
+    if (!query) return;
+    if (q) setSearchText(q);
+    setActiveCategory({ id: 'search', labelKey: 'categories.search', label: t('categories.search'), query, icon: '' });
     setPhotos([]);
-    loadPhotos(searchText, 1);
+    loadPhotos(query, 1);
+    // Історія: останні 5 унікальних, найсвіжіший перший
+    setSearchHistory(prev => {
+      const next = [query, ...prev.filter(x => x !== query)].slice(0, 5);
+      AsyncStorage.setItem('search_history', JSON.stringify(next)).catch(() => { });
+      return next;
+    });
+  };
+
+  const clearSearchHistory = () => {
+    setSearchHistory([]);
+    AsyncStorage.removeItem('search_history').catch(() => { });
   };
 
   const clearSearch = () => {
@@ -643,7 +662,9 @@ export default function HomeScreen() {
             placeholderTextColor="#555"
             value={searchText}
             onChangeText={setSearchText}
-            onSubmitEditing={handleSearch}
+            onSubmitEditing={() => handleSearch()}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
             returnKeyType="search"
           />
           {searchText.length > 0 && (
@@ -653,6 +674,25 @@ export default function HomeScreen() {
           )}
         </View>
       </View>
+
+      {/* Історія пошуку: останні 5, видно коли поле у фокусі й порожнє */}
+      {searchFocused && searchText.length === 0 && searchHistory.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          style={styles.historyRow}
+        >
+          {searchHistory.map(q => (
+            <TouchableOpacity key={q} style={styles.historyChip} onPress={() => handleSearch(q)}>
+              <Text style={styles.historyChipText}>{q}</Text>
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity style={styles.historyClearBtn} onPress={clearSearchHistory} hitSlop={8}>
+            <Text style={styles.historyClearText}>✕</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
 
       {/* Категорії */}
       <FlatList
@@ -936,6 +976,14 @@ const styles = StyleSheet.create({
   searchIcon: { marginRight: 8 },
   searchInput: { flex: 1, color: '#fff', fontSize: 14, paddingVertical: 10 },
   searchClear: { color: '#555', fontSize: 16, paddingLeft: 8 },
+  historyRow: { paddingHorizontal: 16, marginBottom: 10, flexGrow: 0 },
+  historyChip: {
+    backgroundColor: '#15152a', borderWidth: 1, borderColor: '#232347',
+    borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6, marginRight: 8,
+  },
+  historyChipText: { color: '#9b96d0', fontSize: 13 },
+  historyClearBtn: { justifyContent: 'center', paddingHorizontal: 6 },
+  historyClearText: { color: '#555', fontSize: 14 },
   catList: { paddingHorizontal: 12, marginBottom: 12, flexGrow: 0 },
   chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: '#1a1a2e', marginHorizontal: 4, borderWidth: 1, borderColor: '#333', flexDirection: 'row', alignItems: 'center', gap: 6 },
   chipMix: { borderColor: '#534AB7' },
