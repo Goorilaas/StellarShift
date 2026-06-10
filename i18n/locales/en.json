@@ -190,6 +190,7 @@
       "preparing": "⏳ Preparing...",
       "shareFail": "❌ Failed to share",
       "blocked": "✓ Hidden from catalog",
+      "catHidden": "Hidden. Restore in Settings",
       "errKey": "❌ Unsplash API key invalid — check Settings",
       "errRate": "❌ Unsplash rate limit hit — wait or add your own key",
       "errNet": "❌ No internet connection",
@@ -199,6 +200,11 @@
       "title": "Hide this photo?",
       "message": "This image will disappear from the catalog and rotation. You can restore it in Settings → Hidden photos.",
       "confirm": "Hide"
+    },
+    "catMenu": {
+      "pin": "Pin",
+      "unpin": "Unpin",
+      "hide": "Hide from catalog"
     },
     "author": {
       "fallbackDesc": "Photo from Unsplash",
