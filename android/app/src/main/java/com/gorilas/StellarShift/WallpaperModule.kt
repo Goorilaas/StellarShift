@@ -66,6 +66,18 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
     }
 
     @ReactMethod
+    fun drainPendingHistory(promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+            val pending = prefs.getString("pendingHistory", "[]") ?: "[]"
+            prefs.edit().remove("pendingHistory").apply()
+            promise.resolve(pending)
+        } catch (e: Exception) {
+            promise.reject("HISTORY_ERROR", e.message, e)
+        }
+    }
+
+    @ReactMethod
     fun setFromUrl(url: String, target: String, promise: Promise) {
         CoroutineScope(Dispatchers.IO).launch {
             try {

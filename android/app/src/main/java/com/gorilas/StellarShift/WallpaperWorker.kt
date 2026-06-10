@@ -9,6 +9,7 @@ import androidx.work.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
+import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.TimeUnit
@@ -83,14 +84,48 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
 
             val index = prefs.getInt("poolIndex", 0)
             val item = pool.getJSONObject(index % pool.length())
+            val id = item.getString("id")
             val url = item.getString("url")
             val downloadLocation = item.optString("downloadLocation", "").takeIf { it.isNotBlank() }
 
             applyFromUrl(context, url, target)
             // Fire Unsplash download-tracking after successful apply.
             trackUnsplashDownload(context, downloadLocation)
+            appendPendingHistory(prefs, id, url, target)
             prefs.edit().putInt("poolIndex", (index + 1) % pool.length()).apply()
             return true
+        }
+
+        /**
+         * Буфер історії для JS: кожен apply (WorkManager-тік або changeNow) дописує
+         * запис; Settings забирає через WallpaperModule.drainPendingHistory().
+         * Ліміт 30 — захист на випадок, якщо застосунок довго не відкривали.
+         * Помилка тут не повинна ламати apply — мовчазний catch.
+         */
+        private fun appendPendingHistory(
+            prefs: android.content.SharedPreferences,
+            id: String,
+            url: String,
+            target: String
+        ) {
+            try {
+                val arr = JSONArray(prefs.getString("pendingHistory", "[]"))
+                arr.put(
+                    JSONObject()
+                        .put("id", id)
+                        .put("url", url)
+                        .put("target", target)
+                        .put("appliedAt", System.currentTimeMillis())
+                )
+                val trimmed = if (arr.length() > 30) {
+                    JSONArray().also { t ->
+                        for (i in arr.length() - 30 until arr.length()) t.put(arr.get(i))
+                    }
+                } else arr
+                prefs.edit().putString("pendingHistory", trimmed.toString()).apply()
+            } catch (_: Exception) {
+                // історія — best effort
+            }
         }
 
         fun schedule(context: Context, intervalMinutes: Int, wifiOnly: Boolean, chargingOnly: Boolean) {
