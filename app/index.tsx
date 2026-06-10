@@ -16,6 +16,7 @@ import {
   Modal,
   Pressable,
   RefreshControl,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -23,7 +24,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { SvgXml } from 'react-native-svg';
+import * as Haptics from 'expo-haptics';
 import { Blessing, nextBlessingFromQueue } from '../components/blessings';
 import { Category, CATEGORIES, CHAOS_CATEGORY, CHAOS_QUERIES, filterNoPeople, Photo, sortCategoriesByLabel } from '../components/categories';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -116,6 +119,8 @@ export default function HomeScreen() {
   const [blockConfirm, setBlockConfirm] = useState<Photo | null>(null);
   const { toast, showToast, dismissToast } = useToastQueue();
   const [searchText, setSearchText] = useState('');
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [searchFocused, setSearchFocused] = useState(false);
   const [settingWallpaper, setSettingWallpaper] = useState(false);
   const [chaosUnlocked, setChaosUnlocked] = useState(false);
   const [showHeart, setShowHeart] = useState(false);
@@ -124,6 +129,7 @@ export default function HomeScreen() {
   const heartTranslateY = useRef(new Animated.Value(0)).current;
   const heartRotate = useRef(new Animated.Value(0)).current;
   const lastTapRef = useRef<number>(0);
+  const catListRef = useRef<FlatList<Category>>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   // Easter на лого головної: tap = blessing, 3 tap = blessing + spin (без unlock — той окремо в settings)
@@ -198,6 +204,9 @@ export default function HomeScreen() {
 
   useEffect(() => {
     loadFavorites();
+    AsyncStorage.getItem('search_history')
+      .then(raw => { if (raw) setSearchHistory(JSON.parse(raw)); })
+      .catch(() => { });
   }, []);
 
   useFocusEffect(
@@ -269,12 +278,12 @@ export default function HomeScreen() {
     ]).start(() => setShowHeart(false));
   };
 
-  const handleModalImageTap = () => {
+  const handleModalImageTap = (photo: Photo) => {
     const now = Date.now();
     if (now - lastTapRef.current < 350) {
       lastTapRef.current = 0;
-      if (selectedPhoto && !favorites.includes(selectedPhoto.id)) {
-        toggleFavorite(selectedPhoto);
+      if (!favorites.includes(photo.id)) {
+        toggleFavorite(photo);
         triggerHeartAnim();
       }
       // вже в улюблених — ігноруємо, без анімації
@@ -467,11 +476,24 @@ export default function HomeScreen() {
     }
   };
 
-  const handleSearch = () => {
-    if (!searchText.trim()) return;
-    setActiveCategory({ id: 'search', labelKey: 'categories.search', label: t('categories.search'), query: searchText, icon: '' });
+  const handleSearch = (q?: string) => {
+    const query = (q ?? searchText).trim();
+    if (!query) return;
+    if (q) setSearchText(q);
+    setActiveCategory({ id: 'search', labelKey: 'categories.search', label: t('categories.search'), query, icon: '' });
     setPhotos([]);
-    loadPhotos(searchText, 1);
+    loadPhotos(query, 1);
+    // Історія: останні 5 унікальних, найсвіжіший перший
+    setSearchHistory(prev => {
+      const next = [query, ...prev.filter(x => x !== query)].slice(0, 5);
+      AsyncStorage.setItem('search_history', JSON.stringify(next)).catch(() => { });
+      return next;
+    });
+  };
+
+  const clearSearchHistory = () => {
+    setSearchHistory([]);
+    AsyncStorage.removeItem('search_history').catch(() => { });
   };
 
   const clearSearch = () => {
@@ -491,6 +513,31 @@ export default function HomeScreen() {
     setActiveCategory(cat);
     setPhotos([]);
   };
+
+  // Swipe по гриду гортає категорії в порядку чіп-рядка. Стоп на краях, без wrap.
+  // У режимі пошуку вимкнено — активна «категорія» там синтетична.
+  const swipeCategory = (dir: 1 | -1) => {
+    if (activeCategory.id === 'search') return;
+    const idx = categoryList.findIndex(c => c.id === activeCategory.id);
+    if (idx === -1) return;
+    const nextIdx = idx + dir;
+    const next = categoryList[nextIdx];
+    if (!next) return;
+    Haptics.selectionAsync().catch(() => { });
+    handleCategory(next);
+    catListRef.current?.scrollToIndex({ index: nextIdx, viewPosition: 0.5, animated: true });
+  };
+
+  // activeOffsetX — пан активується лише на виразно горизонтальному русі,
+  // failOffsetY віддає вертикаль скролу сітки. runOnJS — без reanimated-worklets.
+  const categorySwipeGesture = Gesture.Pan()
+    .runOnJS(true)
+    .activeOffsetX([-24, 24])
+    .failOffsetY([-12, 12])
+    .onEnd(e => {
+      if (Math.abs(e.translationX) < 60) return;
+      swipeCategory(e.translationX < 0 ? 1 : -1);
+    });
 
   const visiblePhotos = photos.filter(p => !blockedIds.has(p.id));
 
@@ -615,7 +662,9 @@ export default function HomeScreen() {
             placeholderTextColor="#555"
             value={searchText}
             onChangeText={setSearchText}
-            onSubmitEditing={handleSearch}
+            onSubmitEditing={() => handleSearch()}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
             returnKeyType="search"
           />
           {searchText.length > 0 && (
@@ -626,13 +675,36 @@ export default function HomeScreen() {
         </View>
       </View>
 
+      {/* Історія пошуку: останні 5, видно коли поле у фокусі й порожнє */}
+      {searchFocused && searchText.length === 0 && searchHistory.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          style={styles.historyRow}
+        >
+          {searchHistory.map(q => (
+            <TouchableOpacity key={q} style={styles.historyChip} onPress={() => handleSearch(q)}>
+              <Text style={styles.historyChipText}>{q}</Text>
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity style={styles.historyClearBtn} onPress={clearSearchHistory} hitSlop={8}>
+            <Text style={styles.historyClearText}>✕</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
+
       {/* Категорії */}
       <FlatList
+        ref={catListRef}
         data={categoryList}
         horizontal
         showsHorizontalScrollIndicator={false}
         keyExtractor={i => i.id}
         style={styles.catList}
+        onScrollToIndexFailed={info => {
+          catListRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true });
+        }}
         renderItem={({ item }) => (
           <TouchableOpacity
             style={[
@@ -651,7 +723,8 @@ export default function HomeScreen() {
         )}
       />
 
-      {/* Фото сітка */}
+      {/* Фото сітка. GestureDetector ловить горизонтальний swipe → сусідня категорія */}
+      <GestureDetector gesture={categorySwipeGesture}>
       <View style={styles.photoGrid}>
         {loading && photos.length === 0 ? (
           <View style={styles.skeletonGrid}>
@@ -716,6 +789,7 @@ export default function HomeScreen() {
           />
         )}
       </View>
+      </GestureDetector>
 
       {/* Toast */}
       <Toast message={toast?.message ?? null} action={toast?.action} />
@@ -749,14 +823,36 @@ export default function HomeScreen() {
           />
           <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.4)' }]} />
 
-          {/* Фото з подвійним тапом */}
-          <Pressable onPress={handleModalImageTap} style={StyleSheet.absoluteFill}>
-            <Image
-              source={{ uri: selectedPhoto?.urls?.regular }}
-              style={styles.fullImage}
-              resizeMode="cover"
-            />
-          </Pressable>
+          {/* Пейджер фото: swipe вліво/вправо гортає каталог без закриття модалки.
+              Подвійний тап на сторінці — в улюблені, як і раніше. */}
+          <FlatList
+            data={visiblePhotos}
+            keyExtractor={p => p.id}
+            extraData={favorites}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            initialScrollIndex={Math.max(0, visiblePhotos.findIndex(p => p.id === selectedPhoto?.id))}
+            getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
+            onMomentumScrollEnd={e => {
+              const idx = Math.round(e.nativeEvent.contentOffset.x / width);
+              const next = visiblePhotos[idx];
+              if (next && next.id !== selectedPhoto?.id) setSelectedPhoto(next);
+            }}
+            initialNumToRender={1}
+            windowSize={3}
+            maxToRenderPerBatch={2}
+            style={StyleSheet.absoluteFill}
+            renderItem={({ item }) => (
+              <Pressable onPress={() => handleModalImageTap(item)}>
+                <Image
+                  source={{ uri: item.urls.regular }}
+                  style={styles.fullImage}
+                  resizeMode="cover"
+                />
+              </Pressable>
+            )}
+          />
 
           {/* Серце анімація (модалка) */}
           {showHeart && (
@@ -880,6 +976,14 @@ const styles = StyleSheet.create({
   searchIcon: { marginRight: 8 },
   searchInput: { flex: 1, color: '#fff', fontSize: 14, paddingVertical: 10 },
   searchClear: { color: '#555', fontSize: 16, paddingLeft: 8 },
+  historyRow: { paddingHorizontal: 16, marginBottom: 10, flexGrow: 0 },
+  historyChip: {
+    backgroundColor: '#15152a', borderWidth: 1, borderColor: '#232347',
+    borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6, marginRight: 8,
+  },
+  historyChipText: { color: '#9b96d0', fontSize: 13 },
+  historyClearBtn: { justifyContent: 'center', paddingHorizontal: 6 },
+  historyClearText: { color: '#555', fontSize: 14 },
   catList: { paddingHorizontal: 12, marginBottom: 12, flexGrow: 0 },
   chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: '#1a1a2e', marginHorizontal: 4, borderWidth: 1, borderColor: '#333', flexDirection: 'row', alignItems: 'center', gap: 6 },
   chipMix: { borderColor: '#534AB7' },
