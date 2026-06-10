@@ -23,7 +23,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { SvgXml } from 'react-native-svg';
+import * as Haptics from 'expo-haptics';
 import { Blessing, nextBlessingFromQueue } from '../components/blessings';
 import { Category, CATEGORIES, CHAOS_CATEGORY, CHAOS_QUERIES, filterNoPeople, Photo, sortCategoriesByLabel } from '../components/categories';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -124,6 +126,7 @@ export default function HomeScreen() {
   const heartTranslateY = useRef(new Animated.Value(0)).current;
   const heartRotate = useRef(new Animated.Value(0)).current;
   const lastTapRef = useRef<number>(0);
+  const catListRef = useRef<FlatList<Category>>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   // Easter на лого головної: tap = blessing, 3 tap = blessing + spin (без unlock — той окремо в settings)
@@ -492,6 +495,31 @@ export default function HomeScreen() {
     setPhotos([]);
   };
 
+  // Swipe по гриду гортає категорії в порядку чіп-рядка. Стоп на краях, без wrap.
+  // У режимі пошуку вимкнено — активна «категорія» там синтетична.
+  const swipeCategory = (dir: 1 | -1) => {
+    if (activeCategory.id === 'search') return;
+    const idx = categoryList.findIndex(c => c.id === activeCategory.id);
+    if (idx === -1) return;
+    const nextIdx = idx + dir;
+    const next = categoryList[nextIdx];
+    if (!next) return;
+    Haptics.selectionAsync().catch(() => { });
+    handleCategory(next);
+    catListRef.current?.scrollToIndex({ index: nextIdx, viewPosition: 0.5, animated: true });
+  };
+
+  // activeOffsetX — пан активується лише на виразно горизонтальному русі,
+  // failOffsetY віддає вертикаль скролу сітки. runOnJS — без reanimated-worklets.
+  const categorySwipeGesture = Gesture.Pan()
+    .runOnJS(true)
+    .activeOffsetX([-24, 24])
+    .failOffsetY([-12, 12])
+    .onEnd(e => {
+      if (Math.abs(e.translationX) < 60) return;
+      swipeCategory(e.translationX < 0 ? 1 : -1);
+    });
+
   const visiblePhotos = photos.filter(p => !blockedIds.has(p.id));
 
   const handleBlockConfirm = async () => {
@@ -628,11 +656,15 @@ export default function HomeScreen() {
 
       {/* Категорії */}
       <FlatList
+        ref={catListRef}
         data={categoryList}
         horizontal
         showsHorizontalScrollIndicator={false}
         keyExtractor={i => i.id}
         style={styles.catList}
+        onScrollToIndexFailed={info => {
+          catListRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true });
+        }}
         renderItem={({ item }) => (
           <TouchableOpacity
             style={[
@@ -651,7 +683,8 @@ export default function HomeScreen() {
         )}
       />
 
-      {/* Фото сітка */}
+      {/* Фото сітка. GestureDetector ловить горизонтальний swipe → сусідня категорія */}
+      <GestureDetector gesture={categorySwipeGesture}>
       <View style={styles.photoGrid}>
         {loading && photos.length === 0 ? (
           <View style={styles.skeletonGrid}>
@@ -716,6 +749,7 @@ export default function HomeScreen() {
           />
         )}
       </View>
+      </GestureDetector>
 
       {/* Toast */}
       <Toast message={toast?.message ?? null} action={toast?.action} />
