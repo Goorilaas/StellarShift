@@ -65,12 +65,14 @@ export default function HiddenCategoriesSheet({ visible, hidden, onRestore, onRe
                             </TouchableOpacity>
                         </View>
 
+                        {/* Кнопка в статичному потоці ПІД списком — не напливає на рядки при скролі */}
                         <View style={{ height: SHEET_HEIGHT - 70 }}>
                             <FlatList
                                 data={hidden}
                                 keyExtractor={item => item.id}
                                 renderItem={renderItem}
-                                contentContainerStyle={{ paddingTop: 8, paddingBottom: 80 }}
+                                style={{ flexGrow: 0, flexShrink: 1 }}
+                                contentContainerStyle={{ paddingTop: 8, paddingBottom: 8 }}
                             />
                             <TouchableOpacity style={styles.restoreAllBtn} onPress={onRestoreAll}>
                                 <Text style={styles.restoreAllText}>{t('hiddenCatsSheet.restoreAll', { count: hidden.length })}</Text>
@@ -101,6 +103,6 @@ const styles = StyleSheet.create({
     rowLabel: { color: '#e8e6f5', fontSize: 14, flex: 1 },
     restoreBtn: { backgroundColor: '#2a2a4e', borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12 },
     restoreText: { color: '#AFA9EC', fontSize: 12, fontWeight: '700' },
-    restoreAllBtn: { position: 'absolute', bottom: 16, left: 18, right: 18, backgroundColor: 'rgba(127,119,221,0.12)', borderColor: '#7F77DD', borderWidth: 1, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
+    restoreAllBtn: { marginTop: 12, marginHorizontal: 18, backgroundColor: 'rgba(127,119,221,0.12)', borderColor: '#7F77DD', borderWidth: 1, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
     restoreAllText: { color: '#AFA9EC', fontSize: 14, fontWeight: '700' },
 });

@@ -691,10 +691,13 @@ export default function SettingsScreen() {
             <Text style={styles.sectionLabel}>{t('settings.section.greeting')}</Text>
             <View style={styles.card}>
                 <View style={styles.toggleRow}>
-                    <View style={styles.toggleLabelRow}>
+                    {/* label+sub у колонку: тексти довші ніж в autoChange, інакше Switch виштовхується за край */}
+                    <View style={[styles.toggleLabelRow, { flex: 1, marginRight: 10 }]}>
                         <SvgXml xml={ICON.sparkle} width={18} height={18} />
-                        <Text style={styles.toggleLabel}>{t('settings.toggle.greeting')}</Text>
-                        <Text style={styles.toggleSub}>{t('settings.toggle.greetingSub')}</Text>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.toggleLabel}>{t('settings.toggle.greeting')}</Text>
+                            <Text style={styles.toggleSub}>{t('settings.toggle.greetingSub')}</Text>
+                        </View>
                     </View>
                     <Switch
                         value={greetingEnabled}
