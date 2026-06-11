@@ -174,6 +174,13 @@ export const ICON = {
     <path d="M8 6 L9 9 L11 9 L12 6" stroke="#FFA500" stroke-width="0.8" stroke-linecap="round" fill="none"/>
   </svg>`,
 
+  // Дзвіночок — toggle сповіщень автозміни
+  bell: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M10 2.5 C7.2 2.5 5.2 4.8 5.2 7.8 V11 L3.5 13.5 H16.5 L14.8 11 V7.8 C14.8 4.8 12.8 2.5 10 2.5 Z" stroke="#7F77DD" stroke-width="1.4" stroke-linejoin="round"/>
+    <path d="M8.4 15.8 A1.7 1.7 0 0 0 11.6 15.8" stroke="#7F77DD" stroke-width="1.4" stroke-linecap="round"/>
+    <circle cx="14.5" cy="4.5" r="2" fill="#FFD700"/>
+  </svg>`,
+
   // Шпилька — закріплена категорія в каталозі (рендериться ~10px на чіпі)
   pin: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
     <circle cx="13" cy="7" r="3.6" fill="#FFD700" stroke="#FFA500" stroke-width="0.8"/>
