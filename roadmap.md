@@ -39,11 +39,12 @@
 ## 🚀 NEXT — Нові версії
 
 ### v3.8.0 — 🔔 Notification companion
-Продовження wallpaper control: керуй шпалерами **не відкриваючи застосунок**.
-- [ ] Нотифікація при автозміні: поточне фото (BigPictureStyle) + дії **❤️ В улюблені / 🚫 Більше ніколи / ⏭ Далі** прямо в шторці
-- [ ] Kotlin: NotificationChannel + BroadcastReceiver на дії, оновлення на кожен тік Worker'а
-- [ ] **Settings toggle «Сповіщення автозміни»** (default ON) — можна повністю вимкнути
-- [ ] Дії синхронні з застосунком: ❤️ → favorites (через pendingHistory-патерн), 🚫 → block + перебудова пулу + наступна шпалера
+Продовження wallpaper control: керуй шпалерами **не відкриваючи застосунок**. ✅ **Реалізовано 2026-06-11.**
+- [x] Нотифікація при автозміні: collapsed = тамбнейл + кнопки, expanded = BigPicture на весь банер; тихий канал, один ID — оновлюється на місці
+- [x] Kotlin: NotificationHelper + NotificationActionReceiver, постинг на кожен apply (тік + changeNow)
+- [x] **Settings toggle «Сповіщення автозміни»** (default ON) + runtime POST_NOTIFICATIONS на Android 13+ (запит на enable toggle і на enable автозміни)
+- [x] Дії синхронні: ❤️ → pendingFavorites буфер → drain на focus (GET /photos/:id, офлайн-fallback — лайк не губиться) + мітка 💜 у шторці; 🚫 → pendingBlocked + миттєве вирізання з native-пулу + наступна шпалера прямо з шторки; ⏭ → applyNext
+- [x] Бонус: поточне фото кешується у `filesDir/current_wallpaper.jpg` — **готовий фундамент v4.0.0 LW**
 - 💎 *Premium-кандидат при поверненні в Store*
 
 ### v3.9.0 — 😴 Sleep hours + розклад
@@ -149,9 +150,9 @@
 ## 📅 Зведена timeline (без дедлайнів)
 
 ```
-NOW →  3.7.8  ✅ Wallpaper control (картка + історія тіків)
-next   3.8.0  🔔 Notification companion
-потім  3.9.0  😴 Sleep hours
+       3.7.8  ✅ Wallpaper control (картка + історія тіків)
+NOW →  3.8.0  ✅ Notification companion (❤️/🚫/⏭ у шторці)
+next   3.9.0  😴 Sleep hours
 потім  4.0.0  🌌 Live Wallpaper (tilt parallax)
 потім  4.1.0  🎨 Collections + favorites UX
 …      🧊 Store — коли самі захочемо
@@ -171,5 +172,5 @@ next   3.8.0  🔔 Notification companion
 
 ---
 
-*Last updated: 2026-06-11 (Roadmap 2.0 — без store-дедлайнів, v3.7.8 закрито)*
-*Next update: після v3.8.0 Notification companion*
+*Last updated: 2026-06-11 (v3.8.0 Notification companion закрито)*
+*Next update: після v3.9.0 Sleep hours*
