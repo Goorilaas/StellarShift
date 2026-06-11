@@ -52,6 +52,29 @@ export const isIgnoringBatteryOptimization = (): Promise<boolean> =>
 export const requestIgnoreBatteryOptimization = (): Promise<void> =>
     WallpaperModule.requestIgnoreBatteryOptimization();
 
+export type PendingAction = { id: string; url: string };
+
+export const setNotificationsEnabledNative = (enabled: boolean): Promise<void> =>
+    WallpaperModule.setNotificationsEnabled(enabled);
+
+// Локалізовані рядки нотифікації-компаньйона: Kotlin читає їх з prefs.
+// Викликати на mount Settings і при зміні мови.
+export const setNotificationStrings = (s: {
+    title: string; fav: string; block: string; next: string; favDone: string; channelName: string;
+}): Promise<void> =>
+    WallpaperModule.setNotificationStrings(s.title, s.fav, s.block, s.next, s.favDone, s.channelName);
+
+// Дії з шторки (❤️/🚫), накопичені поки застосунок не відкривали.
+export const drainPendingActions = async (): Promise<{ favorites: PendingAction[]; blocked: PendingAction[] }> => {
+    try {
+        const raw: string = await WallpaperModule.drainPendingActions();
+        const parsed = JSON.parse(raw || '{}');
+        return { favorites: parsed.favorites ?? [], blocked: parsed.blocked ?? [] };
+    } catch {
+        return { favorites: [], blocked: [] };
+    }
+};
+
 export const getHistory = async (): Promise<HistoryEntry[]> => {
     const raw = await AsyncStorage.getItem(HISTORY_KEY);
     return raw ? JSON.parse(raw) : [];

@@ -2,6 +2,7 @@ package com.gorilas.StellarShift
 
 import android.app.WallpaperManager
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Rect
 import android.os.Build
@@ -49,8 +50,9 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
             }
         }
 
-        suspend fun applyFromUrl(context: Context, url: String, target: String) {
-            withContext(Dispatchers.IO) {
+        // Повертає застосований bitmap — для кешу current_wallpaper.jpg і нотифікації.
+        suspend fun applyFromUrl(context: Context, url: String, target: String): Bitmap {
+            return withContext(Dispatchers.IO) {
                 val conn = URL(url).openConnection() as HttpURLConnection
                 conn.connectTimeout = 15_000
                 conn.readTimeout = 15_000
@@ -71,6 +73,7 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
                 } else {
                     wm.setBitmap(original, cropHint, true)
                 }
+                original
             }
         }
 
@@ -88,11 +91,14 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
             val url = item.getString("url")
             val downloadLocation = item.optString("downloadLocation", "").takeIf { it.isNotBlank() }
 
-            applyFromUrl(context, url, target)
+            val bitmap = applyFromUrl(context, url, target)
             // Fire Unsplash download-tracking after successful apply.
             trackUnsplashDownload(context, downloadLocation)
             appendPendingHistory(prefs, id, url, target)
             prefs.edit().putInt("poolIndex", (index + 1) % pool.length()).apply()
+            // Кеш + нотифікація-компаньйон (no-op якщо toggle off / нема дозволу)
+            NotificationHelper.saveCurrentToFile(context, bitmap)
+            NotificationHelper.showApplied(context, bitmap, id, url)
             return true
         }
 

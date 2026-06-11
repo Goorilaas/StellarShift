@@ -47,6 +47,7 @@
       "language": "Language",
       "greeting": "Greeting",
       "autoChange": "Auto-change wallpapers",
+      "notify": "Notifications",
       "interval": "Change interval",
       "applyTo": "Apply to",
       "activeCategories": "Categories for auto-change",
@@ -73,7 +74,9 @@
       "autoChangeIdle": "Wallpaper rotates on its own",
       "autoChangeLoading": "Loading photos...",
       "greeting": "Launch greeting",
-      "greetingSub": "A blessing once a day"
+      "greetingSub": "A blessing once a day",
+      "notify": "Auto-change notification",
+      "notifySub": "Photo and ❤️/🚫 actions in the shade"
     },
     "applyTo": {
       "lock": "Lock screen",
@@ -164,6 +167,8 @@
       "enableFirst": "❌ Enable auto-change first",
       "chaosUnlocked": "🌀 Chaos category unlocked!",
       "chaosLocked": "🔒 Chaos hidden again",
+      "notifDenied": "Notification permission denied",
+      "shadeSynced": "↺ Shade actions applied",
       "favAdded": "💜 Added to favorites",
       "favExists": "Already in favorites",
       "favFetchFail": "❌ Couldn't fetch photo data",
@@ -188,6 +193,14 @@
       "clearBlockedMsg": "{{count}} hidden photos will appear in the catalog again.",
       "clearBlockedConfirm": "Unblock all"
     }
+  },
+  "notif": {
+    "title": "On your screen now",
+    "fav": "Favorite",
+    "block": "Never again",
+    "next": "Next",
+    "favDone": "💜 Added to favorites",
+    "channel": "Wallpaper rotation"
   },
   "catalog": {
     "title": "Catalog",

@@ -13,6 +13,8 @@ import {
     Image,
     Linking,
     Modal,
+    PermissionsAndroid,
+    Platform,
     Pressable,
     ScrollView,
     Share,
@@ -37,7 +39,7 @@ import Toast, { useToastQueue } from '../components/Toast';
 
 import { Blessing, nextBlessingFromQueue } from '../components/blessings';
 import { GREETING_ENABLED_KEY } from '../components/LaunchGreeting';
-import { changeWallpaperNow, clearHistory, getHistory, HistoryEntry, isIgnoringBatteryOptimization, PoolItem, requestIgnoreBatteryOptimization, setUnsplashKeyNative, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation, syncNativeHistory } from '../services/wallpaperService';
+import { changeWallpaperNow, clearHistory, drainPendingActions, getHistory, HistoryEntry, isIgnoringBatteryOptimization, PoolItem, requestIgnoreBatteryOptimization, setNotificationsEnabledNative, setNotificationStrings, setUnsplashKeyNative, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation, syncNativeHistory } from '../services/wallpaperService';
 
 const DEFAULT_MIX = CATEGORIES.filter(c => c.id !== 'mix').map(c => c.id);
 
@@ -99,6 +101,7 @@ export default function SettingsScreen() {
     const [autoChange, setAutoChange] = useState(false);
     const [poolLoading, setPoolLoading] = useState(false);
     const [greetingEnabled, setGreetingEnabled] = useState(true);
+    const [notifyEnabled, setNotifyEnabled] = useState(true);
     const { toast, showToast, dismissToast } = useToastQueue();
     const [history, setHistory] = useState<HistoryEntry[]>([]);
     const [blocked, setBlocked] = useState<BlockedPhoto[]>([]);
@@ -153,6 +156,7 @@ export default function SettingsScreen() {
             if (v === '1') setChaosUnlocked(true);
         });
         AsyncStorage.getItem(GREETING_ENABLED_KEY).then(v => setGreetingEnabled(v !== '0'));
+        AsyncStorage.getItem('notify_enabled').then(v => setNotifyEnabled(v !== '0'));
         // Load saved BYO key into UI
         getUserKey().then(k => {
             setByoSavedKey(k);
@@ -325,6 +329,7 @@ export default function SettingsScreen() {
             syncNativeHistory().then(() => getHistory().then(setHistory));
             getBlocked().then(setBlocked);
             AsyncStorage.getItem('favorites').then(v => setFavIds(v ? JSON.parse(v) : [])).catch(() => { });
+            drainShadeActions().catch(() => { });
             AsyncStorage.getItem('hidden_categories').then(v => setHiddenCats(v ? JSON.parse(v) : [])).catch(() => { });
             // Якщо catalog заблокував фото — пул автозміни треба перебудувати
             AsyncStorage.getItem('pool_dirty').then(async dirty => {
@@ -490,6 +495,28 @@ export default function SettingsScreen() {
         showToast(t('settings.toast.poolReady', { count: pool.length }));
     };
 
+    // Android 13+: нотифікації потребують runtime-дозволу. До 13 — завжди true.
+    const ensureNotifPermission = async (): Promise<boolean> => {
+        if (Platform.OS !== 'android' || (Platform.Version as number) < 33) return true;
+        const has = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+        if (has) return true;
+        const res = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+        return res === PermissionsAndroid.RESULTS.GRANTED;
+    };
+
+    const handleNotifyToggle = async (value: boolean) => {
+        if (value) {
+            const ok = await ensureNotifPermission();
+            if (!ok) {
+                showToast(t('settings.toast.notifDenied'));
+                return; // toggle лишається off
+            }
+        }
+        setNotifyEnabled(value);
+        AsyncStorage.setItem('notify_enabled', value ? '1' : '0').catch(() => { });
+        setNotificationsEnabledNative(value).catch(() => { });
+    };
+
     const handleAutoChangeToggle = async (value: boolean) => {
         autoChangeRef.current = value;
         setAutoChange(value);
@@ -499,6 +526,8 @@ export default function SettingsScreen() {
             if (!ignoring) {
                 await requestIgnoreBatteryOptimization();
             }
+            // Сповіщення-компаньйон: best-effort запит дозволу (без revert)
+            if (notifyEnabled) ensureNotifPermission().catch(() => { });
             await loadAndStart();
         } else {
             if (reloadTimer.current) clearTimeout(reloadTimer.current);
@@ -528,6 +557,56 @@ export default function SettingsScreen() {
         setClearHistoryOpen(false);
         await clearHistory();
         setHistory([]);
+    };
+
+    // Локалізовані рядки нотифікації → native prefs (Kotlin не знає про i18next)
+    useEffect(() => {
+        setNotificationStrings({
+            title: t('notif.title'),
+            fav: t('notif.fav'),
+            block: t('notif.block'),
+            next: t('notif.next'),
+            favDone: t('notif.favDone'),
+            channelName: t('notif.channel'),
+        }).catch(() => { });
+    }, [lang, t]);
+
+    // Дії з шторки (❤️/🚫), накопичені поки застосунок був закритий.
+    // Blocked: native-пул уже почистив receiver — тут синхронізуємо store і перебудовуємо пул.
+    // Favorites: тягнемо повне фото по id; офлайн → мінімальний обʼєкт, лайк не губиться.
+    const drainShadeActions = async () => {
+        const { favorites: pendFav, blocked: pendBlocked } = await drainPendingActions();
+        if (pendFav.length === 0 && pendBlocked.length === 0) return;
+        for (const b of pendBlocked) {
+            await blockPhoto({ id: b.id, small: b.url });
+        }
+        if (pendBlocked.length > 0) setBlocked(await getBlocked());
+        if (pendFav.length > 0) {
+            const raw = await AsyncStorage.getItem('favorites_data');
+            const data: any[] = raw ? JSON.parse(raw) : [];
+            let added = false;
+            for (const f of pendFav) {
+                if (data.some(p => p.id === f.id)) continue;
+                let photo: any;
+                try {
+                    const key = await getUnsplashKey();
+                    photo = (await axios.get(`https://api.unsplash.com/photos/${f.id}`, {
+                        headers: { Authorization: `Client-ID ${key}` },
+                    })).data;
+                } catch {
+                    photo = { id: f.id, urls: { regular: f.url, small: f.url }, user: { name: 'Unsplash', username: '' }, links: {} };
+                }
+                data.push(photo);
+                added = true;
+            }
+            if (added) {
+                await AsyncStorage.setItem('favorites_data', JSON.stringify(data));
+                await AsyncStorage.setItem('favorites', JSON.stringify(data.map(p => p.id)));
+                setFavIds(data.map(p => p.id));
+            }
+        }
+        if (pendBlocked.length > 0 && autoChangeRef.current) loadAndStart();
+        showToast(t('settings.toast.shadeSynced'));
     };
 
     // ── Керування шпалерами з історії (включно з «Зараз на екрані») ──
@@ -724,6 +803,25 @@ export default function SettingsScreen() {
                         disabled={poolLoading}
                         trackColor={{ false: '#333', true: '#534AB7' }}
                         thumbColor={autoChange ? '#fff' : '#888'}
+                    />
+                </View>
+            </View>
+
+            <Text style={styles.sectionLabel}>{t('settings.section.notify')}</Text>
+            <View style={styles.card}>
+                <View style={styles.toggleRow}>
+                    <View style={[styles.toggleLabelRow, { flex: 1, marginRight: 10 }]}>
+                        <SvgXml xml={ICON.bell} width={18} height={18} />
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.toggleLabel}>{t('settings.toggle.notify')}</Text>
+                            <Text style={styles.toggleSub}>{t('settings.toggle.notifySub')}</Text>
+                        </View>
+                    </View>
+                    <Switch
+                        value={notifyEnabled}
+                        onValueChange={handleNotifyToggle}
+                        trackColor={{ false: '#333', true: '#534AB7' }}
+                        thumbColor={notifyEnabled ? '#fff' : '#888'}
                     />
                 </View>
             </View>

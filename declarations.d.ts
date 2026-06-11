@@ -15,6 +15,9 @@ declare module 'react-native' {
             setUnsplashKey(key: string): Promise<void>;
             changeNow(): Promise<boolean>;
             drainPendingHistory(): Promise<string>;
+            setNotificationsEnabled(enabled: boolean): Promise<void>;
+            setNotificationStrings(title: string, fav: string, block: string, next: string, favDone: string, channelName: string): Promise<void>;
+            drainPendingActions(): Promise<string>;
             isIgnoringBatteryOptimization(): Promise<boolean>;
             requestIgnoreBatteryOptimization(): Promise<void>;
         };
