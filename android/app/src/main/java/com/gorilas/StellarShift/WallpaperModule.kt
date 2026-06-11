@@ -66,6 +66,51 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
     }
 
     @ReactMethod
+    fun setNotificationsEnabled(enabled: Boolean, promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+            prefs.edit().putBoolean("notifyEnabled", enabled).apply()
+            if (!enabled) NotificationHelper.cancel(reactApplicationContext)
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("NOTIF_ERROR", e.message, e)
+        }
+    }
+
+    // JS пише локалізовані рядки нотифікації — Kotlin не знає про i18next.
+    @ReactMethod
+    fun setNotificationStrings(title: String, fav: String, block: String, next: String, favDone: String, channelName: String, promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+            prefs.edit()
+                .putString("notifTitle", title)
+                .putString("notifFav", fav)
+                .putString("notifBlock", block)
+                .putString("notifNext", next)
+                .putString("notifFavDone", favDone)
+                .putString("notifChannelName", channelName)
+                .apply()
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("NOTIF_ERROR", e.message, e)
+        }
+    }
+
+    // Віддає {favorites:[{id,url}], blocked:[{id,url}]} і чистить обидва буфери.
+    @ReactMethod
+    fun drainPendingActions(promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+            val favorites = prefs.getString("pendingFavorites", "[]") ?: "[]"
+            val blocked = prefs.getString("pendingBlocked", "[]") ?: "[]"
+            prefs.edit().remove("pendingFavorites").remove("pendingBlocked").apply()
+            promise.resolve("""{"favorites":$favorites,"blocked":$blocked}""")
+        } catch (e: Exception) {
+            promise.reject("ACTIONS_ERROR", e.message, e)
+        }
+    }
+
+    @ReactMethod
     fun drainPendingHistory(promise: Promise) {
         try {
             val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
