@@ -66,13 +66,13 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 val prefs = context.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
                 when (action) {
                     ACTION_NEXT -> {
-                        WallpaperWorker.applyNext(context)
+                        WallpaperWorker.applyNext(context, manual = true)
                     }
                     ACTION_BLOCK -> {
                         appendPending(prefs, "pendingBlocked", photoId, photoUrl)
                         removeFromPool(prefs, photoId)
                         // Гидота зникає з екрана негайно. Порожній пул — прибираємо нотифікацію.
-                        val applied = WallpaperWorker.applyNext(context)
+                        val applied = WallpaperWorker.applyNext(context, manual = true)
                         if (!applied) NotificationHelper.cancel(context)
                     }
                     ACTION_FAV -> {

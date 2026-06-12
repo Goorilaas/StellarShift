@@ -54,6 +54,10 @@ export const requestIgnoreBatteryOptimization = (): Promise<void> =>
 
 export type PendingAction = { id: string; url: string };
 
+// Тихі години: вікно в хвилинах від півночі (через північ — ок: start > end).
+export const setSleepHoursNative = (enabled: boolean, startMin: number, endMin: number): Promise<void> =>
+    WallpaperModule.setSleepHours(enabled, startMin, endMin);
+
 export const setNotificationsEnabledNative = (enabled: boolean): Promise<void> =>
     WallpaperModule.setNotificationsEnabled(enabled);
 

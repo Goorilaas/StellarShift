@@ -65,6 +65,22 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
         }
     }
 
+    // Тихі години: вікно у хвилинах від півночі. Worker перевіряє перед кожним тіком.
+    @ReactMethod
+    fun setSleepHours(enabled: Boolean, startMin: Int, endMin: Int, promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+            prefs.edit()
+                .putBoolean("sleepEnabled", enabled)
+                .putInt("sleepStart", startMin)
+                .putInt("sleepEnd", endMin)
+                .apply()
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("SLEEP_ERROR", e.message, e)
+        }
+    }
+
     @ReactMethod
     fun setNotificationsEnabled(enabled: Boolean, promise: Promise) {
         try {
@@ -158,7 +174,7 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
     fun changeNow(promise: Promise) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val applied = WallpaperWorker.applyNext(reactApplicationContext)
+                val applied = WallpaperWorker.applyNext(reactApplicationContext, manual = true)
                 withContext(Dispatchers.Main) {
                     if (applied) {
                         promise.resolve(true)

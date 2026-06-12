@@ -77,8 +77,29 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
             }
         }
 
-        suspend fun applyNext(context: Context): Boolean {
+        /**
+         * Тихі години: true якщо «зараз» у вікні сну. Вікно в хвилинах від півночі.
+         * start < end → звичайне вікно (13:00–15:00); start > end → через північ
+         * (23:00–07:00); start == end → нульове, не діє. Час — локальний на момент
+         * виклику, тож зміна таймзони сама себе лікує.
+         */
+        private fun isInSleepWindow(prefs: android.content.SharedPreferences): Boolean {
+            if (!prefs.getBoolean("sleepEnabled", false)) return false
+            val start = prefs.getInt("sleepStart", 0)
+            val end = prefs.getInt("sleepEnd", 420)
+            if (start == end) return false
+            val cal = java.util.Calendar.getInstance()
+            val now = cal.get(java.util.Calendar.HOUR_OF_DAY) * 60 + cal.get(java.util.Calendar.MINUTE)
+            return if (start < end) now in start until end else now >= start || now < end
+        }
+
+        /**
+         * @param manual true для явних дій юзера («Змінити зараз», ⏭/🚫 з шторки) —
+         * вони працюють і в тихі години; спить тільки плановий тік.
+         */
+        suspend fun applyNext(context: Context, manual: Boolean = false): Boolean {
             val prefs = context.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+            if (!manual && isInSleepWindow(prefs)) return true // тихий skip, не помилка
             val poolJson = prefs.getString("photoPool", null) ?: return false
             val target = prefs.getString("target", "both") ?: "both"
 
