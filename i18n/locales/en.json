@@ -196,9 +196,9 @@
   },
   "notif": {
     "title": "On your screen now",
-    "fav": "Favorite",
-    "block": "Never again",
-    "next": "Next",
+    "fav": "❤️ Favorite",
+    "block": "🚫 Never again",
+    "next": "⏭ Next",
     "favDone": "💜 Added to favorites",
     "channel": "Wallpaper rotation"
   },
