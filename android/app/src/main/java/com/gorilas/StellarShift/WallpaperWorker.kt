@@ -50,31 +50,73 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
             }
         }
 
-        // Повертає застосований bitmap — для кешу current_wallpaper.jpg і нотифікації.
-        suspend fun applyFromUrl(context: Context, url: String, target: String): Bitmap {
-            return withContext(Dispatchers.IO) {
-                val conn = URL(url).openConnection() as HttpURLConnection
-                conn.connectTimeout = 15_000
-                conn.readTimeout = 15_000
-                val original = BitmapFactory.decodeStream(conn.inputStream)
-                conn.disconnect()
+        /** Наша жива шпалера зараз активна? (інша LW чужого пакета → false) */
+        fun isOurLiveWallpaper(context: Context): Boolean = try {
+            WallpaperManager.getInstance(context).wallpaperInfo?.packageName == context.packageName
+        } catch (_: Exception) {
+            false
+        }
 
-                // Pass original bitmap directly — let WallpaperManager handle scaling
-                // Manual resize caused over-cropping on Samsung due to launcher parallax
-                val cropHint = Rect(0, 0, original.width, original.height)
-                val wm = WallpaperManager.getInstance(context)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    val flag = when (target) {
-                        "home" -> WallpaperManager.FLAG_SYSTEM
-                        "lock" -> WallpaperManager.FLAG_LOCK
-                        else -> WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK
-                    }
-                    wm.setBitmap(original, cropHint, true, flag)
-                } else {
-                    wm.setBitmap(original, cropHint, true)
+        private suspend fun downloadBitmap(url: String): Bitmap = withContext(Dispatchers.IO) {
+            val conn = URL(url).openConnection() as HttpURLConnection
+            conn.connectTimeout = 15_000
+            conn.readTimeout = 15_000
+            val bmp = BitmapFactory.decodeStream(conn.inputStream)
+            conn.disconnect()
+            bmp
+        }
+
+        private fun applyStatic(context: Context, bitmap: Bitmap, target: String) {
+            // Pass original bitmap directly — let WallpaperManager handle scaling
+            // Manual resize caused over-cropping on Samsung due to launcher parallax
+            val cropHint = Rect(0, 0, bitmap.width, bitmap.height)
+            val wm = WallpaperManager.getInstance(context)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                val flag = when (target) {
+                    "home" -> WallpaperManager.FLAG_SYSTEM
+                    "lock" -> WallpaperManager.FLAG_LOCK
+                    else -> WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK
                 }
-                original
+                wm.setBitmap(bitmap, cropHint, true, flag)
+            } else {
+                wm.setBitmap(bitmap, cropHint, true)
             }
+        }
+
+        /**
+         * Локскрін при активній LW: якщо в системі живе ОКРЕМИЙ static-lock
+         * (getWallpaperId(FLAG_LOCK) != -1) і target його включає — оновлюємо.
+         * Якщо lock дзеркалить системну шпалеру — LW і так показується там,
+         * setBitmap зламав би це дзеркало.
+         */
+        private fun applyLockIfSeparate(context: Context, bitmap: Bitmap, target: String) {
+            if (target == "home") return
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
+            try {
+                val wm = WallpaperManager.getInstance(context)
+                if (wm.getWallpaperId(WallpaperManager.FLAG_LOCK) != -1) {
+                    val cropHint = Rect(0, 0, bitmap.width, bitmap.height)
+                    wm.setBitmap(bitmap, cropHint, true, WallpaperManager.FLAG_LOCK)
+                }
+            } catch (_: Exception) { }
+        }
+
+        /**
+         * Єдиний шлях застосування для тіків І ручних встановлень.
+         * LW активна → wm.setBitmap НЕ викликаємо (вибив би живу шпалеру в static!)
+         * — пишемо файл, engine підхоплює з fade; lock — окремо за станом системи.
+         * LW неактивна → класичний static-шлях. Файл пишеться в ОБОХ випадках —
+         * він джерело і для LW, і для мітки 💜 у шторці.
+         */
+        suspend fun applyWallpaper(context: Context, url: String, target: String): Bitmap {
+            val bitmap = downloadBitmap(url)
+            if (isOurLiveWallpaper(context)) {
+                applyLockIfSeparate(context, bitmap, target)
+            } else {
+                applyStatic(context, bitmap, target)
+            }
+            NotificationHelper.saveCurrentToFile(context, bitmap)
+            return bitmap
         }
 
         /**
@@ -112,13 +154,13 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
             val url = item.getString("url")
             val downloadLocation = item.optString("downloadLocation", "").takeIf { it.isNotBlank() }
 
-            val bitmap = applyFromUrl(context, url, target)
+            val bitmap = applyWallpaper(context, url, target)
             // Fire Unsplash download-tracking after successful apply.
             trackUnsplashDownload(context, downloadLocation)
             appendPendingHistory(prefs, id, url, target)
             prefs.edit().putInt("poolIndex", (index + 1) % pool.length()).apply()
-            // Кеш + нотифікація-компаньйон (no-op якщо toggle off / нема дозволу)
-            NotificationHelper.saveCurrentToFile(context, bitmap)
+            // Нотифікація-компаньйон (no-op якщо toggle off / нема дозволу);
+            // файл уже закешований усередині applyWallpaper.
             NotificationHelper.showApplied(context, bitmap, id, url)
             return true
         }

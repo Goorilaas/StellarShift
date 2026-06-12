@@ -142,7 +142,9 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
     fun setFromUrl(url: String, target: String, promise: Promise) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                WallpaperWorker.applyFromUrl(reactApplicationContext, url, target)
+                // LW-aware: при активній живій шпалері пише файл (engine fade'ить),
+                // інакше класичний static. Файл кешується в обох випадках.
+                WallpaperWorker.applyWallpaper(reactApplicationContext, url, target)
                 withContext(Dispatchers.Main) { promise.resolve(true) }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) { promise.reject("SET_ERROR", e.message, e) }
