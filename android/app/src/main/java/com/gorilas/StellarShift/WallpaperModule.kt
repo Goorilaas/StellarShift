@@ -1,5 +1,6 @@
 package com.gorilas.StellarShift
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -62,6 +63,35 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
             promise.resolve(null)
         } catch (e: Exception) {
             promise.reject("KEY_ERROR", e.message, e)
+        }
+    }
+
+    @ReactMethod
+    fun isLiveWallpaperActive(promise: Promise) {
+        promise.resolve(WallpaperWorker.isOurLiveWallpaper(reactApplicationContext))
+    }
+
+    // Системний preview нашої LW (один тап «Встановити»). Fallback — загальний chooser.
+    @ReactMethod
+    fun openLiveWallpaperPicker(promise: Promise) {
+        try {
+            val cn = ComponentName(reactApplicationContext, LiveWallpaperService::class.java)
+            val intent = Intent(android.app.WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
+                putExtra(android.app.WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, cn)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            reactApplicationContext.startActivity(intent)
+            promise.resolve(null)
+        } catch (e: Exception) {
+            try {
+                val chooser = Intent(android.app.WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                reactApplicationContext.startActivity(chooser)
+                promise.resolve(null)
+            } catch (e2: Exception) {
+                promise.reject("LW_PICKER_ERROR", e2.message, e2)
+            }
         }
     }
 

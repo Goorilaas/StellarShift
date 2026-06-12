@@ -41,7 +41,7 @@ import Toast, { useToastQueue } from '../components/Toast';
 
 import { Blessing, nextBlessingFromQueue } from '../components/blessings';
 import { GREETING_ENABLED_KEY } from '../components/LaunchGreeting';
-import { changeWallpaperNow, clearHistory, drainPendingActions, getHistory, HistoryEntry, isIgnoringBatteryOptimization, PoolItem, requestIgnoreBatteryOptimization, setNotificationsEnabledNative, setNotificationStrings, setSleepHoursNative, setUnsplashKeyNative, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation, syncNativeHistory } from '../services/wallpaperService';
+import { changeWallpaperNow, clearHistory, drainPendingActions, getHistory, HistoryEntry, isIgnoringBatteryOptimization, isLiveWallpaperActive, openLiveWallpaperPicker, PoolItem, requestIgnoreBatteryOptimization, setNotificationsEnabledNative, setNotificationStrings, setSleepHoursNative, setUnsplashKeyNative, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation, syncNativeHistory } from '../services/wallpaperService';
 
 const DEFAULT_MIX = CATEGORIES.filter(c => c.id !== 'mix').map(c => c.id);
 
@@ -108,6 +108,7 @@ export default function SettingsScreen() {
     const [sleepStart, setSleepStart] = useState(0);    // 00:00, хвилини від півночі
     const [sleepEnd, setSleepEnd] = useState(420);      // 07:00
     const [sleepPicker, setSleepPicker] = useState<'start' | 'end' | null>(null);
+    const [lwActive, setLwActive] = useState(false);
     const { toast, showToast, dismissToast } = useToastQueue();
     const [history, setHistory] = useState<HistoryEntry[]>([]);
     const [blocked, setBlocked] = useState<BlockedPhoto[]>([]);
@@ -335,6 +336,7 @@ export default function SettingsScreen() {
             syncNativeHistory().then(() => getHistory().then(setHistory));
             getBlocked().then(setBlocked);
             AsyncStorage.getItem('favorites').then(v => setFavIds(v ? JSON.parse(v) : [])).catch(() => { });
+            isLiveWallpaperActive().then(setLwActive).catch(() => { });
             drainShadeActions().catch(() => { });
             AsyncStorage.getItem('hidden_categories').then(v => setHiddenCats(v ? JSON.parse(v) : [])).catch(() => { });
             // Якщо catalog заблокував фото — пул автозміни треба перебудувати
@@ -634,6 +636,8 @@ export default function SettingsScreen() {
     const refreshFromShade = () => {
         syncNativeHistory().then(() => getHistory().then(setHistory)).catch(() => { });
         drainShadeActions().catch(() => { });
+        // повернення з системного LW-preview = resume → оновлюємо статус
+        isLiveWallpaperActive().then(setLwActive).catch(() => { });
     };
     const refreshFromShadeRef = useRef(refreshFromShade);
     useEffect(() => { refreshFromShadeRef.current = refreshFromShade; });
@@ -941,6 +945,31 @@ export default function SettingsScreen() {
                         </Text>
                     </TouchableOpacity>
                 ))}
+            </View>
+
+            <Text style={styles.sectionLabel}>{t('settings.section.lw')}</Text>
+            <View style={styles.card}>
+                <View style={styles.toggleRow}>
+                    <View style={[styles.toggleLabelRow, { flex: 1, marginRight: 10 }]}>
+                        <SvgXml xml={ICON.live} width={18} height={18} />
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.toggleLabel}>{t('settings.lw.title')}</Text>
+                            <Text style={styles.toggleSub}>{t('settings.lw.hint')}</Text>
+                        </View>
+                    </View>
+                    <Text style={[styles.lwStatus, lwActive ? styles.lwStatusOn : styles.lwStatusOff]}>
+                        {lwActive ? t('settings.lw.statusActive') : t('settings.lw.statusOff')}
+                    </Text>
+                </View>
+                <TouchableOpacity
+                    style={styles.lwBtn}
+                    onPress={() => openLiveWallpaperPicker().catch(() => showToast(t('settings.toast.lwPickerFail')))}
+                >
+                    <SvgXml xml={ICON.live} width={16} height={16} />
+                    <Text style={styles.lwBtnText}>
+                        {lwActive ? t('settings.lw.reopen') : t('settings.lw.enable')}
+                    </Text>
+                </TouchableOpacity>
             </View>
 
             <Text style={styles.sectionLabel}>{t('settings.section.activeCategories')}</Text>
@@ -1416,6 +1445,16 @@ const styles = StyleSheet.create({
     btnActionText: { color: '#fff', fontSize: 16, fontWeight: '700' },
     historyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
     clearText: { color: '#7F77DD', fontSize: 12, fontWeight: '600', marginBottom: 10 },
+    lwStatus: { fontSize: 12, fontWeight: '700' },
+    lwStatusOn: { color: '#1D9E75' },
+    lwStatusOff: { color: '#555' },
+    lwBtn: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+        marginHorizontal: 16, marginBottom: 14, paddingVertical: 12,
+        borderRadius: 12, borderWidth: 1, borderColor: '#7F77DD',
+        backgroundColor: 'rgba(127,119,221,0.12)',
+    },
+    lwBtnText: { color: '#AFA9EC', fontSize: 14, fontWeight: '700' },
     sleepTimesRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 14 },
     sleepTimeBtn: { backgroundColor: '#1a1a2e', borderWidth: 1, borderColor: '#2a2a4e', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 18 },
     sleepTimeText: { color: '#e8e6f5', fontSize: 15, fontWeight: '600', letterSpacing: 0.5 },

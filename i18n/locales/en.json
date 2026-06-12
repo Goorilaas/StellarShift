@@ -49,6 +49,7 @@
       "autoChange": "Auto-change wallpapers",
       "notify": "Notifications",
       "sleep": "Quiet hours",
+      "lw": "Live wallpaper",
       "interval": "Change interval",
       "applyTo": "Apply to",
       "activeCategories": "Categories for auto-change",
@@ -111,6 +112,14 @@
       "block": "Never again",
       "reapply": "Apply again"
     },
+    "lw": {
+      "title": "Live wallpaper",
+      "hint": "The background responds to phone tilt",
+      "statusActive": "Active",
+      "statusOff": "Off",
+      "enable": "Enable live wallpaper",
+      "reopen": "Open preview"
+    },
     "byo": {
       "badgeCustom": "your key",
       "badgeDemo": "demo",
@@ -170,6 +179,7 @@
       "chaosUnlocked": "🌀 Chaos category unlocked!",
       "chaosLocked": "🔒 Chaos hidden again",
       "notifDenied": "Notification permission denied",
+      "lwPickerFail": "❌ Couldn't open the live wallpaper picker",
       "shadeSynced": "↺ Shade actions applied",
       "favAdded": "💜 Added to favorites",
       "favExists": "Already in favorites",

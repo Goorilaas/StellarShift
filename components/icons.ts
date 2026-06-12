@@ -174,6 +174,13 @@ export const ICON = {
     <path d="M8 6 L9 9 L11 9 L12 6" stroke="#FFA500" stroke-width="0.8" stroke-linecap="round" fill="none"/>
   </svg>`,
 
+  // Нахилений телефон з дугами руху — жива шпалера (tilt parallax)
+  live: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="7" y="2.8" width="8.6" height="14.4" rx="1.8" transform="rotate(8 11.3 10)" stroke="#7F77DD" stroke-width="1.4"/>
+    <path d="M3.4 6.5 A7.5 7.5 0 0 0 3.4 13.5" stroke="#FFD700" stroke-width="1.3" stroke-linecap="round"/>
+    <path d="M1.4 7.8 A5 5 0 0 0 1.4 12.2" stroke="#AFA9EC" stroke-width="1.1" stroke-linecap="round" opacity="0.7"/>
+  </svg>`,
+
   // Місяць — тихі години (sleep hours)
   moon: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M16.5 12 A7 7 0 1 1 8 3.5 A5.5 5.5 0 0 0 16.5 12 Z" stroke="#7F77DD" stroke-width="1.4" stroke-linejoin="round"/>
