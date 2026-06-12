@@ -10,6 +10,7 @@ import { getAppLanguage, Lang, setAppLanguage, SUPPORTED_LANGS } from '../i18n';
 import {
     ActivityIndicator,
     Animated,
+    AppState,
     Easing,
     Image,
     Linking,
@@ -626,6 +627,23 @@ export default function SettingsScreen() {
         if (pendBlocked.length > 0 && autoChangeRef.current) loadAndStart();
         showToast(t('settings.toast.shadeSynced'));
     };
+
+    // Повернення з фону на ЦЕЙ ЖЕ таб не стріляє useFocusEffect — ловимо AppState.
+    // Ref оновлюється в effect (не в рендері — reactCompiler), щоб слухач
+    // завжди кликав свіжий closure (loadAndStart усередині читає поточний стан).
+    const refreshFromShade = () => {
+        syncNativeHistory().then(() => getHistory().then(setHistory)).catch(() => { });
+        drainShadeActions().catch(() => { });
+    };
+    const refreshFromShadeRef = useRef(refreshFromShade);
+    useEffect(() => { refreshFromShadeRef.current = refreshFromShade; });
+
+    useEffect(() => {
+        const sub = AppState.addEventListener('change', state => {
+            if (state === 'active') refreshFromShadeRef.current();
+        });
+        return () => sub.remove();
+    }, []);
 
     // ── Керування шпалерами з історії (включно з «Зараз на екрані») ──
 
