@@ -57,15 +57,21 @@
 - [→] Точне прокидання рівно в кінці вікна (AlarmManager) — не робимо: зміна на найближчому тіку після вікна, складність будильника не варта цінності
 - 💎 *Premium-кандидат при поверненні в Store*
 
-### v4.0.0 — 🌌 Live Wallpaper: tilt parallax
-**R&D пройдено** (гілка `experiment/live-wallpaper-rnd`, 2026-06-09): One UI приймає наш WallpaperService, tilt плавний на 60fps, батарея ок. Killer-фіча розблокована — store її більше не тримає.
-- [ ] **Bitmap з власного файлу**: Worker кешує застосоване фото в `filesDir/current_wallpaper.jpg`, LW читає звідти (системний bitmap заблокований на Android 14+ — головна знахідка R&D). autoChange продовжує працювати: Worker оновлює файл → LW підхоплює нову базу
-- [ ] **Choreographer vsync-рендер** замість фіксованих 16ms — фікс 120Гц-шиммера
-- [ ] Slider інтенсивності (maxShift) + tilt on/off у Settings
-- [ ] Battery: sensor off при невидимості (вже є), FPS-стратегія
-- [ ] Перевірити на **One UI 8.5** (S23 Ultra оновлено) — можливо, з тілтом стало простіше
+### v3.10.0 — 🌌 Live Wallpaper MVP ✅
+**Реалізовано 2026-06-12.** Перший реліз живої шпалери — двіжок у проді.
+- [x] **Bitmap з власного файлу** — LW читає `current_wallpaper.jpg`, кожен apply (включно з ручними!) оновлює файл, engine підхоплює через FileObserver
+- [x] **Choreographer vsync-рендер** + draw-on-demand (спокій = нуль перемальовок)
+- [x] **Fade-переходи** між шпалерами (~600мс crossfade)
+- [x] **LW-aware пайплайн**: активна LW → файл замість `wm.setBitmap` (не вибиваємо engine); lock — окремо за станом системи
+- [x] Settings: статус Активна/Вимкнена + кнопка → системний preview в один тап
+- [x] Battery: сенсор/Choreographer/FileObserver повністю знімаються при невидимості
+
+### v4.0.0 — 🌌 Live Wallpaper: фінал
+Полірування MVP за фідбеком з One UI 8.5.
+- [ ] Пресети інтенсивності в Settings (М'яко/Звичайно/Сильно = 30/60/100) — prefs `lwIntensity` вже читається наживо
+- [ ] Перевірити на **One UI 8.5** (S23 Ultra): tilt, fade, поведінка пікера
 - [ ] Scroll parallax (`onOffsetsChanged`) — перевірити чи live-режим отримує offset events на One UI
-- [ ] Fade-переходи між шпалерами
+- [ ] Тюнинг за відчуттям: чутливість (`/3f`), fade-тривалість
 - 💎 *Premium-headliner при поверненні в Store*
 
 ### v4.1.0 — 🎨 Collections + favorites UX
@@ -154,8 +160,9 @@
 ```
        3.7.8  ✅ Wallpaper control (картка + історія тіків)
        3.8.0  ✅ Notification companion (❤️/🚫/⏭ у шторці)
-NOW →  3.9.0  ✅ Sleep hours (тихі години)
-потім  4.0.0  🌌 Live Wallpaper (tilt parallax)
+       3.9.x  ✅ Sleep hours (тихі години)
+NOW →  3.10.0 ✅ Live Wallpaper MVP (tilt у проді!)
+next   4.0.0  🌌 LW фінал (інтенсивність, scroll, One UI 8.5 тюнинг)
 потім  4.1.0  🎨 Collections + favorites UX
 …      🧊 Store — коли самі захочемо
 ```
@@ -174,5 +181,5 @@ NOW →  3.9.0  ✅ Sleep hours (тихі години)
 
 ---
 
-*Last updated: 2026-06-11 (v3.9.0 Sleep hours закрито)*
-*Next update: після v4.0.0 Live Wallpaper*
+*Last updated: 2026-06-12 (v3.10.0 Live Wallpaper MVP закрито)*
+*Next update: після v4.0.0 — фінал LW за фідбеком з One UI 8.5*

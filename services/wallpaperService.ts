@@ -54,6 +54,13 @@ export const requestIgnoreBatteryOptimization = (): Promise<void> =>
 
 export type PendingAction = { id: string; url: string };
 
+// Жива шпалера: чи активна наша зараз / відкрити системний preview.
+export const isLiveWallpaperActive = (): Promise<boolean> =>
+    WallpaperModule.isLiveWallpaperActive();
+
+export const openLiveWallpaperPicker = (): Promise<void> =>
+    WallpaperModule.openLiveWallpaperPicker();
+
 // Тихі години: вікно в хвилинах від півночі (через північ — ок: start > end).
 export const setSleepHoursNative = (enabled: boolean, startMin: number, endMin: number): Promise<void> =>
     WallpaperModule.setSleepHours(enabled, startMin, endMin);
