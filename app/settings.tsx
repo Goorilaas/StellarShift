@@ -10,6 +10,7 @@ import { getAppLanguage, Lang, setAppLanguage, SUPPORTED_LANGS } from '../i18n';
 import {
     ActivityIndicator,
     Animated,
+    AppState,
     Easing,
     Image,
     Linking,
@@ -627,6 +628,23 @@ export default function SettingsScreen() {
         showToast(t('settings.toast.shadeSynced'));
     };
 
+    // Повернення з фону на ЦЕЙ ЖЕ таб не стріляє useFocusEffect — ловимо AppState.
+    // Ref оновлюється в effect (не в рендері — reactCompiler), щоб слухач
+    // завжди кликав свіжий closure (loadAndStart усередині читає поточний стан).
+    const refreshFromShade = () => {
+        syncNativeHistory().then(() => getHistory().then(setHistory)).catch(() => { });
+        drainShadeActions().catch(() => { });
+    };
+    const refreshFromShadeRef = useRef(refreshFromShade);
+    useEffect(() => { refreshFromShadeRef.current = refreshFromShade; });
+
+    useEffect(() => {
+        const sub = AppState.addEventListener('change', state => {
+            if (state === 'active') refreshFromShadeRef.current();
+        });
+        return () => sub.remove();
+    }, []);
+
     // ── Керування шпалерами з історії (включно з «Зараз на екрані») ──
 
     const timeAgo = (ts: number): string => {
@@ -997,9 +1015,15 @@ export default function SettingsScreen() {
             )}
 
             {/* Зараз на екрані: history[0] після злиття з native-буфером */}
+            {/* Один блок: картка поточної + стрічка решти історії під нею */}
             {history.length > 0 && (
                 <>
-                    <Text style={styles.sectionLabel}>{t('settings.current.title')}</Text>
+                    <View style={styles.historyHeader}>
+                        <Text style={styles.sectionLabel}>{t('settings.current.title')}</Text>
+                        <TouchableOpacity onPress={handleClearHistory}>
+                            <Text style={styles.clearText}>{t('settings.history.clear')}</Text>
+                        </TouchableOpacity>
+                    </View>
                     <View style={styles.currentCard}>
                         <Image source={{ uri: history[0].small ?? history[0].url }} style={styles.currentImg} />
                         <View style={styles.currentInfo}>
@@ -1022,36 +1046,31 @@ export default function SettingsScreen() {
                             </View>
                         </View>
                     </View>
-                </>
-            )}
-
-            {/* Історія (без поточної — вона в картці зверху). Long-press → меню */}
-            {history.length > 1 && (
-                <>
-                    <View style={styles.historyHeader}>
-                        <Text style={styles.sectionLabel}>{t('settings.section.history')}</Text>
-                        <TouchableOpacity onPress={handleClearHistory}>
-                            <Text style={styles.clearText}>{t('settings.history.clear')}</Text>
-                        </TouchableOpacity>
-                    </View>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.historyRow}>
-                        {history.slice(1).map(h => (
-                            <TouchableOpacity
-                                key={`${h.id}-${h.appliedAt}`}
-                                style={styles.historyCard}
-                                onPress={() => handleReapply(h)}
-                                onLongPress={() => {
-                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
-                                    setHistMenuTarget(h);
-                                }}
-                            >
-                                <Image source={{ uri: h.small ?? h.url }} style={styles.historyImg} />
-                                <View style={styles.historyOverlay}>
-                                    <SvgXml xml={ICON.refresh} width={14} height={14} />
-                                </View>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
+                    {history.length > 1 && (
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            style={styles.historyStrip}
+                            contentContainerStyle={styles.historyRow}
+                        >
+                            {history.slice(1).map(h => (
+                                <TouchableOpacity
+                                    key={`${h.id}-${h.appliedAt}`}
+                                    style={styles.historyCard}
+                                    onPress={() => handleReapply(h)}
+                                    onLongPress={() => {
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
+                                        setHistMenuTarget(h);
+                                    }}
+                                >
+                                    <Image source={{ uri: h.small ?? h.url }} style={styles.historyImg} />
+                                    <View style={styles.historyOverlay}>
+                                        <SvgXml xml={ICON.refresh} width={14} height={14} />
+                                    </View>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    )}
                 </>
             )}
 
@@ -1401,6 +1420,7 @@ const styles = StyleSheet.create({
     sleepTimeBtn: { backgroundColor: '#1a1a2e', borderWidth: 1, borderColor: '#2a2a4e', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 18 },
     sleepTimeText: { color: '#e8e6f5', fontSize: 15, fontWeight: '600', letterSpacing: 0.5 },
     sleepDash: { color: '#555', fontSize: 15 },
+    historyStrip: { marginTop: 10 },
     historyRow: { gap: 8, paddingVertical: 4 },
     historyCard: { width: 70, height: 105, borderRadius: 10, overflow: 'hidden', position: 'relative' },
     historyImg: { width: 70, height: 105, borderRadius: 10 },
