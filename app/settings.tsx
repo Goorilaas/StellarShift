@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import axios, { isCancel } from 'axios';
 import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
@@ -39,7 +40,7 @@ import Toast, { useToastQueue } from '../components/Toast';
 
 import { Blessing, nextBlessingFromQueue } from '../components/blessings';
 import { GREETING_ENABLED_KEY } from '../components/LaunchGreeting';
-import { changeWallpaperNow, clearHistory, drainPendingActions, getHistory, HistoryEntry, isIgnoringBatteryOptimization, PoolItem, requestIgnoreBatteryOptimization, setNotificationsEnabledNative, setNotificationStrings, setUnsplashKeyNative, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation, syncNativeHistory } from '../services/wallpaperService';
+import { changeWallpaperNow, clearHistory, drainPendingActions, getHistory, HistoryEntry, isIgnoringBatteryOptimization, PoolItem, requestIgnoreBatteryOptimization, setNotificationsEnabledNative, setNotificationStrings, setSleepHoursNative, setUnsplashKeyNative, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation, syncNativeHistory } from '../services/wallpaperService';
 
 const DEFAULT_MIX = CATEGORIES.filter(c => c.id !== 'mix').map(c => c.id);
 
@@ -102,6 +103,10 @@ export default function SettingsScreen() {
     const [poolLoading, setPoolLoading] = useState(false);
     const [greetingEnabled, setGreetingEnabled] = useState(true);
     const [notifyEnabled, setNotifyEnabled] = useState(true);
+    const [sleepEnabled, setSleepEnabled] = useState(false);
+    const [sleepStart, setSleepStart] = useState(0);    // 00:00, хвилини від півночі
+    const [sleepEnd, setSleepEnd] = useState(420);      // 07:00
+    const [sleepPicker, setSleepPicker] = useState<'start' | 'end' | null>(null);
     const { toast, showToast, dismissToast } = useToastQueue();
     const [history, setHistory] = useState<HistoryEntry[]>([]);
     const [blocked, setBlocked] = useState<BlockedPhoto[]>([]);
@@ -350,6 +355,9 @@ export default function SettingsScreen() {
                 const p = JSON.parse(s);
                 setIntervalVal(p.interval ?? 30);
                 setApplyTo(p.applyTo ?? 'both');
+                setSleepEnabled(p.sleepEnabled ?? false);
+                setSleepStart(p.sleepStart ?? 0);
+                setSleepEnd(p.sleepEnd ?? 420);
                 setActiveCategories(p.activeCategories ?? ['space']);
                 setMixCategories(p.mixCategories ?? DEFAULT_MIX);
                 setAutoChange(p.autoChange ?? false);
@@ -364,8 +372,15 @@ export default function SettingsScreen() {
         if (!loaded.current) return;
         AsyncStorage.setItem('settings', JSON.stringify({
             interval, applyTo, activeCategories, mixCategories, autoChange,
+            sleepEnabled, sleepStart, sleepEnd,
         }));
-    }, [interval, applyTo, activeCategories, mixCategories, autoChange]);
+    }, [interval, applyTo, activeCategories, mixCategories, autoChange, sleepEnabled, sleepStart, sleepEnd]);
+
+    // Тихі години → native prefs. Без рестарту ротації — Worker читає на кожному тіку.
+    useEffect(() => {
+        if (!loaded.current) return;
+        setSleepHoursNative(sleepEnabled, sleepStart, sleepEnd).catch(() => { });
+    }, [sleepEnabled, sleepStart, sleepEnd]);
 
     // When rotation settings change while autoChange is ON → debounced reload
     useEffect(() => {
@@ -558,6 +573,9 @@ export default function SettingsScreen() {
         await clearHistory();
         setHistory([]);
     };
+
+    const fmtTime = (m: number): string =>
+        `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 
     // Локалізовані рядки нотифікації → native prefs (Kotlin не знає про i18next)
     useEffect(() => {
@@ -825,6 +843,56 @@ export default function SettingsScreen() {
                     />
                 </View>
             </View>
+
+            <Text style={styles.sectionLabel}>{t('settings.section.sleep')}</Text>
+            <View style={styles.card}>
+                <View style={styles.toggleRow}>
+                    <View style={[styles.toggleLabelRow, { flex: 1, marginRight: 10 }]}>
+                        <SvgXml xml={ICON.moon} width={18} height={18} />
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.toggleLabel}>{t('settings.toggle.sleep')}</Text>
+                            <Text style={styles.toggleSub}>{t('settings.toggle.sleepSub')}</Text>
+                        </View>
+                    </View>
+                    <Switch
+                        value={sleepEnabled}
+                        onValueChange={setSleepEnabled}
+                        trackColor={{ false: '#333', true: '#534AB7' }}
+                        thumbColor={sleepEnabled ? '#fff' : '#888'}
+                    />
+                </View>
+                {sleepEnabled && (
+                    <View style={styles.sleepTimesRow}>
+                        <TouchableOpacity style={styles.sleepTimeBtn} onPress={() => setSleepPicker('start')}>
+                            <Text style={styles.sleepTimeText}>{fmtTime(sleepStart)}</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.sleepDash}>—</Text>
+                        <TouchableOpacity style={styles.sleepTimeBtn} onPress={() => setSleepPicker('end')}>
+                            <Text style={styles.sleepTimeText}>{fmtTime(sleepEnd)}</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+            </View>
+            {sleepPicker && (
+                <DateTimePicker
+                    mode="time"
+                    is24Hour
+                    value={(() => {
+                        const d = new Date();
+                        const m = sleepPicker === 'start' ? sleepStart : sleepEnd;
+                        d.setHours(Math.floor(m / 60), m % 60, 0, 0);
+                        return d;
+                    })()}
+                    onChange={(e, date) => {
+                        const which = sleepPicker;
+                        setSleepPicker(null); // Android-діалог стріляє один раз
+                        if (e.type !== 'set' || !date || !which) return;
+                        const mins = date.getHours() * 60 + date.getMinutes();
+                        if (which === 'start') setSleepStart(mins);
+                        else setSleepEnd(mins);
+                    }}
+                />
+            )}
 
             <Text style={styles.sectionLabel}>{t('settings.section.interval')}</Text>
             <View style={styles.grid}>
@@ -1329,6 +1397,10 @@ const styles = StyleSheet.create({
     btnActionText: { color: '#fff', fontSize: 16, fontWeight: '700' },
     historyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
     clearText: { color: '#7F77DD', fontSize: 12, fontWeight: '600', marginBottom: 10 },
+    sleepTimesRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 14 },
+    sleepTimeBtn: { backgroundColor: '#1a1a2e', borderWidth: 1, borderColor: '#2a2a4e', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 18 },
+    sleepTimeText: { color: '#e8e6f5', fontSize: 15, fontWeight: '600', letterSpacing: 0.5 },
+    sleepDash: { color: '#555', fontSize: 15 },
     historyRow: { gap: 8, paddingVertical: 4 },
     historyCard: { width: 70, height: 105, borderRadius: 10, overflow: 'hidden', position: 'relative' },
     historyImg: { width: 70, height: 105, borderRadius: 10 },
