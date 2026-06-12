@@ -98,9 +98,9 @@ object NotificationHelper {
             ensureChannel(context)
             val p = prefs(context)
             val title = p.getString("notifTitle", null) ?: "Зараз на екрані"
-            val favLabel = p.getString("notifFav", null) ?: "В улюблені"
-            val blockLabel = p.getString("notifBlock", null) ?: "Більше ніколи"
-            val nextLabel = p.getString("notifNext", null) ?: "Далі"
+            val favLabel = p.getString("notifFav", null) ?: "❤️ В улюблені"
+            val blockLabel = p.getString("notifBlock", null) ?: "🚫 Більше ніколи"
+            val nextLabel = p.getString("notifNext", null) ?: "⏭ Далі"
             val favDone = p.getString("notifFavDone", null) ?: "💜 Додано в улюблені"
 
             val thumb = scaleTo(bitmap, 256)
