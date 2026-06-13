@@ -28,7 +28,7 @@ import {
     View,
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
-import { CATEGORIES, Category, CHAOS_CATEGORY, CHAOS_QUERIES, FAVORITES_CATEGORY, filterNoPeople, sortCategoriesByLabel } from '../components/categories';
+import { CATEGORIES, Category, CHAOS_CATEGORY, CHAOS_QUERIES, FAVORITES_CATEGORY, filterNoPeople, pickCategoryQueries, sortCategoriesByLabel } from '../components/categories';
 import { blockPhoto, BlockedPhoto, clearBlocked, getBlocked, getBlockedIds, setBlockedAll, unblockPhoto } from '../services/blocked';
 import { clearUserKey, getUnsplashKey, getUserKey, setUserKey, useUnsplashKey, validateKey } from '../services/unsplashKey';
 import { openUnsplashHome } from '../services/unsplashTracking';
@@ -423,23 +423,35 @@ export default function SettingsScreen() {
         poolAbortRef.current = abort;
         setPoolLoading(true);
         try {
-            const queryJobs: { query: string; excludePeople: boolean }[] = [];
+            const queryJobs: { query: string; excludePeople: boolean; pageCount: number }[] = [];
             const seenQ = new Set<string>();
             let wantsFavorites = false;
-            const addCat = (cat: { query: string; excludePeople?: boolean } | undefined) => {
-                if (!cat?.query || seenQ.has(cat.query)) return;
-                seenQ.add(cat.query);
-                queryJobs.push({ query: cat.query, excludePeople: !!cat.excludePeople });
+            // Соло-категорія (не Мікс, не Улюблені) → беремо більше під-запитів,
+            // бо весь пул з неї однієї (бюджет дозволяє). Мікс → 2 на категорію.
+            const isSolo = categories.length === 1 && categories[0] !== 'mix' && categories[0] !== 'favorites';
+            const subCount = isSolo ? 5 : 2;
+            const addJob = (query: string | undefined, excludePeople: boolean, pageCount: number) => {
+                if (!query || seenQ.has(query)) return;
+                seenQ.add(query);
+                queryJobs.push({ query, excludePeople, pageCount });
             };
             const addById = (id: string) => {
                 if (id === 'favorites') {
                     wantsFavorites = true;
                 } else if (id === 'chaos') {
-                    // Chaos — беремо 6 random queries з CHAOS_QUERIES
-                    const shuffled = [...CHAOS_QUERIES].sort(() => Math.random() - 0.5).slice(0, 6);
-                    shuffled.forEach(q => addCat({ query: q, excludePeople: true }));
+                    // Chaos — 6 random queries з CHAOS_QUERIES (по 2 сторінки)
+                    [...CHAOS_QUERIES].sort(() => Math.random() - 0.5).slice(0, 6)
+                        .forEach(q => addJob(q, true, 2));
                 } else {
-                    addCat(CATEGORIES.find(c => c.id === id));
+                    // Ротаційні (гори/космос/океан/тварини/природа) → N різних
+                    // під-запитів по 1 сторінці. Решта → базовий query, 2 сторінки.
+                    const cat = CATEGORIES.find(c => c.id === id);
+                    const subs = pickCategoryQueries(id, subCount);
+                    if (subs.length > 0) {
+                        subs.forEach(q => addJob(q, !!cat?.excludePeople, 1));
+                    } else {
+                        addJob(cat?.query, !!cat?.excludePeople, 2);
+                    }
                 }
             };
             categories.forEach(catId => {
@@ -468,9 +480,15 @@ export default function SettingsScreen() {
             const responses = key
                 ? await Promise.all(
                     queryJobs.flatMap(job => {
-                        const p1 = Math.ceil(Math.random() * 5);
-                        const p2 = p1 < 5 ? p1 + 5 : p1 - 4;
-                        return [p1, p2].map(page =>
+                        // 2 сторінки (база, рознесені) або 1 випадкова (ротаційний під-запит)
+                        let pages: number[];
+                        if (job.pageCount === 2) {
+                            const p1 = Math.ceil(Math.random() * 5);
+                            pages = [p1, p1 < 5 ? p1 + 5 : p1 - 4];
+                        } else {
+                            pages = [Math.ceil(Math.random() * 6)];
+                        }
+                        return pages.map(page =>
                             axios.get('https://api.unsplash.com/search/photos', {
                                 params: { query: job.query, page, per_page: 30, orientation: 'portrait' },
                                 headers: { Authorization: `Client-ID ${key}` },

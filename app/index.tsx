@@ -29,7 +29,7 @@ import { SvgXml } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { Blessing, nextBlessingFromQueue } from '../components/blessings';
 import FavoriteHeart from '../components/FavoriteHeart';
-import { Category, CATEGORIES, CHAOS_CATEGORY, CHAOS_QUERIES, filterNoPeople, Photo, SEARCH_SUGGESTIONS, sortCategoriesByLabel } from '../components/categories';
+import { Category, CATEGORIES, CHAOS_CATEGORY, CHAOS_QUERIES, filterNoPeople, pickCategoryQueries, Photo, SEARCH_SUGGESTIONS, sortCategoriesByLabel } from '../components/categories';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { ensureGalleryPermission } from '../services/galleryPermission';
 import { randomCheer } from '../services/cheer';
@@ -136,6 +136,9 @@ export default function HomeScreen() {
   const lastTapRef = useRef<number>(0);
   const catListRef = useRef<FlatList<Category>>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Активний під-запит ротаційної категорії — тримаємо стабільним для infinite
+  // scroll, перевибираємо на pull-to-refresh. Для не-ротаційних = base query.
+  const catalogQueryRef = useRef<string>('');
 
   // Easter на лого головної: tap = blessing, 3 tap = blessing + spin (без unlock — той окремо в settings)
   const logoTapCountRef = useRef(0);
@@ -252,7 +255,8 @@ export default function HomeScreen() {
     } else if (activeCategory.id === 'chaos') {
       loadChaos();
     } else if (activeCategory.id !== 'search') {
-      loadPhotos(activeCategory.query, 1);
+      catalogQueryRef.current = pickCategoryQueries(activeCategory.id, 1)[0] ?? activeCategory.query;
+      loadPhotos(catalogQueryRef.current, 1, activeCategory);
     }
   }, [activeCategory]);
 
@@ -317,7 +321,7 @@ export default function HomeScreen() {
         ? (JSON.parse(s).mixCategories ?? CATEGORIES.filter(c => c.id !== 'mix').map(c => c.id))
         : CATEGORIES.filter(c => c.id !== 'mix').map(c => c.id);
       const allQueries = mixIds
-        .map(id => CATEGORIES.find(c => c.id === id)?.query)
+        .map(id => pickCategoryQueries(id, 1)[0] ?? CATEGORIES.find(c => c.id === id)?.query)
         .filter((q): q is string => !!q);
       const pool = allQueries.length > 0 ? allQueries : CATEGORIES.filter(c => c.query).map(c => c.query);
       const randomQueries = shuffle(pool).slice(0, 8);
@@ -380,7 +384,7 @@ export default function HomeScreen() {
     }
   };
 
-  const loadPhotos = async (query: string, pageNum: number) => {
+  const loadPhotos = async (query: string, pageNum: number, category?: Category) => {
     if (pageNum === 1) {
       setLoading(true);
       setPhotos([]);
@@ -391,7 +395,7 @@ export default function HomeScreen() {
     abortRef.current?.abort();
     abortRef.current = new AbortController();
     try {
-      const cat = CATEGORIES.find(c => c.query === query);
+      const cat = category ?? CATEGORIES.find(c => c.query === query);
       const perPage = cat?.excludePeople ? 30 : 20;
       // На першому завантаженні беремо рандомну сторінку 1-3, щоб одна категорія
       // не була завжди тими ж 30 фото. Infinite scroll далі додає послідовно.
@@ -815,7 +819,7 @@ export default function HomeScreen() {
             removeClippedSubviews={true}
             onEndReached={() => {
               if (activeCategory.id !== 'mix' && activeCategory.id !== 'chaos' && !loading) {
-                loadPhotos(activeCategory.query, page + 1);
+                loadPhotos(catalogQueryRef.current || activeCategory.query, page + 1, activeCategory);
               }
             }}
             onEndReachedThreshold={0.5}
@@ -828,7 +832,8 @@ export default function HomeScreen() {
                   } else if (activeCategory.id === 'chaos') {
                     loadChaos();
                   } else {
-                    loadPhotos(activeCategory.query, 1);
+                    catalogQueryRef.current = pickCategoryQueries(activeCategory.id, 1)[0] ?? activeCategory.query;
+                    loadPhotos(catalogQueryRef.current, 1, activeCategory);
                   }
                 }}
                 colors={['#FFD700', '#534AB7', '#7F77DD']}
