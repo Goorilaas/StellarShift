@@ -87,6 +87,11 @@ export const ICON = {
     <path d="M8.5 9v6M11.5 9v6" stroke="#cc3355" stroke-width="1.4" stroke-linecap="round"/>
   </svg>`,
 
+  // Біле порожнє серце — для кнопки улюблених на тайлах (на темному колі)
+  heartWhite: `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M10 17S2.5 12 2.5 7c0-2.2 1.7-3.8 4-3.8 1.3 0 2.6.7 3.5 1.9C10.9 3.9 12.2 3.2 13.5 3.2c2.3 0 4 1.6 4 3.8C17.5 12 10 17 10 17z" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/>
+  </svg>`,
+
   // Heart with white fill + purple stroke + glow — visible on будь-якому фоні
   heartGlow: `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <defs>

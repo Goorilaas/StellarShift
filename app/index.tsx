@@ -28,6 +28,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { SvgXml } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { Blessing, nextBlessingFromQueue } from '../components/blessings';
+import FavoriteHeart from '../components/FavoriteHeart';
 import { Category, CATEGORIES, CHAOS_CATEGORY, CHAOS_QUERIES, filterNoPeople, Photo, SEARCH_SUGGESTIONS, sortCategoriesByLabel } from '../components/categories';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { ensureGalleryPermission } from '../services/galleryPermission';
@@ -643,15 +644,10 @@ export default function HomeScreen() {
     <TouchableOpacity
       style={styles.photoCard}
       onPress={() => setSelectedPhoto(item)}
-      onLongPress={() => { toggleFavorite(item); triggerHeartAnim(); }}
-      delayLongPress={300}
+      activeOpacity={0.85}
     >
       <Image source={{ uri: item.urls.small }} style={styles.photo} resizeMode="cover" />
-      {favorites.includes(item.id) && (
-        <View style={styles.favBadge}>
-          <SvgXml xml={ICON.heartFilled} width={14} height={14} />
-        </View>
-      )}
+      <FavoriteHeart active={favorites.includes(item.id)} onToggle={() => toggleFavorite(item)} />
     </TouchableOpacity>
   );
 
@@ -1120,7 +1116,6 @@ const styles = StyleSheet.create({
   row: { paddingHorizontal: 12, gap: 12, marginBottom: 12 },
   photoCard: { borderRadius: 12, overflow: 'hidden', position: 'relative' },
   photo: { width: IMG_SIZE, height: IMG_SIZE * 1.5, borderRadius: 12 },
-  favBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: 4 },
   modalBg: { flex: 1, backgroundColor: '#000' },
   fullImage: { width: width, height: height },
   heartOverlay: { position: 'absolute', alignSelf: 'center', top: height / 2 - 90, zIndex: 99 },
