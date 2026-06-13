@@ -19,6 +19,7 @@ declare module 'react-native' {
             isLiveWallpaperActive(): Promise<boolean>;
             openLiveWallpaperPicker(): Promise<void>;
             disableLiveWallpaper(): Promise<boolean>;
+            setLiveIntensity(px: number): Promise<void>;
             setNotificationsEnabled(enabled: boolean): Promise<void>;
             setNotificationStrings(title: string, fav: string, block: string, next: string, favDone: string, channelName: string): Promise<void>;
             drainPendingActions(): Promise<string>;

@@ -119,7 +119,11 @@
       "statusOff": "Off",
       "enable": "Enable live wallpaper",
       "reopen": "Open preview",
-      "disable": "Turn off live wallpaper"
+      "disable": "Turn off live wallpaper",
+      "intensity": "Effect strength",
+      "soft": "Soft",
+      "normal": "Normal",
+      "strong": "Strong"
     },
     "byo": {
       "badgeCustom": "your key",
@@ -182,6 +186,7 @@
       "notifDenied": "Notification permission denied",
       "lwPickerFail": "❌ Couldn't open the live wallpaper picker",
       "lwDisabled": "Live wallpaper turned off",
+      "lwDisableFail": "❌ Couldn't turn off live wallpaper",
       "shadeSynced": "↺ Shade actions applied",
       "favAdded": "💜 Added to favorites",
       "favExists": "Already in favorites",

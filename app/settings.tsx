@@ -41,7 +41,7 @@ import Toast, { useToastQueue } from '../components/Toast';
 
 import { Blessing, nextBlessingFromQueue } from '../components/blessings';
 import { GREETING_ENABLED_KEY } from '../components/LaunchGreeting';
-import { changeWallpaperNow, clearHistory, disableLiveWallpaper, drainPendingActions, getHistory, HistoryEntry, isIgnoringBatteryOptimization, isLiveWallpaperActive, openLiveWallpaperPicker, PoolItem, requestIgnoreBatteryOptimization, setNotificationsEnabledNative, setNotificationStrings, setSleepHoursNative, setUnsplashKeyNative, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation, syncNativeHistory } from '../services/wallpaperService';
+import { changeWallpaperNow, clearHistory, disableLiveWallpaper, drainPendingActions, getHistory, HistoryEntry, isIgnoringBatteryOptimization, isLiveWallpaperActive, openLiveWallpaperPicker, PoolItem, requestIgnoreBatteryOptimization, setLiveIntensityNative, setNotificationsEnabledNative, setNotificationStrings, setSleepHoursNative, setUnsplashKeyNative, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation, syncNativeHistory } from '../services/wallpaperService';
 
 const DEFAULT_MIX = CATEGORIES.filter(c => c.id !== 'mix').map(c => c.id);
 
@@ -109,6 +109,7 @@ export default function SettingsScreen() {
     const [sleepEnd, setSleepEnd] = useState(420);      // 07:00
     const [sleepPicker, setSleepPicker] = useState<'start' | 'end' | null>(null);
     const [lwActive, setLwActive] = useState(false);
+    const [lwIntensity, setLwIntensity] = useState(60);
     const { toast, showToast, dismissToast } = useToastQueue();
     const [history, setHistory] = useState<HistoryEntry[]>([]);
     const [blocked, setBlocked] = useState<BlockedPhoto[]>([]);
@@ -337,6 +338,7 @@ export default function SettingsScreen() {
             getBlocked().then(setBlocked);
             AsyncStorage.getItem('favorites').then(v => setFavIds(v ? JSON.parse(v) : [])).catch(() => { });
             isLiveWallpaperActive().then(setLwActive).catch(() => { });
+            AsyncStorage.getItem('lw_intensity').then(v => { if (v) setLwIntensity(parseInt(v, 10)); }).catch(() => { });
             drainShadeActions().catch(() => { });
             AsyncStorage.getItem('hidden_categories').then(v => setHiddenCats(v ? JSON.parse(v) : [])).catch(() => { });
             // Якщо catalog заблокував фото — пул автозміни треба перебудувати
@@ -581,14 +583,23 @@ export default function SettingsScreen() {
         `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 
     const handleDisableLw = async () => {
-        try {
-            await disableLiveWallpaper();
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => { });
+        // boolean-результат: native повертає true/false (не кидає), тож фідбек завжди
+        // правильний — раніше глухо ловило 'lwPickerFail' навіть при успіху.
+        const ok = await disableLiveWallpaper().catch(() => false);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => { });
+        if (ok) {
             setLwActive(false);
             showToast(t('settings.toast.lwDisabled'));
-        } catch {
-            showToast(t('settings.toast.lwPickerFail'));
+        } else {
+            showToast(t('settings.toast.lwDisableFail'));
         }
+    };
+
+    const applyLwIntensity = (px: number) => {
+        setLwIntensity(px);
+        AsyncStorage.setItem('lw_intensity', String(px)).catch(() => { });
+        setLiveIntensityNative(px).catch(() => { });
+        Haptics.selectionAsync().catch(() => { });
     };
 
     // Локалізовані рядки нотифікації → native prefs (Kotlin не знає про i18next)
@@ -971,6 +982,20 @@ export default function SettingsScreen() {
                     <Text style={[styles.lwStatus, lwActive ? styles.lwStatusOn : styles.lwStatusOff]}>
                         {lwActive ? t('settings.lw.statusActive') : t('settings.lw.statusOff')}
                     </Text>
+                </View>
+                <Text style={styles.lwIntensityLabel}>{t('settings.lw.intensity')}</Text>
+                <View style={styles.lwIntensityRow}>
+                    {[{ k: 'soft', v: 30 }, { k: 'normal', v: 60 }, { k: 'strong', v: 100 }].map(opt => (
+                        <TouchableOpacity
+                            key={opt.k}
+                            style={[styles.btn, styles.btnFlex, lwIntensity === opt.v && styles.btnActive]}
+                            onPress={() => applyLwIntensity(opt.v)}
+                        >
+                            <Text style={[styles.btnText, lwIntensity === opt.v && styles.btnTextActive]}>
+                                {t(`settings.lw.${opt.k}`)}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
                 </View>
                 <TouchableOpacity
                     style={styles.lwBtn}
@@ -1472,6 +1497,8 @@ const styles = StyleSheet.create({
     lwBtnText: { color: '#AFA9EC', fontSize: 14, fontWeight: '700' },
     lwDisableBtn: { alignItems: 'center', marginHorizontal: 16, marginBottom: 14, marginTop: -4, paddingVertical: 10 },
     lwDisableText: { color: '#cc3355', fontSize: 13, fontWeight: '700' },
+    lwIntensityLabel: { color: '#7a7a90', fontSize: 12, paddingHorizontal: 16, marginTop: 4, marginBottom: 8 },
+    lwIntensityRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 14 },
     sleepTimesRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 14 },
     sleepTimeBtn: { backgroundColor: '#1a1a2e', borderWidth: 1, borderColor: '#2a2a4e', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 18 },
     sleepTimeText: { color: '#e8e6f5', fontSize: 15, fontWeight: '600', letterSpacing: 0.5 },

@@ -71,6 +71,18 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
         promise.resolve(WallpaperWorker.isOurLiveWallpaper(reactApplicationContext))
     }
 
+    // Інтенсивність tilt у px. Engine має listener на цей ключ → міняється наживо.
+    @ReactMethod
+    fun setLiveIntensity(px: Int, promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+            prefs.edit().putInt("lwIntensity", px).apply()
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("LW_INTENSITY_ERROR", e.message, e)
+        }
+    }
+
     @ReactMethod
     fun disableLiveWallpaper(promise: Promise) {
         CoroutineScope(Dispatchers.IO).launch {
