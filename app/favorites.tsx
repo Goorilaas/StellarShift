@@ -20,6 +20,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import { Photo } from '../components/categories';
+import FavoriteHeart from '../components/FavoriteHeart';
 import { ICON } from '../components/icons';
 import Toast, { useToastQueue } from '../components/Toast';
 import { setWallpaperFromUrl } from '../services/wallpaperService';
@@ -122,8 +123,10 @@ export default function FavoritesScreen() {
     };
 
     const renderPhoto = ({ item }: { item: Photo }) => (
-        <TouchableOpacity style={styles.photoCard} onPress={() => setSelectedPhoto(item)}>
+        <TouchableOpacity style={styles.photoCard} onPress={() => setSelectedPhoto(item)} activeOpacity={0.85}>
             <Image source={{ uri: item.urls.small }} style={styles.photo} resizeMode="cover" />
+            {/* Всі тут улюблені → серце filled, тап = швидко зняти (з undo) */}
+            <FavoriteHeart active onToggle={() => removeFavorite(item)} />
         </TouchableOpacity>
     );
 
