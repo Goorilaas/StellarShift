@@ -71,6 +71,18 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
         promise.resolve(WallpaperWorker.isOurLiveWallpaper(reactApplicationContext))
     }
 
+    @ReactMethod
+    fun disableLiveWallpaper(promise: Promise) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val ok = WallpaperWorker.disableLive(reactApplicationContext)
+                withContext(Dispatchers.Main) { promise.resolve(ok) }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { promise.reject("LW_DISABLE_ERROR", e.message, e) }
+            }
+        }
+    }
+
     // Системний preview нашої LW (один тап «Встановити»). Fallback — загальний chooser.
     @ReactMethod
     fun openLiveWallpaperPicker(promise: Promise) {

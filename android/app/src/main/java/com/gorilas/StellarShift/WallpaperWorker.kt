@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.TimeUnit
@@ -48,6 +49,26 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
             } catch (_: Exception) {
                 // Tracking failure must be silent.
             }
+        }
+
+        /**
+         * Вимикає нашу живу шпалеру: ставить статичну версію поточного фото з кешу
+         * (wm.setBitmap витісняє live назад у static — тут це навмисно). Без файлу —
+         * системна дефолтна. Автозміна продовжить працювати на статиці.
+         */
+        fun disableLive(context: Context): Boolean = try {
+            val prefs = context.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+            val target = prefs.getString("target", "both") ?: "both"
+            val f = File(context.filesDir, NotificationHelper.CURRENT_FILE)
+            val bmp = if (f.exists()) BitmapFactory.decodeFile(f.absolutePath) else null
+            if (bmp != null) {
+                applyStatic(context, bmp, target)
+            } else {
+                WallpaperManager.getInstance(context).clear()
+            }
+            true
+        } catch (_: Exception) {
+            false
         }
 
         /** Наша жива шпалера зараз активна? (інша LW чужого пакета → false) */

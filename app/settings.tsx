@@ -41,7 +41,7 @@ import Toast, { useToastQueue } from '../components/Toast';
 
 import { Blessing, nextBlessingFromQueue } from '../components/blessings';
 import { GREETING_ENABLED_KEY } from '../components/LaunchGreeting';
-import { changeWallpaperNow, clearHistory, drainPendingActions, getHistory, HistoryEntry, isIgnoringBatteryOptimization, isLiveWallpaperActive, openLiveWallpaperPicker, PoolItem, requestIgnoreBatteryOptimization, setNotificationsEnabledNative, setNotificationStrings, setSleepHoursNative, setUnsplashKeyNative, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation, syncNativeHistory } from '../services/wallpaperService';
+import { changeWallpaperNow, clearHistory, disableLiveWallpaper, drainPendingActions, getHistory, HistoryEntry, isIgnoringBatteryOptimization, isLiveWallpaperActive, openLiveWallpaperPicker, PoolItem, requestIgnoreBatteryOptimization, setNotificationsEnabledNative, setNotificationStrings, setSleepHoursNative, setUnsplashKeyNative, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation, syncNativeHistory } from '../services/wallpaperService';
 
 const DEFAULT_MIX = CATEGORIES.filter(c => c.id !== 'mix').map(c => c.id);
 
@@ -580,6 +580,17 @@ export default function SettingsScreen() {
     const fmtTime = (m: number): string =>
         `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 
+    const handleDisableLw = async () => {
+        try {
+            await disableLiveWallpaper();
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => { });
+            setLwActive(false);
+            showToast(t('settings.toast.lwDisabled'));
+        } catch {
+            showToast(t('settings.toast.lwPickerFail'));
+        }
+    };
+
     // Локалізовані рядки нотифікації → native prefs (Kotlin не знає про i18next)
     useEffect(() => {
         setNotificationStrings({
@@ -970,6 +981,11 @@ export default function SettingsScreen() {
                         {lwActive ? t('settings.lw.reopen') : t('settings.lw.enable')}
                     </Text>
                 </TouchableOpacity>
+                {lwActive && (
+                    <TouchableOpacity style={styles.lwDisableBtn} onPress={handleDisableLw}>
+                        <Text style={styles.lwDisableText}>{t('settings.lw.disable')}</Text>
+                    </TouchableOpacity>
+                )}
             </View>
 
             <Text style={styles.sectionLabel}>{t('settings.section.activeCategories')}</Text>
@@ -1086,10 +1102,9 @@ export default function SettingsScreen() {
                                 <TouchableOpacity
                                     key={`${h.id}-${h.appliedAt}`}
                                     style={styles.historyCard}
-                                    onPress={() => handleReapply(h)}
-                                    onLongPress={() => {
-                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
-                                        setHistMenuTarget(h);
+                                    onPress={() => {
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
+                                        setHistMenuTarget(h); // тап = багате меню (улюблені / блок / застосувати)
                                     }}
                                 >
                                     <Image source={{ uri: h.small ?? h.url }} style={styles.historyImg} />
@@ -1455,6 +1470,8 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(127,119,221,0.12)',
     },
     lwBtnText: { color: '#AFA9EC', fontSize: 14, fontWeight: '700' },
+    lwDisableBtn: { alignItems: 'center', marginHorizontal: 16, marginBottom: 14, marginTop: -4, paddingVertical: 10 },
+    lwDisableText: { color: '#cc3355', fontSize: 13, fontWeight: '700' },
     sleepTimesRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 14 },
     sleepTimeBtn: { backgroundColor: '#1a1a2e', borderWidth: 1, borderColor: '#2a2a4e', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 18 },
     sleepTimeText: { color: '#e8e6f5', fontSize: 15, fontWeight: '600', letterSpacing: 0.5 },
