@@ -61,6 +61,10 @@ export const isLiveWallpaperActive = (): Promise<boolean> =>
 export const openLiveWallpaperPicker = (): Promise<void> =>
     WallpaperModule.openLiveWallpaperPicker();
 
+// Вимкнути живу шпалеру — поточне фото стає статичним (Android не дає «зняти» LW інакше).
+export const disableLiveWallpaper = (): Promise<boolean> =>
+    WallpaperModule.disableLiveWallpaper();
+
 // Тихі години: вікно в хвилинах від півночі (через північ — ок: start > end).
 export const setSleepHoursNative = (enabled: boolean, startMin: number, endMin: number): Promise<void> =>
     WallpaperModule.setSleepHours(enabled, startMin, endMin);

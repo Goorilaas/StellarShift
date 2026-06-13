@@ -118,7 +118,8 @@
       "statusActive": "Active",
       "statusOff": "Off",
       "enable": "Enable live wallpaper",
-      "reopen": "Open preview"
+      "reopen": "Open preview",
+      "disable": "Turn off live wallpaper"
     },
     "byo": {
       "badgeCustom": "your key",
@@ -180,6 +181,7 @@
       "chaosLocked": "🔒 Chaos hidden again",
       "notifDenied": "Notification permission denied",
       "lwPickerFail": "❌ Couldn't open the live wallpaper picker",
+      "lwDisabled": "Live wallpaper turned off",
       "shadeSynced": "↺ Shade actions applied",
       "favAdded": "💜 Added to favorites",
       "favExists": "Already in favorites",
