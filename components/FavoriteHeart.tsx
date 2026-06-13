@@ -4,10 +4,13 @@ import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { ICON } from './icons';
 
-// «Cosmic spark» — наш підпис: серце вистрибує + розлітаються бренд-зорі.
-const SPARK_COUNT = 4;
-const SPARK_COLORS = ['#FFD700', '#AFA9EC', '#7F77DD', '#FFD700'];
-const SPARK_DIST = 13; // px — невеликий радіус, щоб не кліпалось overflow тайла
+// «Cosmic spark» — наш підпис: серце вистрибує + осипається зоряний пил.
+// v2: серце в кутку тайла (overflow:hidden), тому зорі летять ВНИЗ-ВЛІВО, у
+// видиму зону — інакше пів-сплеску обрізалось краєм. 6 зір, більші, зі світінням.
+const SPARK_COUNT = 6;
+const SPARK_COLORS = ['#FFD700', '#AFA9EC', '#7F77DD', '#FFE9A8', '#C9C2FF', '#FFD700'];
+const SPARK_ANGLES = [70, 95, 120, 145, 170, 195].map(d => (d * Math.PI) / 180); // +y вниз
+const SPARK_DIST = [24, 28, 25, 29, 26, 22];
 
 type Props = {
     active: boolean;
@@ -32,10 +35,11 @@ export default function FavoriteHeart({ active, onToggle }: Props) {
             return;
         }
         if (active) {
-            Animated.spring(fill, { toValue: 1, useNativeDriver: true, friction: 4, tension: 150 }).start();
+            // помітніший pop (нижче friction → більший overshoot за 1)
+            Animated.spring(fill, { toValue: 1, useNativeDriver: true, friction: 3.2, tension: 150 }).start();
             sparks.forEach(s => {
                 s.setValue(0);
-                Animated.timing(s, { toValue: 1, duration: 420, useNativeDriver: true }).start();
+                Animated.timing(s, { toValue: 1, duration: 540, useNativeDriver: true }).start();
             });
         } else {
             Animated.timing(fill, { toValue: 0, duration: 170, useNativeDriver: true }).start();
@@ -63,17 +67,19 @@ export default function FavoriteHeart({ active, onToggle }: Props) {
                 </Animated.View>
             </View>
             {sparks.map((s, i) => {
-                const angle = (Math.PI * 2 * i) / SPARK_COUNT - Math.PI / 2;
-                const tx = s.interpolate({ inputRange: [0, 1], outputRange: [0, Math.cos(angle) * SPARK_DIST] });
-                const ty = s.interpolate({ inputRange: [0, 1], outputRange: [0, Math.sin(angle) * SPARK_DIST] });
-                const opacity = s.interpolate({ inputRange: [0, 0.25, 1], outputRange: [0, 1, 0] });
-                const scale = s.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0.2, 1, 0.3] });
+                const angle = SPARK_ANGLES[i];
+                const dist = SPARK_DIST[i];
+                const tx = s.interpolate({ inputRange: [0, 1], outputRange: [0, Math.cos(angle) * dist] });
+                const ty = s.interpolate({ inputRange: [0, 1], outputRange: [0, Math.sin(angle) * dist] });
+                const opacity = s.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 1, 0] });
+                const scale = s.interpolate({ inputRange: [0, 0.35, 1], outputRange: [0.3, 1.2, 0.4] });
                 return (
                     <Animated.View
                         key={i}
                         pointerEvents="none"
                         style={[styles.spark, { opacity, transform: [{ translateX: tx }, { translateY: ty }, { scale }] }]}
                     >
+                        <View style={[styles.sparkGlow, { backgroundColor: SPARK_COLORS[i] }]} />
                         <View style={[styles.sparkDot, { backgroundColor: SPARK_COLORS[i] }]} />
                     </Animated.View>
                 );
@@ -86,6 +92,7 @@ const styles = StyleSheet.create({
     wrap: { position: 'absolute', top: 6, right: 6, width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
     circle: { width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.42)', alignItems: 'center', justifyContent: 'center' },
     center: { alignItems: 'center', justifyContent: 'center' },
-    spark: { position: 'absolute', top: 13, left: 13, width: 4, height: 4 },
-    sparkDot: { width: 4, height: 4, borderRadius: 2 },
+    spark: { position: 'absolute', top: 15, left: 15, alignItems: 'center', justifyContent: 'center' },
+    sparkGlow: { position: 'absolute', width: 10, height: 10, borderRadius: 5, opacity: 0.35 },
+    sparkDot: { width: 5, height: 5, borderRadius: 2.5 },
 });
