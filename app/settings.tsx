@@ -121,6 +121,13 @@ export default function SettingsScreen() {
     const [clearBlockedOpen, setClearBlockedOpen] = useState(false);
     const loaded = useRef(false);
     const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Ключ налаштувань, для яких пул уже зібрано. Захищає від спурйозного
+    // перезавантаження: loadSettings на КОЖЕН focus робить setState новими
+    // масивами (JSON.parse) → reload-ефект порівнював за посиланням і думав
+    // що змінилось. Тепер порівнюємо за ЗНАЧЕННЯМ.
+    const appliedPoolKeyRef = useRef<string>('');
+    const poolKeyOf = (p: { activeCategories: string[]; mixCategories: string[]; interval: number; applyTo: string }) =>
+        JSON.stringify([p.activeCategories, p.mixCategories, p.interval, p.applyTo]);
     const autoChangeRef = useRef(false);
     const poolAbortRef = useRef<AbortController | null>(null);
 
@@ -367,6 +374,13 @@ export default function SettingsScreen() {
                 setMixCategories(p.mixCategories ?? DEFAULT_MIX);
                 setAutoChange(p.autoChange ?? false);
                 autoChangeRef.current = p.autoChange ?? false;
+                // Пул уже відповідає цим налаштуванням — не перебудовуємо на focus
+                appliedPoolKeyRef.current = poolKeyOf({
+                    activeCategories: p.activeCategories ?? ['space'],
+                    mixCategories: p.mixCategories ?? DEFAULT_MIX,
+                    interval: p.interval ?? 30,
+                    applyTo: p.applyTo ?? 'both',
+                });
             }
         } catch { }
         loaded.current = true;
@@ -387,9 +401,15 @@ export default function SettingsScreen() {
         setSleepHoursNative(sleepEnabled, sleepStart, sleepEnd).catch(() => { });
     }, [sleepEnabled, sleepStart, sleepEnd]);
 
-    // When rotation settings change while autoChange is ON → debounced reload
+    // When rotation settings change while autoChange is ON → debounced reload.
+    // Порівнюємо за ЗНАЧЕННЯМ: loadSettings на focus робить setState новими
+    // масивами (JSON.parse), тож reference-deps бачили б фальшиву зміну і
+    // перебудовували пул (+toast) на кожен вхід у Settings. Ключ ідентичний —
+    // нічого не робимо.
     useEffect(() => {
         if (!loaded.current || !autoChangeRef.current) return;
+        const key = poolKeyOf({ activeCategories, mixCategories, interval, applyTo });
+        if (key === appliedPoolKeyRef.current) return;
         if (reloadTimer.current) clearTimeout(reloadTimer.current);
         reloadTimer.current = setTimeout(() => loadAndStart(), 1500);
         return () => { if (reloadTimer.current) clearTimeout(reloadTimer.current); };
@@ -512,6 +532,7 @@ export default function SettingsScreen() {
         // wifiOnly / chargingOnly removed as a feature (redundant for users) — pass false,
         // false so WorkManager has no network/charging constraints (rotate always).
         await startWallpaperRotation(pool, interval, applyTo, false, false);
+        appliedPoolKeyRef.current = poolKeyOf({ activeCategories, mixCategories, interval, applyTo });
         showToast(t('settings.toast.poolReady', { count: pool.length }));
     };
 
