@@ -65,6 +65,10 @@ export const openLiveWallpaperPicker = (): Promise<void> =>
 export const disableLiveWallpaper = (): Promise<boolean> =>
     WallpaperModule.disableLiveWallpaper();
 
+// Сила tilt-зсуву у px (engine читає наживо). 30 м'яко / 60 звичайно / 100 сильно.
+export const setLiveIntensityNative = (px: number): Promise<void> =>
+    WallpaperModule.setLiveIntensity(px);
+
 // Тихі години: вікно в хвилинах від півночі (через північ — ок: start > end).
 export const setSleepHoursNative = (enabled: boolean, startMin: number, endMin: number): Promise<void> =>
     WallpaperModule.setSleepHours(enabled, startMin, endMin);
