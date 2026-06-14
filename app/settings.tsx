@@ -28,7 +28,7 @@ import {
     View,
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
-import { CATEGORIES, CATEGORY_QUERIES, Category, CHAOS_CATEGORY, CHAOS_QUERIES, FAVORITES_CATEGORY, filterNoPeople, PEOPLE_TAGS, pickCategoryQueries, sortCategoriesByLabel } from '../components/categories';
+import { CATEGORIES, CATEGORY_QUERIES, Category, CHAOS_CATEGORY, CHAOS_QUERIES, FAVORITES_CATEGORY, filterNoPeople, PEOPLE_TAGS, pickCategoryQueries, sortCategoriesByLabel, subCountForMix } from '../components/categories';
 import { blockPhoto, BlockedPhoto, clearBlocked, getBlocked, getBlockedIds, setBlockedAll, unblockPhoto } from '../services/blocked';
 import { clearUserKey, getUnsplashKey, getUserKey, setUserKey, useUnsplashKey, validateKey } from '../services/unsplashKey';
 import { openUnsplashHome } from '../services/unsplashTracking';
@@ -426,10 +426,12 @@ export default function SettingsScreen() {
             const queryJobs: { query: string; excludePeople: boolean; pageCount: number }[] = [];
             const seenQ = new Set<string>();
             let wantsFavorites = false;
-            // Соло-категорія (не Мікс, не Улюблені) → беремо більше під-запитів,
-            // бо весь пул з неї однієї (бюджет дозволяє). Мікс → 2 на категорію.
-            const isSolo = categories.length === 1 && categories[0] !== 'mix' && categories[0] !== 'favorites';
-            const subCount = isSolo ? 5 : 2;
+            // Скільки під-запитів на категорію — залежить від розміру міксу під
+            // бюджет ~44 запити (Варіант A): менше категорій → багатше кожній.
+            const expandedIds = categories.flatMap(c =>
+                c === 'mix' ? (mixCategories.length > 0 ? mixCategories : DEFAULT_MIX) : [c]);
+            const apiCatCount = new Set(expandedIds.filter(c => c !== 'favorites')).size;
+            const subCount = subCountForMix(apiCatCount);
             const addJob = (query: string | undefined, excludePeople: boolean, pageCount: number) => {
                 if (!query || seenQ.has(query)) return;
                 seenQ.add(query);
@@ -558,8 +560,10 @@ export default function SettingsScreen() {
     // не логіка — списки запитів лишаються лише тут). Дзеркалить job-білдер
     // loadPhotoPool, але емітить КАНДИДАТІВ, а не вже обрані запити.
     const buildPoolRecipe = async (categories: string[]): Promise<string> => {
-        const isSolo = categories.length === 1 && categories[0] !== 'mix' && categories[0] !== 'favorites';
-        const subCount = isSolo ? 5 : 2;
+        const expandedIds = categories.flatMap(c =>
+            c === 'mix' ? (mixCategories.length > 0 ? mixCategories : DEFAULT_MIX) : [c]);
+        const apiCatCount = new Set(expandedIds.filter(c => c !== 'favorites')).size;
+        const subCount = subCountForMix(apiCatCount);
         const jobs: { queries: string[]; pick: number; pages: number; excludePeople: boolean }[] = [];
         const seen = new Set<string>();
         let wantsFavorites = false;

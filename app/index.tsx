@@ -29,7 +29,7 @@ import { SvgXml } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { Blessing, nextBlessingFromQueue } from '../components/blessings';
 import FavoriteHeart from '../components/FavoriteHeart';
-import { Category, CATEGORIES, CHAOS_CATEGORY, CHAOS_QUERIES, dedupAndCapByAuthor, filterNoPeople, pickCategoryQueries, Photo, SEARCH_SUGGESTIONS, sortCategoriesByLabel } from '../components/categories';
+import { Category, CATEGORIES, CHAOS_CATEGORY, CHAOS_QUERIES, dedupAndCapByAuthor, filterNoPeople, pickCategoryQueries, Photo, SEARCH_SUGGESTIONS, sortCategoriesByLabel, subCountForMix } from '../components/categories';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { ensureGalleryPermission } from '../services/galleryPermission';
 import { randomCheer } from '../services/cheer';
@@ -320,11 +320,15 @@ export default function HomeScreen() {
       const mixIds: string[] = s
         ? (JSON.parse(s).mixCategories ?? CATEGORIES.filter(c => c.id !== 'mix').map(c => c.id))
         : CATEGORIES.filter(c => c.id !== 'mix').map(c => c.id);
-      const allQueries = mixIds
-        .map(id => pickCategoryQueries(id, 1)[0] ?? CATEGORIES.find(c => c.id === id)?.query)
-        .filter((q): q is string => !!q);
+      // Беремо subCountForMix під-запитів на категорію (легший cap ≤3, бо браузинг
+      // рефрешиться частіше за пул), далі ≤12 запитів усього → грид ~80+, не 31.
+      const per = Math.min(subCountForMix(mixIds.filter(id => id !== 'favorites').length), 3);
+      const allQueries = mixIds.flatMap(id => {
+        const subs = pickCategoryQueries(id, per);
+        return subs.length > 0 ? subs : [CATEGORIES.find(c => c.id === id)?.query].filter((q): q is string => !!q);
+      });
       const pool = allQueries.length > 0 ? allQueries : CATEGORIES.filter(c => c.query).map(c => c.query);
-      const randomQueries = shuffle(pool).slice(0, 8);
+      const randomQueries = shuffle(pool).slice(0, 12);
       const key = await getUnsplashKey();
       const results = await Promise.all(
         randomQueries.map(q =>
