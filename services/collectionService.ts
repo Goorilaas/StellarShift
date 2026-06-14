@@ -28,20 +28,27 @@ export const getCollectionPhotos = async (
 };
 
 // Метадані колекції для картки: назва, к-сть, обкладинка, куратор.
+// Memoize на сесію — браузинг настроїв/полиці повторно не б'є API (ліміт 50/год).
+const metaCache = new Map<string, CollectionMeta>();
+
 export const getCollectionMeta = async (collectionId: string): Promise<CollectionMeta | null> => {
+    const cached = metaCache.get(collectionId);
+    if (cached) return cached;
     try {
         const key = await getUnsplashKey();
         const res = await axios.get(`https://api.unsplash.com/collections/${collectionId}`, {
             headers: { Authorization: `Client-ID ${key}` },
         });
         const d = res.data;
-        return {
+        const meta: CollectionMeta = {
             id: d.id,
             title: d.title,
             total: d.total_photos,
             cover: d.cover_photo?.urls?.small,
             curator: d.user?.name,
         };
+        metaCache.set(collectionId, meta);
+        return meta;
     } catch {
         return null;
     }
