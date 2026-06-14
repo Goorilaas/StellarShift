@@ -30,6 +30,7 @@ import {
 import { SvgXml } from 'react-native-svg';
 import { CATEGORIES, CATEGORY_QUERIES, Category, CHAOS_CATEGORY, CHAOS_QUERIES, FAVORITES_CATEGORY, filterNoPeople, PEOPLE_TAGS, pickCategoryQueries, sortCategoriesByLabel, subCountForMix } from '../components/categories';
 import { blockPhoto, BlockedPhoto, clearBlocked, getBlocked, getBlockedIds, setBlockedAll, unblockPhoto } from '../services/blocked';
+import { getActiveCollections } from '../services/collectionSubs';
 import { clearUserKey, getUnsplashKey, getUserKey, setUserKey, useUnsplashKey, validateKey } from '../services/unsplashKey';
 import { openUnsplashHome } from '../services/unsplashTracking';
 import BlockedManagerSheet from '../components/BlockedManagerSheet';
@@ -605,6 +606,15 @@ export default function SettingsScreen() {
     };
 
     const loadAndStart = async () => {
+        // Model B: активні колекції перебивають категорії — не пушимо категорійний
+        // пул (бо перебив би колекційну шпалеру). Лише тримаємо рецепт свіжим для
+        // фолбеку, коли юзер зніме всі колекції.
+        const activeColl = await getActiveCollections();
+        if (activeColl.length > 0) {
+            appliedPoolKeyRef.current = poolKeyOf({ activeCategories, mixCategories, interval, applyTo });
+            try { await setPoolRecipeNative(await buildPoolRecipe(activeCategories)); } catch { /* best-effort */ }
+            return;
+        }
         const pool = await loadPhotoPool(activeCategories);
         if (!pool) return;
         // Sync current Unsplash key into native prefs so WallpaperWorker can fire

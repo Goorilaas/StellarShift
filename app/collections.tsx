@@ -5,6 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Mood, MOODS } from '../components/collections';
 import { CollectionMeta, getCollectionMeta } from '../services/collectionService';
 import { getActiveCollections, getBookmarkedCollections, toggleActiveCollection, toggleBookmarkCollection } from '../services/collectionSubs';
+import { getUnsplashKey } from '../services/unsplashKey';
+import { refreshPoolNative, setActiveCollectionsNative, setUnsplashKeyNative } from '../services/wallpaperService';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -45,7 +47,19 @@ export default function CollectionsScreen() {
     }, []);
 
     const onBm = async (id: string) => setBookmarks(await toggleBookmarkCollection(id));
-    const onAct = async (id: string) => setActive(await toggleActiveCollection(id));
+    const onAct = async (id: string) => {
+        const next = await toggleActiveCollection(id);
+        setActive(next);
+        // Model B: пишемо активні в native + миттєвий перезбір (нова шпалера з колекцій,
+        // або фолбек на категорії, якщо зняли всі). Ротація — за станом автозміни.
+        try {
+            // Ключ у native prefs обов'язковий для фетчу колекцій (юзер міг прийти
+            // сюди, не налаштувавши категорії — тоді ключа ще нема).
+            await setUnsplashKeyNative(await getUnsplashKey());
+            await setActiveCollectionsNative(JSON.stringify(next));
+            await refreshPoolNative();
+        } catch { /* non-fatal */ }
+    };
 
     if (mood) {
         return <MoodDetail mood={mood} top={insets.top} onBack={() => setMood(null)}
