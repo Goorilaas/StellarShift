@@ -26,6 +26,14 @@ export const setUnsplashKeyNative = (key: string): Promise<void> =>
 export const setPoolRecipeNative = (recipeJson: string): Promise<void> =>
     WallpaperModule.setPoolRecipe(recipeJson);
 
+// Активні колекції (Model B): перебивають категорійний пул, поки не порожні.
+export const setActiveCollectionsNative = (json: string): Promise<void> =>
+    WallpaperModule.setActiveCollections(json);
+
+// Миттєвий перезбір пулу + застосувати нову шпалеру (на активацію/зняття колекції).
+export const refreshPoolNative = (): Promise<boolean> =>
+    WallpaperModule.refreshPool();
+
 export const stopWallpaperRotation = (): Promise<void> =>
     WallpaperModule.stopRotation();
 

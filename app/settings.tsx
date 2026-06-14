@@ -30,6 +30,7 @@ import {
 import { SvgXml } from 'react-native-svg';
 import { CATEGORIES, CATEGORY_QUERIES, Category, CHAOS_CATEGORY, CHAOS_QUERIES, FAVORITES_CATEGORY, filterNoPeople, PEOPLE_TAGS, pickCategoryQueries, sortCategoriesByLabel, subCountForMix } from '../components/categories';
 import { blockPhoto, BlockedPhoto, clearBlocked, getBlocked, getBlockedIds, setBlockedAll, unblockPhoto } from '../services/blocked';
+import { getActiveCollections } from '../services/collectionSubs';
 import { clearUserKey, getUnsplashKey, getUserKey, setUserKey, useUnsplashKey, validateKey } from '../services/unsplashKey';
 import { openUnsplashHome } from '../services/unsplashTracking';
 import BlockedManagerSheet from '../components/BlockedManagerSheet';
@@ -41,7 +42,7 @@ import Toast, { useToastQueue } from '../components/Toast';
 
 import { Blessing, nextBlessingFromQueue } from '../components/blessings';
 import { GREETING_ENABLED_KEY } from '../components/LaunchGreeting';
-import { changeWallpaperNow, clearHistory, disableLiveWallpaper, drainPendingActions, getHistory, HistoryEntry, isIgnoringBatteryOptimization, isLiveWallpaperActive, openLiveWallpaperPicker, PoolItem, requestIgnoreBatteryOptimization, setLiveIntensityNative, setNotificationsEnabledNative, setNotificationStrings, setPoolRecipeNative, setSleepHoursNative, setUnsplashKeyNative, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation, syncNativeHistory } from '../services/wallpaperService';
+import { changeWallpaperNow, clearHistory, disableLiveWallpaper, drainPendingActions, getHistory, HistoryEntry, isIgnoringBatteryOptimization, isLiveWallpaperActive, openLiveWallpaperPicker, PoolItem, refreshPoolNative, requestIgnoreBatteryOptimization, setLiveIntensityNative, setNotificationsEnabledNative, setNotificationStrings, setPoolRecipeNative, setSleepHoursNative, setUnsplashKeyNative, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation, syncNativeHistory } from '../services/wallpaperService';
 
 const DEFAULT_MIX = CATEGORIES.filter(c => c.id !== 'mix').map(c => c.id);
 
@@ -605,6 +606,17 @@ export default function SettingsScreen() {
     };
 
     const loadAndStart = async () => {
+        // Model B: активні колекції перебивають категорії — не пушимо категорійний
+        // пул (бо перебив би колекційну шпалеру). Лише тримаємо рецепт свіжим для
+        // фолбеку, коли юзер зніме всі колекції.
+        const activeColl = await getActiveCollections();
+        if (activeColl.length > 0) {
+            appliedPoolKeyRef.current = poolKeyOf({ activeCategories, mixCategories, interval, applyTo });
+            // Рецепт свіжий для фолбеку + перезбір/планування воркера на колекційному джерелі.
+            try { await setPoolRecipeNative(await buildPoolRecipe(activeCategories)); } catch { /* best-effort */ }
+            try { await setUnsplashKeyNative(await getUnsplashKey()); await refreshPoolNative(); } catch { /* best-effort */ }
+            return;
+        }
         const pool = await loadPhotoPool(activeCategories);
         if (!pool) return;
         // Sync current Unsplash key into native prefs so WallpaperWorker can fire

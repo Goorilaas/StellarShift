@@ -271,6 +271,9 @@
       "cta": "Спробувати ще"
     }
   },
+  "collections": {
+    "title": "Колекції"
+  },
   "favorites": {
     "title": "Улюблені",
     "empty": {
