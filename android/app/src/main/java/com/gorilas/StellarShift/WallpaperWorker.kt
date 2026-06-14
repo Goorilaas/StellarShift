@@ -229,20 +229,33 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
         private const val POOL_TTL_MS = 24L * 60 * 60 * 1000      // 24 год — вік пулу
         private const val REBUILD_BACKOFF_MS = 60L * 60 * 1000    // 1 год між невдалими спробами
 
+        /** Активні колекції (Model B): якщо є — перебивають категорійний рецепт. */
+        private fun activeCollections(prefs: android.content.SharedPreferences): List<String> =
+            try { jsonToStringList(JSONArray(prefs.getString("activeCollections", "[]"))) } catch (_: Exception) { emptyList() }
+
         /**
-         * Перезбирає пул за рецептом, якщо він старший за 24год. Рецепт пише JS у
-         * `poolRecipe` (списки під-запитів + прапорці) — Kotlin лише виконавець, що
-         * сам щодня рандомить ротацію. Swap-on-success: при будь-якій невдачі
-         * (нема мережі / 403 / порожньо) старий пул лишається, ретрай за годину.
+         * Єдина точка збірки пулу: активні колекції (override) АБО рецепт категорій.
+         * І для фонового тіку, і для миттєвого перезбору на дію юзера.
+         */
+        private suspend fun buildPool(prefs: android.content.SharedPreferences): JSONArray? {
+            val active = activeCollections(prefs)
+            if (active.isNotEmpty()) return buildFromCollections(prefs, active)
+            val recipeJson = prefs.getString("poolRecipe", null) ?: return null
+            return buildPoolFromRecipe(prefs, JSONObject(recipeJson))
+        }
+
+        /**
+         * Перезбирає пул, якщо старший за 24год. Swap-on-success: при невдачі старий
+         * пул лишається, ретрай за годину. Джерело — buildPool (колекції/рецепт).
          */
         private suspend fun maybeRebuildPool(context: Context, prefs: android.content.SharedPreferences) {
-            val recipeJson = prefs.getString("poolRecipe", null) ?: return
+            if (prefs.getString("poolRecipe", null) == null && activeCollections(prefs).isEmpty()) return
             val now = System.currentTimeMillis()
             if (now - prefs.getLong("lastPoolBuild", 0L) < POOL_TTL_MS) return
             if (now - prefs.getLong("lastPoolAttempt", 0L) < REBUILD_BACKOFF_MS) return
             prefs.edit().putLong("lastPoolAttempt", now).apply()
             try {
-                val fresh = buildPoolFromRecipe(prefs, JSONObject(recipeJson)) ?: return
+                val fresh = buildPool(prefs) ?: return
                 if (fresh.length() == 0) return
                 prefs.edit()
                     .putString("photoPool", fresh.toString())
@@ -251,6 +264,23 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
                     .apply()
             } catch (_: Exception) {
                 // лишаємо старий пул; наступна спроба за REBUILD_BACKOFF_MS
+            }
+        }
+
+        /** Примусовий перезбір (на дію юзера — активація колекції). Ігнорує 24h-гард. */
+        suspend fun rebuildNow(context: Context): Boolean {
+            val prefs = context.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+            return try {
+                val fresh = buildPool(prefs) ?: return false
+                if (fresh.length() == 0) return false
+                prefs.edit()
+                    .putString("photoPool", fresh.toString())
+                    .putInt("poolIndex", 0)
+                    .putLong("lastPoolBuild", System.currentTimeMillis())
+                    .apply()
+                true
+            } catch (_: Exception) {
+                false
             }
         }
 
@@ -321,6 +351,76 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
                 pool.put(out)
             }
             pool
+        }
+
+        /** Пул із активних колекцій (Model B). Куровані → без фільтра людей; author-cap + дедуп лишаємо. */
+        private suspend fun buildFromCollections(
+            prefs: android.content.SharedPreferences,
+            collectionIds: List<String>
+        ): JSONArray? = withContext(Dispatchers.IO) {
+            val key = prefs.getString("unsplashKey", null)?.takeIf { it.isNotBlank() } ?: return@withContext null
+            val blocked = try {
+                jsonToStringSet(JSONObject(prefs.getString("poolRecipe", "{}")).optJSONArray("blockedIds"))
+            } catch (_: Exception) { HashSet<String>() }
+
+            // 2 випадкові сторінки на колекцію (колекції зазвичай на 100+ фото).
+            val tasks = ArrayList<Pair<String, Int>>()
+            for (cid in collectionIds) {
+                val p1 = (1..3).random()
+                listOf(p1, p1 + 3).forEach { tasks.add(Pair(cid, it)) }
+            }
+
+            val fetched = coroutineScope {
+                tasks.map { t -> async { fetchCollection(key, t.first, t.second) ?: emptyList() } }.awaitAll()
+            }
+            val collected = ArrayList<JSONObject>()
+            fetched.forEach { collected.addAll(it) }
+
+            collected.shuffle()
+            val seen = HashSet<String>()
+            val authorCount = HashMap<String, Int>()
+            val pool = JSONArray()
+            for (p in collected) {
+                val id = p.optString("id", "")
+                if (id.isBlank() || id in blocked || id in seen) continue
+                val author = p.optString("author", "")
+                val n = authorCount[author] ?: 0
+                if (author.isNotBlank() && n >= 2) continue
+                seen.add(id)
+                authorCount[author] = n + 1
+                val out = JSONObject().put("id", id).put("url", p.getString("url"))
+                p.optString("downloadLocation", "").takeIf { it.isNotBlank() }?.let { out.put("downloadLocation", it) }
+                pool.put(out)
+            }
+            pool
+        }
+
+        /** Один Unsplash /collections/:id/photos (повертає масив фото напряму). */
+        private fun fetchCollection(key: String, collectionId: String, page: Int): List<JSONObject>? {
+            return try {
+                val url = "https://api.unsplash.com/collections/$collectionId/photos?page=$page&per_page=30&orientation=portrait"
+                val conn = URL(url).openConnection() as HttpURLConnection
+                conn.connectTimeout = 15_000
+                conn.readTimeout = 15_000
+                conn.setRequestProperty("Authorization", "Client-ID $key")
+                if (conn.responseCode != 200) { conn.disconnect(); return null }
+                val body = conn.inputStream.bufferedReader().use { it.readText() }
+                conn.disconnect()
+                val results = JSONArray(body)
+                val out = ArrayList<JSONObject>(results.length())
+                for (i in 0 until results.length()) {
+                    val r = results.getJSONObject(i)
+                    val regular = r.optJSONObject("urls")?.optString("regular", "")?.takeIf { it.isNotBlank() } ?: continue
+                    val o = JSONObject().put("id", r.optString("id", "")).put("url", regular)
+                    r.optJSONObject("links")?.optString("download_location", "")?.takeIf { it.isNotBlank() }
+                        ?.let { o.put("downloadLocation", it) }
+                    o.put("author", r.optJSONObject("user")?.optString("username", "") ?: "")
+                    out.add(o)
+                }
+                out
+            } catch (_: Exception) {
+                null
+            }
         }
 
         /** Один Unsplash /search/photos. Повертає [{id,url,downloadLocation,haystack}] або null. */
