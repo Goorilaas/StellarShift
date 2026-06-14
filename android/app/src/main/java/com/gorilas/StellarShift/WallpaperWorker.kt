@@ -304,11 +304,18 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
 
             collected.shuffle()
             val seen = HashSet<String>()
+            val authorCount = HashMap<String, Int>()
             val pool = JSONArray()
             for (p in collected) {
                 val id = p.optString("id", "")
                 if (id.isBlank() || id in blocked || id in seen) continue
+                // ≤2 фото на автора — розбиваємо «шпалерні ферми». Favorites без
+                // поля author (порожнє) → не лімітуються.
+                val author = p.optString("author", "")
+                val n = authorCount[author] ?: 0
+                if (author.isNotBlank() && n >= 2) continue
                 seen.add(id)
+                authorCount[author] = n + 1
                 val out = JSONObject().put("id", id).put("url", p.getString("url"))
                 p.optString("downloadLocation", "").takeIf { it.isNotBlank() }?.let { out.put("downloadLocation", it) }
                 pool.put(out)
@@ -336,6 +343,7 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
                     val o = JSONObject().put("id", r.optString("id", "")).put("url", regular)
                     r.optJSONObject("links")?.optString("download_location", "")?.takeIf { it.isNotBlank() }
                         ?.let { o.put("downloadLocation", it) }
+                    o.put("author", r.optJSONObject("user")?.optString("username", "") ?: "")
                     val hay = StringBuilder()
                         .append(r.optString("alt_description", "").lowercase()).append(' ')
                         .append(r.optString("description", "").lowercase()).append(' ')

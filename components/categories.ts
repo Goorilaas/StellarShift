@@ -30,6 +30,28 @@ export function filterNoPeople<T extends Photo>(photos: T[]): T[] {
     });
 }
 
+/**
+ * Дедуп по id + ліміт фото на автора. Б'є по «шпалерних фермах»: один автор
+ * заливає тисячі картинок і флудить майже всі wallpaper-запити (напр.
+ * BoliviaInteligante) → грид/пул стає одноманітним. Favorites / фото без
+ * автора — не лімітуються.
+ */
+export function dedupAndCapByAuthor<T extends Photo>(photos: T[], maxPerAuthor = 2): T[] {
+    const seenId = new Set<string>();
+    const authorCount = new Map<string, number>();
+    const out: T[] = [];
+    for (const p of photos) {
+        if (seenId.has(p.id)) continue;
+        const author = p.user?.username ?? '';
+        const n = authorCount.get(author) ?? 0;
+        if (author && n >= maxPerAuthor) continue;
+        seenId.add(p.id);
+        authorCount.set(author, n + 1);
+        out.push(p);
+    }
+    return out;
+}
+
 // Demo Unsplash Access Key. Production: read from .env (EXPO_PUBLIC_UNSPLASH_KEY).
 // Hardcoded fallback тут лишається на час перехідного періоду — щоб додаток не вмер
 // у юзерів, які оновляться без .env (вони через BYO key все одно ставлять свій).
@@ -209,6 +231,15 @@ export const CATEGORY_QUERIES: Record<string, string[]> = {
         'river valley aerial', 'bamboo forest path', 'sunbeams through forest',
         'mossy rocks and stream', 'golden wheat field', 'cherry blossom trees',
         'iceland geothermal landscape', 'tall redwood forest',
+    ],
+    rain: [
+        'rainy window droplets', 'wet city street at night', 'dramatic storm clouds',
+        'rain on green leaves', 'puddle reflection lights', 'neon rain street',
+        'raindrops on glass', 'rainforest heavy rain', 'lightning thunderstorm',
+        'misty rain over mountains', 'rain on car windshield', 'wet asphalt reflections',
+        'rainy cafe window bokeh', 'tropical monsoon rain', 'rain falling on ocean',
+        'dark stormy sky', 'water ripples in puddle', 'raindrops on flower petals',
+        'rain on spider web macro', 'wet street long exposure',
     ],
 };
 
