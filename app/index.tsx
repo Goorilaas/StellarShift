@@ -29,7 +29,7 @@ import { SvgXml } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { Blessing, nextBlessingFromQueue } from '../components/blessings';
 import FavoriteHeart from '../components/FavoriteHeart';
-import { Category, CATEGORIES, CHAOS_CATEGORY, CHAOS_QUERIES, filterNoPeople, pickCategoryQueries, Photo, SEARCH_SUGGESTIONS, sortCategoriesByLabel } from '../components/categories';
+import { Category, CATEGORIES, CHAOS_CATEGORY, CHAOS_QUERIES, dedupAndCapByAuthor, filterNoPeople, pickCategoryQueries, Photo, SEARCH_SUGGESTIONS, sortCategoriesByLabel } from '../components/categories';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { ensureGalleryPermission } from '../services/galleryPermission';
 import { randomCheer } from '../services/cheer';
@@ -337,7 +337,7 @@ export default function HomeScreen() {
       );
       const flat: Photo[] = results.flatMap(r => r.data.results);
       const filtered = filterNoPeople(flat);
-      setPhotos(shuffle(filtered.length >= 8 ? filtered : flat));
+      setPhotos(shuffle(dedupAndCapByAuthor(filtered.length >= 8 ? filtered : flat)));
     } catch (e: any) {
       if (e?.code === 'ERR_CANCELED') return;
       if (e?.response?.status === 403) { trigger403(); return; }
@@ -367,12 +367,7 @@ export default function HomeScreen() {
       );
       const flat: Photo[] = results.flatMap(r => r.data.results);
       const filtered = filterNoPeople(flat);
-      const seen = new Set<string>();
-      const dedup = (filtered.length >= 8 ? filtered : flat).filter(p => {
-        if (seen.has(p.id)) return false;
-        seen.add(p.id);
-        return true;
-      });
+      const dedup = dedupAndCapByAuthor(filtered.length >= 8 ? filtered : flat);
       setPhotos(shuffle(dedup));
     } catch (e: any) {
       if (e?.code === 'ERR_CANCELED') return;

@@ -498,19 +498,31 @@ export default function SettingsScreen() {
                     })
                 )
                 : [];
-            const apiPool: PoolItem[] = responses
-                .flatMap(r => (r.excludePeople ? filterNoPeople(r.data) : r.data))
-                .map((p: any) => ({ id: p.id, url: p.urls.regular, downloadLocation: p.links?.download_location }));
-
-            // Об'єднуємо favorites + API, дедуп по id, виключаємо заблоковані
+            // Дедуп по id + ліміт ≤2 фото на автора — розбиваємо «шпалерні ферми»
+            // (один автор флудить усі запити). Author беремо з сирих Unsplash-фото
+            // ДО мапи в PoolItem (там автора вже нема).
             const blockedSet = await getBlockedIds();
-            const seen = new Set<string>();
-            const pool: PoolItem[] = [...favoritesPool, ...apiPool].filter(p => {
-                if (blockedSet.has(p.id)) return false;
-                if (seen.has(p.id)) return false;
-                seen.add(p.id);
-                return true;
-            });
+            const seenId = new Set<string>();
+            const authorCount = new Map<string, number>();
+            const apiPool: PoolItem[] = [];
+            for (const p of responses.flatMap(r => (r.excludePeople ? filterNoPeople(r.data) : r.data)) as any[]) {
+                if (blockedSet.has(p.id) || seenId.has(p.id)) continue;
+                const author = p.user?.username ?? '';
+                const n = authorCount.get(author) ?? 0;
+                if (author && n >= 2) continue;
+                seenId.add(p.id);
+                authorCount.set(author, n + 1);
+                apiPool.push({ id: p.id, url: p.urls.regular, downloadLocation: p.links?.download_location });
+            }
+
+            // Favorites спершу (без author-ліміту — це власні вибори юзера), дедуп по id
+            const pool: PoolItem[] = [];
+            const finalSeen = new Set<string>();
+            for (const p of [...favoritesPool, ...apiPool]) {
+                if (blockedSet.has(p.id) || finalSeen.has(p.id)) continue;
+                finalSeen.add(p.id);
+                pool.push(p);
+            }
 
             // shuffle so cycle order is always different
             for (let i = pool.length - 1; i > 0; i--) {
