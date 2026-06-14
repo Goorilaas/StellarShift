@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -56,6 +57,12 @@ export default function CollectionsScreen() {
             // Ключ у native prefs обов'язковий для фетчу колекцій (юзер міг прийти
             // сюди, не налаштувавши категорії — тоді ключа ще нема).
             await setUnsplashKeyNative(await getUnsplashKey());
+            // Option B: активація вмикає автозміну (Settings це відобразить).
+            if (next.length > 0) {
+                const raw = await AsyncStorage.getItem('settings');
+                const s = raw ? JSON.parse(raw) : {};
+                if (!s.autoChange) { s.autoChange = true; await AsyncStorage.setItem('settings', JSON.stringify(s)); }
+            }
             await setActiveCollectionsNative(JSON.stringify(next));
             await refreshPoolNative();
         } catch { /* non-fatal */ }

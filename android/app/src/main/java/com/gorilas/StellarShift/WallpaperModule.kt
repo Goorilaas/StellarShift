@@ -91,6 +91,14 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val rebuilt = WallpaperWorker.rebuildNow(reactApplicationContext)
+                if (rebuilt) {
+                    // Option B: активація колекції сама вмикає ротацію — плануємо воркер
+                    // (інтервал з prefs, дефолт 30 хв якщо ще не налаштовано).
+                    val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+                    val interval = prefs.getInt("intervalMinutes", 0).let { if (it >= 15) it else 30 }
+                    prefs.edit().putInt("intervalMinutes", interval).apply()
+                    WallpaperWorker.schedule(reactApplicationContext, interval, false, false)
+                }
                 val applied = if (rebuilt) WallpaperWorker.applyNext(reactApplicationContext, manual = true) else false
                 withContext(Dispatchers.Main) { promise.resolve(applied) }
             } catch (e: Exception) {
