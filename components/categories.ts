@@ -251,6 +251,19 @@ export function pickCategoryQueries(categoryId: string, count: number): string[]
     return [...list].sort(() => Math.random() - 0.5).slice(0, Math.min(count, list.length));
 }
 
+/**
+ * Скільки під-запитів брати з кожної категорії — залежить від розміру міксу,
+ * щоб укластись у бюджет ~44 запити (demo-ключ 50/год). Менше категорій →
+ * багатше кожній. [Варіант A]
+ */
+export function subCountForMix(categoryCount: number): number {
+    if (categoryCount <= 4) return 6;
+    if (categoryCount <= 7) return 5;
+    if (categoryCount <= 10) return 4;
+    if (categoryCount <= 14) return 3;
+    return 2;
+}
+
 // Підказки пошуку — показуються рандомні 5-6, коли історія пошуку порожня.
 // EN-запити: Unsplash шукає англійською найкраще (категорійні query теж EN).
 export const SEARCH_SUGGESTIONS = [
