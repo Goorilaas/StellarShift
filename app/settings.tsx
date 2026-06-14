@@ -28,7 +28,7 @@ import {
     View,
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
-import { CATEGORIES, Category, CHAOS_CATEGORY, CHAOS_QUERIES, FAVORITES_CATEGORY, filterNoPeople, pickCategoryQueries, sortCategoriesByLabel } from '../components/categories';
+import { CATEGORIES, CATEGORY_QUERIES, Category, CHAOS_CATEGORY, CHAOS_QUERIES, FAVORITES_CATEGORY, filterNoPeople, PEOPLE_TAGS, pickCategoryQueries, sortCategoriesByLabel } from '../components/categories';
 import { blockPhoto, BlockedPhoto, clearBlocked, getBlocked, getBlockedIds, setBlockedAll, unblockPhoto } from '../services/blocked';
 import { clearUserKey, getUnsplashKey, getUserKey, setUserKey, useUnsplashKey, validateKey } from '../services/unsplashKey';
 import { openUnsplashHome } from '../services/unsplashTracking';
@@ -41,7 +41,7 @@ import Toast, { useToastQueue } from '../components/Toast';
 
 import { Blessing, nextBlessingFromQueue } from '../components/blessings';
 import { GREETING_ENABLED_KEY } from '../components/LaunchGreeting';
-import { changeWallpaperNow, clearHistory, disableLiveWallpaper, drainPendingActions, getHistory, HistoryEntry, isIgnoringBatteryOptimization, isLiveWallpaperActive, openLiveWallpaperPicker, PoolItem, requestIgnoreBatteryOptimization, setLiveIntensityNative, setNotificationsEnabledNative, setNotificationStrings, setSleepHoursNative, setUnsplashKeyNative, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation, syncNativeHistory } from '../services/wallpaperService';
+import { changeWallpaperNow, clearHistory, disableLiveWallpaper, drainPendingActions, getHistory, HistoryEntry, isIgnoringBatteryOptimization, isLiveWallpaperActive, openLiveWallpaperPicker, PoolItem, requestIgnoreBatteryOptimization, setLiveIntensityNative, setNotificationsEnabledNative, setNotificationStrings, setPoolRecipeNative, setSleepHoursNative, setUnsplashKeyNative, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation, syncNativeHistory } from '../services/wallpaperService';
 
 const DEFAULT_MIX = CATEGORIES.filter(c => c.id !== 'mix').map(c => c.id);
 
@@ -541,6 +541,53 @@ export default function SettingsScreen() {
         }
     };
 
+    // Будує «рецепт» для нативного щоденного перезбору: повні списки кандидатів +
+    // скільки брати + скільки сторінок. Kotlin сам рандомить ротацію щодня (дані,
+    // не логіка — списки запитів лишаються лише тут). Дзеркалить job-білдер
+    // loadPhotoPool, але емітить КАНДИДАТІВ, а не вже обрані запити.
+    const buildPoolRecipe = async (categories: string[]): Promise<string> => {
+        const isSolo = categories.length === 1 && categories[0] !== 'mix' && categories[0] !== 'favorites';
+        const subCount = isSolo ? 5 : 2;
+        const jobs: { queries: string[]; pick: number; pages: number; excludePeople: boolean }[] = [];
+        const seen = new Set<string>();
+        let wantsFavorites = false;
+        const addJobsForId = (id: string) => {
+            if (id === 'favorites') { wantsFavorites = true; return; }
+            if (id === 'chaos') {
+                if (seen.has('__chaos')) return;
+                seen.add('__chaos');
+                jobs.push({ queries: [...CHAOS_QUERIES], pick: 6, pages: 2, excludePeople: true });
+                return;
+            }
+            if (seen.has(id)) return;
+            seen.add(id);
+            const cat = CATEGORIES.find(c => c.id === id);
+            if (!cat) return;
+            const subs = CATEGORY_QUERIES[id];
+            if (subs && subs.length > 0) {
+                jobs.push({ queries: [...subs], pick: subCount, pages: 1, excludePeople: !!cat.excludePeople });
+            } else if (cat.query) {
+                jobs.push({ queries: [cat.query], pick: 1, pages: 2, excludePeople: !!cat.excludePeople });
+            }
+        };
+        categories.forEach(catId => {
+            if (catId === 'mix') (mixCategories.length > 0 ? mixCategories : DEFAULT_MIX).forEach(addJobsForId);
+            else addJobsForId(catId);
+        });
+        let favorites: PoolItem[] = [];
+        if (wantsFavorites) {
+            try {
+                const raw = await AsyncStorage.getItem('favorites_data');
+                const favData: any[] = raw ? JSON.parse(raw) : [];
+                favorites = favData
+                    .filter(p => p?.id && p?.urls?.regular)
+                    .map(p => ({ id: p.id, url: p.urls.regular, downloadLocation: p.links?.download_location }));
+            } catch { /* favorites best-effort */ }
+        }
+        const blockedIds = [...(await getBlockedIds())];
+        return JSON.stringify({ subCount, peopleKeywords: PEOPLE_TAGS, blockedIds, favorites, jobs });
+    };
+
     const loadAndStart = async () => {
         const pool = await loadPhotoPool(activeCategories);
         if (!pool) return;
@@ -551,6 +598,8 @@ export default function SettingsScreen() {
         // false so WorkManager has no network/charging constraints (rotate always).
         await startWallpaperRotation(pool, interval, applyTo, false, false);
         appliedPoolKeyRef.current = poolKeyOf({ activeCategories, mixCategories, interval, applyTo });
+        // Зберігаємо рецепт у native prefs → Worker перезбере пул сам раз на добу.
+        try { await setPoolRecipeNative(await buildPoolRecipe(activeCategories)); } catch { /* recipe best-effort */ }
         showToast(t('settings.toast.poolReady', { count: pool.length }));
     };
 

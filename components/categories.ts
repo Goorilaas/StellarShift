@@ -17,7 +17,7 @@ export type Category = {
     excludePeople?: boolean;
 };
 
-const PEOPLE_TAGS = ['person', 'people', 'human', 'man', 'woman', 'girl', 'boy', 'face', 'portrait', 'model', 'selfie'];
+export const PEOPLE_TAGS = ['person', 'people', 'human', 'man', 'woman', 'girl', 'boy', 'face', 'portrait', 'model', 'selfie'];
 
 export function filterNoPeople<T extends Photo>(photos: T[]): T[] {
     return photos.filter(p => {

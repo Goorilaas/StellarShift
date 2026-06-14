@@ -34,6 +34,9 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
                 .putInt("intervalMinutes", intervalMinutes)
                 .putBoolean("wifiOnly", wifiOnly)
                 .putBoolean("chargingOnly", chargingOnly)
+                // Свіжий пул щойно зібрано в JS → запускаємо 24h-годинник фонового
+                // перезбору від цього моменту (Worker перевіряє lastPoolBuild).
+                .putLong("lastPoolBuild", System.currentTimeMillis())
                 .apply()
 
             WallpaperWorker.schedule(reactApplicationContext, intervalMinutes, wifiOnly, chargingOnly)
@@ -52,6 +55,20 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
             promise.resolve(null)
         } catch (e: Exception) {
             promise.reject("STOP_ERROR", e.message, e)
+        }
+    }
+
+    // «Рецепт» для фонового щоденного перезбору пулу: списки під-запитів +
+    // прапорці (дані, не логіка). Worker читає його раз на добу. lastPoolBuild
+    // НЕ чіпаємо — годинник стартує лише на реальній збірці пулу (startRotation).
+    @ReactMethod
+    fun setPoolRecipe(recipeJson: String, promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+            prefs.edit().putString("poolRecipe", recipeJson).apply()
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("RECIPE_ERROR", e.message, e)
         }
     }
 

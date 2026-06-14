@@ -22,6 +22,10 @@ export const startWallpaperRotation = (
 export const setUnsplashKeyNative = (key: string): Promise<void> =>
     WallpaperModule.setUnsplashKey(key);
 
+// «Рецепт» пулу для фонового щоденного перезбору (Kotlin сам рандомить ротацію).
+export const setPoolRecipeNative = (recipeJson: string): Promise<void> =>
+    WallpaperModule.setPoolRecipe(recipeJson);
+
 export const stopWallpaperRotation = (): Promise<void> =>
     WallpaperModule.stopRotation();
 

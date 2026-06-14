@@ -8,12 +8,16 @@ import android.graphics.Rect
 import android.os.Build
 import androidx.work.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
 class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
@@ -163,6 +167,9 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
         suspend fun applyNext(context: Context, manual: Boolean = false): Boolean {
             val prefs = context.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
             if (!manual && isInSleepWindow(prefs)) return true // тихий skip, не помилка
+            // Щоденний перезбір пулу (тільки плановий тік): свіжий контент + нова
+            // ротація під-запитів без відкриття застосунку. Swap-on-success.
+            if (!manual) maybeRebuildPool(context, prefs)
             val poolJson = prefs.getString("photoPool", null) ?: return false
             val target = prefs.getString("target", "both") ?: "both"
 
@@ -217,6 +224,145 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
                 // історія — best effort
             }
         }
+
+        // ── Щоденний перезбір пулу (фоновий, за «рецептом» від JS) ──────────────
+        private const val POOL_TTL_MS = 24L * 60 * 60 * 1000      // 24 год — вік пулу
+        private const val REBUILD_BACKOFF_MS = 60L * 60 * 1000    // 1 год між невдалими спробами
+
+        /**
+         * Перезбирає пул за рецептом, якщо він старший за 24год. Рецепт пише JS у
+         * `poolRecipe` (списки під-запитів + прапорці) — Kotlin лише виконавець, що
+         * сам щодня рандомить ротацію. Swap-on-success: при будь-якій невдачі
+         * (нема мережі / 403 / порожньо) старий пул лишається, ретрай за годину.
+         */
+        private suspend fun maybeRebuildPool(context: Context, prefs: android.content.SharedPreferences) {
+            val recipeJson = prefs.getString("poolRecipe", null) ?: return
+            val now = System.currentTimeMillis()
+            if (now - prefs.getLong("lastPoolBuild", 0L) < POOL_TTL_MS) return
+            if (now - prefs.getLong("lastPoolAttempt", 0L) < REBUILD_BACKOFF_MS) return
+            prefs.edit().putLong("lastPoolAttempt", now).apply()
+            try {
+                val fresh = buildPoolFromRecipe(prefs, JSONObject(recipeJson)) ?: return
+                if (fresh.length() == 0) return
+                prefs.edit()
+                    .putString("photoPool", fresh.toString())
+                    .putInt("poolIndex", 0)
+                    .putLong("lastPoolBuild", now)
+                    .apply()
+            } catch (_: Exception) {
+                // лишаємо старий пул; наступна спроба за REBUILD_BACKOFF_MS
+            }
+        }
+
+        /** Виконує рецепт: ротація під-запитів → Unsplash (паралельно) → фільтр людей → дедуп → шафл. */
+        private suspend fun buildPoolFromRecipe(
+            prefs: android.content.SharedPreferences,
+            recipe: JSONObject
+        ): JSONArray? = withContext(Dispatchers.IO) {
+            val key = prefs.getString("unsplashKey", null)?.takeIf { it.isNotBlank() } ?: return@withContext null
+            val jobs = recipe.optJSONArray("jobs") ?: return@withContext null
+            val peopleKeywords = jsonToLowerList(recipe.optJSONArray("peopleKeywords"))
+            val blocked = jsonToStringSet(recipe.optJSONArray("blockedIds"))
+
+            // Розгортаємо рецепт у пласкі fetch-задачі (query, page, excludePeople).
+            // Ротацію (який під-запит брати) робимо ТУТ — тож щодня інший зріз.
+            val tasks = ArrayList<Triple<String, Int, Boolean>>()
+            for (j in 0 until jobs.length()) {
+                val job = jobs.getJSONObject(j)
+                val candidates = jsonToStringList(job.getJSONArray("queries")).toMutableList().apply { shuffle() }
+                val pick = job.optInt("pick", 1).coerceAtMost(candidates.size)
+                val pages = job.optInt("pages", 2)
+                val excludePeople = job.optBoolean("excludePeople", false)
+                for (qi in 0 until pick) {
+                    val query = candidates[qi]
+                    val pageList = if (pages >= 2) {
+                        val p1 = (1..5).random()
+                        listOf(p1, if (p1 < 5) p1 + 5 else p1 - 4)
+                    } else listOf((1..6).random())
+                    for (page in pageList) tasks.add(Triple(query, page, excludePeople))
+                }
+            }
+
+            val collected = ArrayList<JSONObject>()
+            // Улюблені (якщо обрані) — без фільтра людей, як є
+            recipe.optJSONArray("favorites")?.let { favs ->
+                for (i in 0 until favs.length()) collected.add(favs.getJSONObject(i))
+            }
+
+            // Паралельний фетч — інакше ~44 послідовні запити можуть перевищити
+            // 10-хв ліміт WorkManager. Dispatchers.IO тримає пул потоків.
+            val fetched = coroutineScope {
+                tasks.map { t ->
+                    async {
+                        fetchSearch(key, t.first, t.second)
+                            ?.filter { !(t.third && hasPerson(it, peopleKeywords)) }
+                            ?: emptyList()
+                    }
+                }.awaitAll()
+            }
+            fetched.forEach { collected.addAll(it) }
+
+            collected.shuffle()
+            val seen = HashSet<String>()
+            val pool = JSONArray()
+            for (p in collected) {
+                val id = p.optString("id", "")
+                if (id.isBlank() || id in blocked || id in seen) continue
+                seen.add(id)
+                val out = JSONObject().put("id", id).put("url", p.getString("url"))
+                p.optString("downloadLocation", "").takeIf { it.isNotBlank() }?.let { out.put("downloadLocation", it) }
+                pool.put(out)
+            }
+            pool
+        }
+
+        /** Один Unsplash /search/photos. Повертає [{id,url,downloadLocation,haystack}] або null. */
+        private fun fetchSearch(key: String, query: String, page: Int): List<JSONObject>? {
+            return try {
+                val q = URLEncoder.encode(query, "UTF-8")
+                val url = "https://api.unsplash.com/search/photos?query=$q&page=$page&per_page=30&orientation=portrait"
+                val conn = URL(url).openConnection() as HttpURLConnection
+                conn.connectTimeout = 15_000
+                conn.readTimeout = 15_000
+                conn.setRequestProperty("Authorization", "Client-ID $key")
+                if (conn.responseCode != 200) { conn.disconnect(); return null }
+                val body = conn.inputStream.bufferedReader().use { it.readText() }
+                conn.disconnect()
+                val results = JSONObject(body).optJSONArray("results") ?: return null
+                val out = ArrayList<JSONObject>(results.length())
+                for (i in 0 until results.length()) {
+                    val r = results.getJSONObject(i)
+                    val regular = r.optJSONObject("urls")?.optString("regular", "")?.takeIf { it.isNotBlank() } ?: continue
+                    val o = JSONObject().put("id", r.optString("id", "")).put("url", regular)
+                    r.optJSONObject("links")?.optString("download_location", "")?.takeIf { it.isNotBlank() }
+                        ?.let { o.put("downloadLocation", it) }
+                    val hay = StringBuilder()
+                        .append(r.optString("alt_description", "").lowercase()).append(' ')
+                        .append(r.optString("description", "").lowercase()).append(' ')
+                    r.optJSONArray("tags")?.let { ta ->
+                        for (k in 0 until ta.length()) ta.optJSONObject(k)?.optString("title", "")
+                            ?.let { hay.append(it.lowercase()).append(' ') }
+                    }
+                    o.put("haystack", hay.toString())
+                    out.add(o)
+                }
+                out
+            } catch (_: Exception) {
+                null
+            }
+        }
+
+        private fun hasPerson(photo: JSONObject, keywords: List<String>): Boolean {
+            val hay = photo.optString("haystack", "")
+            return keywords.any { hay.contains(it) }
+        }
+
+        private fun jsonToStringList(arr: JSONArray?): List<String> =
+            if (arr == null) emptyList() else (0 until arr.length()).map { arr.optString(it, "") }.filter { it.isNotBlank() }
+
+        private fun jsonToLowerList(arr: JSONArray?): List<String> = jsonToStringList(arr).map { it.lowercase() }
+
+        private fun jsonToStringSet(arr: JSONArray?): HashSet<String> = HashSet(jsonToStringList(arr))
 
         fun schedule(context: Context, intervalMinutes: Int, wifiOnly: Boolean, chargingOnly: Boolean) {
             val constraints = Constraints.Builder()
