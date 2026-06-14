@@ -66,6 +66,15 @@ function TabsInner() {
                     }}
                 />
                 <Tabs.Screen
+                    name="collections"
+                    options={{
+                        title: t('collections.title'),
+                        tabBarIcon: ({ color, size }) => (
+                            <Ionicons name="albums-outline" size={size} color={color} />
+                        ),
+                    }}
+                />
+                <Tabs.Screen
                     name="favorites"
                     options={{
                         title: t('favorites.title'),
