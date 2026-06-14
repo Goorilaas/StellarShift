@@ -13,6 +13,7 @@ declare module 'react-native' {
             stopRotation(): Promise<void>;
             setFromUrl(url: string, target: string): Promise<boolean>;
             setUnsplashKey(key: string): Promise<void>;
+            setPoolRecipe(recipeJson: string): Promise<void>;
             changeNow(): Promise<boolean>;
             drainPendingHistory(): Promise<string>;
             setSleepHours(enabled: boolean, startMin: number, endMin: number): Promise<void>;
