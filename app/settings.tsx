@@ -1645,8 +1645,8 @@ const styles = StyleSheet.create({
     aboutFooterLink: { color: '#7F77DD', textDecorationLine: 'underline' },
     logoWrap: { width: 56, height: 56, alignItems: 'center', justifyContent: 'center' },
     blessingWrap: { alignSelf: 'stretch', marginTop: 12, paddingHorizontal: 24, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-    blessingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'stretch' },
-    blessingText: { color: '#AFA9EC', fontSize: 14, lineHeight: 20, fontWeight: '600', fontStyle: 'italic', flex: 1, flexWrap: 'wrap' },
+    blessingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, alignSelf: 'stretch' },
+    blessingText: { color: '#AFA9EC', fontSize: 14, lineHeight: 20, fontWeight: '600', fontStyle: 'italic', flexShrink: 1, flexWrap: 'wrap', textAlign: 'center' },
     // BYO key
     byoHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     byoBadgeOk: { backgroundColor: 'rgba(29,158,117,0.18)', borderColor: '#1D9E75', borderWidth: 1, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, marginTop: 14 },
