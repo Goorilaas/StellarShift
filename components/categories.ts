@@ -236,10 +236,11 @@ export const CATEGORY_QUERIES: Record<string, string[]> = {
         'rainy window droplets', 'wet city street at night', 'dramatic storm clouds',
         'rain on green leaves', 'puddle reflection lights', 'neon rain street',
         'raindrops on glass', 'rainforest heavy rain', 'lightning thunderstorm',
-        'misty rain over mountains', 'rain on car windshield', 'wet asphalt reflections',
+        'misty rain over mountains', 'wet asphalt reflections',
         'rainy cafe window bokeh', 'tropical monsoon rain', 'rain falling on ocean',
         'dark stormy sky', 'water ripples in puddle', 'raindrops on flower petals',
         'rain on spider web macro', 'wet street long exposure',
+        'rain over a calm lake', 'rainy forest path', 'downpour over city skyline',
     ],
 };
 
