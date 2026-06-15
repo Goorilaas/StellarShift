@@ -213,8 +213,8 @@ function MoodDetail({ mood, top, onBack, bookmarks, active, onBm, onAct, onOpen 
                     <Text style={styles.empty}>Збираємо власноруч — скоро тут з&apos;являться добірки.</Text>
                 )}
                 {metas === null && <ActivityIndicator color="#7F77DD" style={{ marginTop: 22 }} />}
-                {metas?.map(c => (
-                    <Row key={c.id} meta={c} color={color}
+                {metas?.map((c, i) => (
+                    <Row key={c.id} meta={c} index={i} color={color}
                         isBm={bookmarks.includes(c.id)} isAct={active.includes(c.id)} onBm={onBm} onAct={onAct} onOpen={onOpen} />
                 ))}
             </ScrollView>
@@ -237,18 +237,32 @@ function Shelf({ ids, emptyMsg, bookmarks, active, onBm, onAct, onOpen }: RowPro
         <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 32 }}>
             {ids.length === 0 && <Text style={styles.empty}>{emptyMsg}</Text>}
             {metas === null && ids.length > 0 && <ActivityIndicator color="#7F77DD" style={{ marginTop: 22 }} />}
-            {metas?.map(c => (
-                <Row key={c.id} meta={c} color="#2A2350"
+            {metas?.map((c, i) => (
+                <Row key={c.id} meta={c} index={i} color="#2A2350"
                     isBm={bookmarks.includes(c.id)} isAct={active.includes(c.id)} onBm={onBm} onAct={onAct} onOpen={onOpen} />
             ))}
         </ScrollView>
     );
 }
 
-function Row({ meta, color, isBm, isAct, onBm, onAct, onOpen }: {
-    meta: CollectionMeta; color: string; isBm: boolean; isAct: boolean;
+function Row({ meta, index, color, isBm, isAct, onBm, onAct, onOpen }: {
+    meta: CollectionMeta; index: number; color: string; isBm: boolean; isAct: boolean;
     onBm: (id: string) => void; onAct: (id: string) => void; onOpen: (c: CollectionMeta) => void;
 }) {
+    const [examples, setExamples] = useState<string[]>([]);
+    // Приклади (перші 3 фото) — ліниво-cap: лише для перших рядків + стаґер, щоб не
+    // вибухнути запитами. Кеш спільний із фото-гридом (тап → миттєво).
+    useEffect(() => {
+        if (index >= 8) return;
+        let alive = true;
+        const timer = setTimeout(() => {
+            getCollectionPhotos(meta.id)
+                .then(ps => { if (alive) setExamples(ps.slice(0, 3).map(p => p.urls.small)); })
+                .catch(() => { });
+        }, index * 220);
+        return () => { alive = false; clearTimeout(timer); };
+    }, [meta.id, index]);
+
     return (
         <View style={styles.ac}>
             <Pressable onPress={() => onOpen(meta)}>
@@ -261,6 +275,11 @@ function Row({ meta, color, isBm, isAct, onBm, onAct, onOpen }: {
                     <Text style={styles.at} numberOfLines={1}>{meta.title || 'Колекція'}</Text>
                     {!!meta.curator && <Text style={styles.au} numberOfLines={1}>куратор · {meta.curator}</Text>}
                 </Pressable>
+                {examples.length > 0 && (
+                    <Pressable onPress={() => onOpen(meta)} style={styles.strip}>
+                        {examples.map((u, i) => <Image key={i} source={{ uri: u }} style={styles.thumb} />)}
+                    </Pressable>
+                )}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 }}>
                     <Pressable onPress={() => onAct(meta.id)} style={[styles.actPill, isAct && styles.actPillOn]}>
                         <Ionicons name={isAct ? 'checkmark' : 'add'} size={13} color={isAct ? '#fff' : '#AFA9EC'} />
@@ -348,6 +367,8 @@ const styles = StyleSheet.create({
     at: { color: '#fff', fontSize: 14, fontWeight: '600' },
     au: { color: '#8a8aa3', fontSize: 11.5, marginTop: 2 },
     ap: { color: '#7d7d99', fontSize: 11 },
+    strip: { flexDirection: 'row', gap: 5, marginTop: 7 },
+    thumb: { width: 34, height: 34, borderRadius: 7, backgroundColor: '#1b1b2e' },
     actPill: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#534AB7', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 3 },
     actPillOn: { backgroundColor: '#534AB7', borderColor: '#534AB7' },
     actTxt: { color: '#AFA9EC', fontSize: 11, fontWeight: '600' },
