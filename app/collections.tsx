@@ -1,6 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useState } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, BackHandler, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Photo } from '../components/categories';
@@ -8,6 +10,7 @@ import { Mood, MOODS } from '../components/collections';
 import FavoriteHeart from '../components/FavoriteHeart';
 import PhotoViewer from '../components/PhotoViewer';
 import { CollectionMeta, getCollectionMeta, getCollectionPhotos } from '../services/collectionService';
+import { fetchFirstCover, loadCoversMap, mergeMoodCovers } from '../services/moodCovers';
 import { getActiveCollections, getBookmarkedCollections, toggleActiveCollection, toggleBookmarkCollection } from '../services/collectionSubs';
 import { getFavoriteIds, toggleFavoritePhoto } from '../services/favorites';
 import { getUnsplashKey } from '../services/unsplashKey';
@@ -116,14 +119,42 @@ function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () 
 }
 
 function Grid({ onPick }: { onPick: (m: Mood) => void }) {
+    const [covers, setCovers] = useState<Record<string, string>>({});
+
+    // Шафл на focus: щоразу як відкриваєш таб — випадкова обкладинка кожного
+    // настрою з кешу. Кеш порожній → Фаза 1 (перша обкладинка, 1 запит/настрій).
+    useFocusEffect(useCallback(() => {
+        let alive = true;
+        (async () => {
+            const map = await loadCoversMap();
+            const picked: Record<string, string> = {};
+            const missing: Mood[] = [];
+            for (const m of MOODS) {
+                const cs = map[m.id] ?? [];
+                if (cs.length) picked[m.id] = cs[Math.floor(Math.random() * cs.length)];
+                else missing.push(m);
+            }
+            if (alive) setCovers(picked);
+            for (const m of missing) {
+                const c = await fetchFirstCover(m);
+                if (alive && c) setCovers(prev => ({ ...prev, [m.id]: c }));
+            }
+        })();
+        return () => { alive = false; };
+    }, []));
+
     return (
         <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 24 }}>
             <View style={styles.grid}>
                 {MOODS.map(m => {
                     const s = STYLE[m.id] ?? FALLBACK;
+                    const cover = covers[m.id];
                     return (
                         <Pressable key={m.id} style={[styles.card, { backgroundColor: s.color }]} onPress={() => onPick(m)}>
-                            <Ionicons name={s.icon} size={60} color="rgba(255,255,255,0.13)" style={styles.motif} />
+                            {cover
+                                ? <Image source={{ uri: cover }} style={StyleSheet.absoluteFill} />
+                                : <Ionicons name={s.icon} size={60} color="rgba(255,255,255,0.13)" style={styles.motif} />}
+                            <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={styles.scrim} />
                             <View style={styles.cardBottom}>
                                 <Text style={styles.name} numberOfLines={1}>{m.name}</Text>
                                 <Text style={styles.cardSub} numberOfLines={2}>{m.subtitle}</Text>
@@ -147,12 +178,18 @@ function MoodDetail({ mood, top, onBack, bookmarks, active, onBm, onAct, onOpen 
     const [metas, setMetas] = useState<CollectionMeta[] | null>(null);
     const color = colorFor(mood.id);
     const s = STYLE[mood.id] ?? FALLBACK;
+    const hero = metas && metas.length > 0 ? metas[0].cover : undefined;
 
     useEffect(() => {
         let alive = true;
         if (mood.collectionIds.length === 0) { setMetas([]); return; }
         Promise.all(mood.collectionIds.map(id => getCollectionMeta(id)))
-            .then(r => { if (alive) setMetas(r.filter((x): x is CollectionMeta => !!x)); })
+            .then(r => {
+                const ms = r.filter((x): x is CollectionMeta => !!x);
+                if (alive) setMetas(ms);
+                // Органічне наповнення кешу обкладинок настрою → шафл на гриді росте.
+                mergeMoodCovers(mood.id, ms.map(m => m.cover).filter((c): c is string => !!c));
+            })
             .catch(() => { if (alive) setMetas([]); });
         return () => { alive = false; };
     }, [mood]);
@@ -165,7 +202,10 @@ function MoodDetail({ mood, top, onBack, bookmarks, active, onBm, onAct, onOpen 
             </View>
             <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 32 }}>
                 <View style={[styles.band, { backgroundColor: color }]}>
-                    <Ionicons name={s.icon} size={70} color="rgba(255,255,255,0.14)" style={styles.motif} />
+                    {hero
+                        ? <Image source={{ uri: hero }} style={StyleSheet.absoluteFill} />
+                        : <Ionicons name={s.icon} size={70} color="rgba(255,255,255,0.14)" style={styles.motif} />}
+                    <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={styles.scrim} />
                     <Text style={styles.bandSub} numberOfLines={2}>{mood.subtitle}</Text>
                 </View>
                 <Text style={styles.section}>Колекції авторів</Text>
@@ -295,6 +335,7 @@ const styles = StyleSheet.create({
     card: { width: '48.5%', height: 132, borderRadius: 16, padding: 12, marginBottom: 12, overflow: 'hidden' },
     motif: { position: 'absolute', top: -6, right: -4 },
     cardBottom: { position: 'absolute', left: 12, right: 12, bottom: 11 },
+    scrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 90 },
     name: { color: '#fff', fontSize: 15, fontWeight: '600' },
     cardSub: { color: 'rgba(255,255,255,0.62)', fontSize: 11, marginTop: 2, lineHeight: 14 },
     count: { color: 'rgba(255,255,255,0.85)', fontSize: 11, marginTop: 7 },
