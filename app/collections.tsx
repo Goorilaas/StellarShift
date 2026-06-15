@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Photo } from '../components/categories';
 import { Mood, MOODS } from '../components/collections';
 import FavoriteHeart from '../components/FavoriteHeart';
+import PhotoViewer from '../components/PhotoViewer';
 import { CollectionMeta, getCollectionMeta, getCollectionPhotos } from '../services/collectionService';
 import { getActiveCollections, getBookmarkedCollections, toggleActiveCollection, toggleBookmarkCollection } from '../services/collectionSubs';
 import { getFavoriteIds, toggleFavoritePhoto } from '../services/favorites';
@@ -240,6 +241,7 @@ function PhotoGrid({ collection, top, onBack, favIds, onFav }: {
     favIds: string[]; onFav: (p: Photo) => void;
 }) {
     const [photos, setPhotos] = useState<Photo[] | null>(null);
+    const [viewing, setViewing] = useState<Photo | null>(null);
     useEffect(() => {
         let alive = true;
         getCollectionPhotos(collection.id, 1, 30)
@@ -259,13 +261,22 @@ function PhotoGrid({ collection, top, onBack, favIds, onFav }: {
                 {photos?.length === 0 && <Text style={styles.empty}>Не вдалося завантажити фото.</Text>}
                 <View style={styles.grid}>
                     {photos?.map(p => (
-                        <View key={p.id} style={styles.tile}>
+                        <Pressable key={p.id} style={styles.tile} onPress={() => setViewing(p)}>
                             <Image source={{ uri: p.urls.small }} style={styles.tileImg} />
                             <FavoriteHeart active={favIds.includes(p.id)} onToggle={() => onFav(p)} />
-                        </View>
+                        </Pressable>
                     ))}
                 </View>
             </ScrollView>
+            {viewing && (
+                <PhotoViewer
+                    photo={viewing}
+                    isFav={favIds.includes(viewing.id)}
+                    onClose={() => setViewing(null)}
+                    onToggleFav={() => onFav(viewing)}
+                    onBlocked={() => { setPhotos(prev => prev?.filter(x => x.id !== viewing.id) ?? null); setViewing(null); }}
+                />
+            )}
         </View>
     );
 }
