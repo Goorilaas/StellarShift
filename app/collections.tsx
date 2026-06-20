@@ -44,6 +44,7 @@ const colorFor = (moodId: string) => (STYLE[moodId] ?? FALLBACK).color;
 export default function CollectionsScreen() {
     const insets = useSafeAreaInsets();
     const [mood, setMood] = useState<Mood | null>(null);
+    const [moodCover, setMoodCover] = useState<string | undefined>(undefined);
     const [collection, setCollection] = useState<CollectionMeta | null>(null);
     const [tab, setTab] = useState<'moods' | 'mine' | 'active'>('moods');
     const [bookmarks, setBookmarks] = useState<string[]>([]);
@@ -88,7 +89,7 @@ export default function CollectionsScreen() {
             onBack={() => setCollection(null)} favIds={favIds} onFav={onFav} />;
     }
     if (mood) {
-        return <MoodDetail mood={mood} top={insets.top} onBack={() => setMood(null)}
+        return <MoodDetail mood={mood} heroCover={moodCover} top={insets.top} onBack={() => setMood(null)}
             bookmarks={bookmarks} active={active} onBm={onBm} onAct={onAct} onOpen={setCollection} />;
     }
     return (
@@ -101,7 +102,7 @@ export default function CollectionsScreen() {
                     <Chip label={`У ротації${active.length ? ` · ${active.length}` : ''}`} on={tab === 'active'} onPress={() => setTab('active')} />
                 </ScrollView>
             </View>
-            {tab === 'moods' && <Grid onPick={setMood} />}
+            {tab === 'moods' && <Grid onPick={(m, cover) => { setMood(m); setMoodCover(cover); }} />}
             {tab === 'mine' && <Shelf ids={bookmarks} emptyMsg="Полиця порожня. Збережи колекції з настроїв — і вони з'являться тут."
                 bookmarks={bookmarks} active={active} onBm={onBm} onAct={onAct} onOpen={setCollection} />}
             {tab === 'active' && <Shelf ids={active} emptyMsg="Поки нічого не в ротації. Активуй колекцію в настрої — і вона крутитиметься тут."
@@ -118,7 +119,7 @@ function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () 
     );
 }
 
-function Grid({ onPick }: { onPick: (m: Mood) => void }) {
+function Grid({ onPick }: { onPick: (m: Mood, cover?: string) => void }) {
     const [covers, setCovers] = useState<Record<string, string>>({});
 
     // Шафл на focus: щоразу як відкриваєш таб — випадкова обкладинка кожного
@@ -150,7 +151,7 @@ function Grid({ onPick }: { onPick: (m: Mood) => void }) {
                     const s = STYLE[m.id] ?? FALLBACK;
                     const cover = covers[m.id];
                     return (
-                        <Pressable key={m.id} style={[styles.card, { backgroundColor: s.color }]} onPress={() => onPick(m)}>
+                        <Pressable key={m.id} style={[styles.card, { backgroundColor: s.color }]} onPress={() => onPick(m, cover)}>
                             {cover
                                 ? <Image source={{ uri: cover }} style={StyleSheet.absoluteFill} />
                                 : <Ionicons name={s.icon} size={60} color="rgba(255,255,255,0.13)" style={styles.motif} />}
@@ -173,12 +174,12 @@ type RowProps = {
     onBm: (id: string) => void; onAct: (id: string) => void; onOpen: (c: CollectionMeta) => void;
 };
 
-function MoodDetail({ mood, top, onBack, bookmarks, active, onBm, onAct, onOpen }:
-    RowProps & { mood: Mood; top: number; onBack: () => void }) {
+function MoodDetail({ mood, heroCover, top, onBack, bookmarks, active, onBm, onAct, onOpen }:
+    RowProps & { mood: Mood; heroCover?: string; top: number; onBack: () => void }) {
     const [metas, setMetas] = useState<CollectionMeta[] | null>(null);
     const color = colorFor(mood.id);
     const s = STYLE[mood.id] ?? FALLBACK;
-    const hero = metas && metas.length > 0 ? metas[0].cover : undefined;
+    const hero = heroCover ?? (metas && metas.length > 0 ? metas[0].cover : undefined);
 
     useEffect(() => {
         let alive = true;
@@ -196,7 +197,7 @@ function MoodDetail({ mood, top, onBack, bookmarks, active, onBm, onAct, onOpen 
 
     return (
         <View style={styles.screen}>
-            <View style={styles.head}>
+            <View style={[styles.head, { paddingTop: top + 8 }]}>
                 <Pressable onPress={onBack} hitSlop={12}><Ionicons name="arrow-back" size={24} color="#fff" /></Pressable>
                 <Text style={styles.h2} numberOfLines={1}>{mood.name}</Text>
             </View>
@@ -275,9 +276,12 @@ function Row({ meta, index, color, isBm, isAct, onBm, onAct, onOpen }: {
                     <Text style={styles.at} numberOfLines={1}>{meta.title || 'Колекція'}</Text>
                     {!!meta.curator && <Text style={styles.au} numberOfLines={1}>куратор · {meta.curator}</Text>}
                 </Pressable>
-                {examples.length > 0 && (
+                {index < 8 && (
                     <Pressable onPress={() => onOpen(meta)} style={styles.strip}>
-                        {examples.map((u, i) => <Image key={i} source={{ uri: u }} style={styles.thumb} />)}
+                        {(examples.length ? examples : ['', '', '']).map((u, i) => (
+                            u ? <Image key={i} source={{ uri: u }} style={styles.thumb} />
+                              : <View key={i} style={styles.thumb} />
+                        ))}
                     </Pressable>
                 )}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 }}>
@@ -311,7 +315,7 @@ function PhotoGrid({ collection, top, onBack, favIds, onFav }: {
 
     return (
         <View style={styles.screen}>
-            <View style={styles.head}>
+            <View style={[styles.head, { paddingTop: top + 8 }]}>
                 <Pressable onPress={onBack} hitSlop={12}><Ionicons name="arrow-back" size={24} color="#fff" /></Pressable>
                 <Text style={styles.h2} numberOfLines={1}>{collection.title || 'Колекція'}</Text>
             </View>
@@ -342,7 +346,7 @@ function PhotoGrid({ collection, top, onBack, favIds, onFav }: {
 
 const styles = StyleSheet.create({
     screen: { flex: 1, backgroundColor: '#0a0a1a' },
-    head: { paddingHorizontal: 12, paddingBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 16 },
+    head: { paddingHorizontal: 16, paddingBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 10 },
     h1: { color: '#fff', fontSize: 22, fontWeight: '600' },
     h2: { color: '#fff', fontSize: 18, fontWeight: '600', flex: 1 },
     chips: { flexDirection: 'row', gap: 8, marginTop: 10, paddingRight: 16 },
