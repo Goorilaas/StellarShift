@@ -28,6 +28,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { SvgXml } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { Blessing, nextBlessingFromQueue } from '../components/blessings';
+import AuthorInfoModal from '../components/AuthorInfoModal';
 import FavoriteHeart from '../components/FavoriteHeart';
 import { Category, CATEGORIES, CHAOS_CATEGORY, CHAOS_QUERIES, dedupAndCapByAuthor, filterNoPeople, pickCategoryQueries, Photo, SEARCH_SUGGESTIONS, sortCategoriesByLabel, subCountForMix } from '../components/categories';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -39,7 +40,7 @@ import SkeletonCard from '../components/SkeletonCard';
 import Toast, { useToastQueue } from '../components/Toast';
 import { blockPhoto as blockPhotoStore, getBlockedIds, unblockPhoto as unblockPhotoStore } from '../services/blocked';
 import { setWallpaperFromUrl } from '../services/wallpaperService';
-import { openAuthorProfile, trackDownload } from '../services/unsplashTracking';
+import { trackDownload } from '../services/unsplashTracking';
 
 const { width, height } = Dimensions.get('window');
 const IMG_SIZE = (width - 36) / 2;
@@ -1033,37 +1034,7 @@ export default function HomeScreen() {
         </Pressable>
       </Modal>
 
-      <Modal visible={authorInfoOpen && !!selectedPhoto} transparent animationType="fade" onRequestClose={() => setAuthorInfoOpen(false)}>
-        <Pressable style={styles.authorInfoBackdrop} onPress={() => setAuthorInfoOpen(false)}>
-          <Pressable style={styles.authorInfoCard} onPress={(e) => e.stopPropagation()}>
-            {selectedPhoto && (
-              <>
-                <View style={styles.authorInfoHeader}>
-                  <Image source={{ uri: selectedPhoto.user.profile_image?.medium || selectedPhoto.user.profile_image?.small }} style={styles.authorInfoAvatar} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.authorInfoName}>{selectedPhoto.user.name}</Text>
-                    <Text style={styles.authorInfoHandle}>@{selectedPhoto.user.username} · Unsplash</Text>
-                  </View>
-                </View>
-                <Text style={styles.authorInfoDesc}>
-                  {selectedPhoto.description || selectedPhoto.alt_description || t('catalog.author.fallbackDesc')}
-                </Text>
-                <View style={styles.authorInfoActions}>
-                  <TouchableOpacity
-                    style={styles.authorInfoLink}
-                    onPress={() => openAuthorProfile(selectedPhoto.user.username)}
-                  >
-                    <Text style={styles.authorInfoLinkText}>{t('catalog.author.openProfile')}</Text>
-                  </TouchableOpacity>
-                </View>
-                <TouchableOpacity style={styles.authorInfoClose} onPress={() => setAuthorInfoOpen(false)}>
-                  <Text style={styles.authorInfoCloseText}>{t('common.close')}</Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <AuthorInfoModal photo={selectedPhoto} visible={authorInfoOpen} onClose={() => setAuthorInfoOpen(false)} />
     </View>
   );
 }
@@ -1129,18 +1100,6 @@ const styles = StyleSheet.create({
   closeTop: { position: 'absolute', top: 50, right: 20, backgroundColor: 'rgba(0,0,0,0.5)', width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   closeTopText: { color: '#fff', fontSize: 16 },
   authorRow: { position: 'absolute', top: 50, left: 16, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(0,0,0,0.55)', padding: 8, borderRadius: 14 },
-  authorInfoBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 28 },
-  authorInfoCard: { width: '100%', maxWidth: 360, backgroundColor: '#15152a', borderRadius: 22, padding: 22, borderWidth: 1, borderColor: '#2a2a4e', shadowColor: '#534AB7', shadowOpacity: 0.4, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 12 },
-  authorInfoHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
-  authorInfoAvatar: { width: 52, height: 52, borderRadius: 26, borderWidth: 1, borderColor: '#2a2a4e' },
-  authorInfoName: { color: '#fff', fontSize: 17, fontWeight: '700' },
-  authorInfoHandle: { color: '#7F77DD', fontSize: 12, marginTop: 2 },
-  authorInfoDesc: { color: '#aaa', fontSize: 14, lineHeight: 20, marginBottom: 18 },
-  authorInfoActions: { flexDirection: 'row', gap: 10, marginBottom: 14 },
-  authorInfoLink: { flex: 1, paddingVertical: 11, paddingHorizontal: 12, borderRadius: 10, backgroundColor: 'rgba(127,119,221,0.15)', borderWidth: 1, borderColor: '#534AB7', alignItems: 'center' },
-  authorInfoLinkText: { color: '#AFA9EC', fontSize: 12, fontWeight: '700' },
-  authorInfoClose: { alignSelf: 'flex-end', paddingVertical: 10, paddingHorizontal: 18, borderRadius: 12, backgroundColor: '#534AB7' },
-  authorInfoCloseText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   authorAvatar: { width: 36, height: 36, borderRadius: 18 },
   authorName: { color: '#fff', fontSize: 13, fontWeight: '600' },
   authorUsername: { color: '#aaa', fontSize: 11 },
