@@ -20,11 +20,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import { Photo } from '../components/categories';
+import AuthorInfoModal from '../components/AuthorInfoModal';
 import FavoriteHeart from '../components/FavoriteHeart';
 import { ICON } from '../components/icons';
 import Toast, { useToastQueue } from '../components/Toast';
 import { setWallpaperFromUrl } from '../services/wallpaperService';
-import { openAuthorProfile, trackDownload } from '../services/unsplashTracking';
+import { trackDownload } from '../services/unsplashTracking';
 import { ensureGalleryPermission } from '../services/galleryPermission';
 import { randomCheer } from '../services/cheer';
 
@@ -35,6 +36,7 @@ export default function FavoritesScreen() {
     const { t } = useTranslation();
     const [photos, setPhotos] = useState<Photo[]>([]);
     const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
+    const [authorInfoOpen, setAuthorInfoOpen] = useState(false);
     const [setting, setSetting] = useState<boolean>(false);
     const { toast, showToast, dismissToast } = useToastQueue();
     const { bottom, top } = useSafeAreaInsets();
@@ -172,10 +174,14 @@ export default function FavoritesScreen() {
                         />
                     </TouchableWithoutFeedback>
 
+                    <TouchableOpacity style={[styles.closeTop, { top: top + 12 }]} onPress={() => setSelectedPhoto(null)}>
+                        <Text style={styles.closeTopText}>✕</Text>
+                    </TouchableOpacity>
+
                     {selectedPhoto?.user && (
                         <TouchableOpacity
                             style={[styles.authorChip, { top: top + 12 }]}
-                            onPress={() => openAuthorProfile(selectedPhoto.user.username)}
+                            onPress={() => setAuthorInfoOpen(true)}
                             activeOpacity={0.85}
                         >
                             {selectedPhoto.user.profile_image?.small && (
@@ -224,6 +230,8 @@ export default function FavoritesScreen() {
                 </View>
             </Modal>
 
+            <AuthorInfoModal photo={selectedPhoto} visible={authorInfoOpen} onClose={() => setAuthorInfoOpen(false)} />
+
             <Toast message={toast?.message ?? null} action={toast?.action} />
         </View>
     );
@@ -249,6 +257,8 @@ const styles = StyleSheet.create({
     modalBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
     actionRow: { flexDirection: 'row', gap: 12, marginTop: 4 },
     iconBtn: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(0,0,0,0.6)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' },
+    closeTop: { position: 'absolute', right: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+    closeTopText: { color: '#fff', fontSize: 16 },
     authorChip: { position: 'absolute', left: 12, right: 60, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 22, paddingVertical: 6, paddingHorizontal: 8, paddingRight: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
     authorChipAvatar: { width: 32, height: 32, borderRadius: 16 },
     authorChipName: { color: '#fff', fontSize: 13, fontWeight: '700' },
