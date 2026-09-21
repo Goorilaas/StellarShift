@@ -1,4 +1,5 @@
-import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios, { CanceledError } from 'axios';
 import { dedupAndCapByAuthor, Photo } from '../components/categories';
 import { getUnsplashKey } from './unsplashKey';
 
@@ -10,11 +11,47 @@ export type CollectionMeta = {
     curator?: string;     // user.name — куратор
 };
 
-// Фото з конкретної колекції (портрет, як решта пулу). author-cap лишаємо —
-// навіть у кураторській добірці один автор не має монополізувати грид.
-// Page 1 кешуємо на сесію — міні-стрічка прикладів і фото-грид ділять один
-// фетч (тапнув колекцію після прев'ю → фото вже є, миттєво).
-const photosCache = new Map<string, Photo[]>();
+// Публічні дані колекцій зберігаємо між сесіями на добу.
+const CACHE_TTL = 24 * 60 * 60 * 1000;
+type CacheEntry<T> = { savedAt: number; value: T };
+const memory = new Map<string, CacheEntry<unknown>>();
+const pending = new Map<string, Promise<unknown>>();
+
+async function cached<T>(id: string, fetchValue: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    const storageKey = `collection_cache_v1:${id}`;
+    const read = async (): Promise<T> => {
+        let entry = memory.get(storageKey) as CacheEntry<T> | undefined;
+        if (!entry) {
+            try {
+                const raw = await AsyncStorage.getItem(storageKey);
+                const parsed = raw ? JSON.parse(raw) : null;
+                if (parsed && typeof parsed.savedAt === 'number' && parsed.value != null) {
+                    entry = parsed;
+                    memory.set(storageKey, parsed);
+                }
+            } catch { /* Несправний кеш не блокує мережу. */ }
+        }
+        if (entry && Date.now() - entry.savedAt >= 0 && Date.now() - entry.savedAt < CACHE_TTL) {
+            return entry.value;
+        }
+        const value = await fetchValue();
+        const next = { savedAt: Date.now(), value };
+        memory.set(storageKey, next);
+        try { await AsyncStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* best-effort */ }
+        return value;
+    };
+    // Запити з власним AbortSignal не ділять скасування з іншими споживачами.
+    if (signal) {
+        if (signal.aborted) throw new CanceledError('Request canceled');
+        return read();
+    }
+    const existing = pending.get(storageKey);
+    if (existing) return existing as Promise<T>;
+    const request = read();
+    pending.set(storageKey, request);
+    try { return await request; }
+    finally { pending.delete(storageKey); }
+}
 
 export const getCollectionPhotos = async (
     collectionId: string,
@@ -22,43 +59,36 @@ export const getCollectionPhotos = async (
     perPage = 30,
     signal?: AbortSignal,
 ): Promise<Photo[]> => {
-    if (page === 1) {
-        const cached = photosCache.get(collectionId);
-        if (cached) return cached;
-    }
-    const key = await getUnsplashKey();
-    const res = await axios.get(`https://api.unsplash.com/collections/${collectionId}/photos`, {
-        params: { page, per_page: perPage, orientation: 'portrait' },
-        headers: { Authorization: `Client-ID ${key}` },
-        signal,
-    });
-    const photos = dedupAndCapByAuthor(res.data as Photo[]);
-    if (page === 1) photosCache.set(collectionId, photos);
-    return photos;
+    return cached(`photos:${collectionId}:${page}:${perPage}`, async () => {
+        const key = await getUnsplashKey();
+        const res = await axios.get(`https://api.unsplash.com/collections/${collectionId}/photos`, {
+            params: { page, per_page: perPage, orientation: 'portrait' },
+            headers: { Authorization: `Client-ID ${key}` },
+            signal,
+        });
+        const photos = dedupAndCapByAuthor(res.data as Photo[]);
+        return photos;
+    }, signal);
 };
 
 // Метадані колекції для картки: назва, к-сть, обкладинка, куратор.
-// Memoize на сесію — браузинг настроїв/полиці повторно не б'є API (ліміт 50/год).
-const metaCache = new Map<string, CollectionMeta>();
-
 export const getCollectionMeta = async (collectionId: string): Promise<CollectionMeta | null> => {
-    const cached = metaCache.get(collectionId);
-    if (cached) return cached;
     try {
-        const key = await getUnsplashKey();
-        const res = await axios.get(`https://api.unsplash.com/collections/${collectionId}`, {
-            headers: { Authorization: `Client-ID ${key}` },
+        return await cached(`meta:${collectionId}`, async () => {
+            const key = await getUnsplashKey();
+            const res = await axios.get(`https://api.unsplash.com/collections/${collectionId}`, {
+                headers: { Authorization: `Client-ID ${key}` },
+            });
+            const d = res.data;
+            const meta: CollectionMeta = {
+                id: d.id,
+                title: d.title,
+                total: d.total_photos,
+                cover: d.cover_photo?.urls?.small,
+                curator: d.user?.name,
+            };
+            return meta;
         });
-        const d = res.data;
-        const meta: CollectionMeta = {
-            id: d.id,
-            title: d.title,
-            total: d.total_photos,
-            cover: d.cover_photo?.urls?.small,
-            curator: d.user?.name,
-        };
-        metaCache.set(collectionId, meta);
-        return meta;
     } catch {
         return null;
     }
