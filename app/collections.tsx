@@ -2,8 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, BackHandler, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, BackHandler, FlatList, Image, Pressable, ScrollView, StyleSheet, Text, View, ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Photo } from '../components/categories';
 import { Mood, MOODS } from '../components/collections';
@@ -201,7 +201,8 @@ function MoodDetail({ mood, heroCover, top, onBack, bookmarks, active, onBm, onA
                 <Pressable onPress={onBack} hitSlop={12}><Ionicons name="arrow-back" size={24} color="#fff" /></Pressable>
                 <Text style={styles.h2} numberOfLines={1}>{mood.name}</Text>
             </View>
-            <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 32 }}>
+            <CollectionList metas={metas} color={color} bookmarks={bookmarks} active={active}
+                onBm={onBm} onAct={onAct} onOpen={onOpen} header={<>
                 <View style={[styles.band, { backgroundColor: color }]}>
                     {hero
                         ? <Image source={{ uri: hero }} style={StyleSheet.absoluteFill} />
@@ -214,11 +215,7 @@ function MoodDetail({ mood, heroCover, top, onBack, bookmarks, active, onBm, onA
                     <Text style={styles.empty}>Збираємо власноруч — скоро тут з&apos;являться добірки.</Text>
                 )}
                 {metas === null && <ActivityIndicator color="#7F77DD" style={{ marginTop: 22 }} />}
-                {metas?.map((c, i) => (
-                    <Row key={c.id} meta={c} index={i} color={color}
-                        isBm={bookmarks.includes(c.id)} isAct={active.includes(c.id)} onBm={onBm} onAct={onAct} onOpen={onOpen} />
-                ))}
-            </ScrollView>
+            </>} />
         </View>
     );
 }
@@ -235,34 +232,50 @@ function Shelf({ ids, emptyMsg, bookmarks, active, onBm, onAct, onOpen }: RowPro
     }, [ids]);
 
     return (
-        <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 32 }}>
+        <CollectionList metas={metas} color="#2A2350" bookmarks={bookmarks} active={active}
+            onBm={onBm} onAct={onAct} onOpen={onOpen} header={<>
             {ids.length === 0 && <Text style={styles.empty}>{emptyMsg}</Text>}
             {metas === null && ids.length > 0 && <ActivityIndicator color="#7F77DD" style={{ marginTop: 22 }} />}
-            {metas?.map((c, i) => (
-                <Row key={c.id} meta={c} index={i} color="#2A2350"
-                    isBm={bookmarks.includes(c.id)} isAct={active.includes(c.id)} onBm={onBm} onAct={onAct} onOpen={onOpen} />
-            ))}
-        </ScrollView>
+        </>} />
     );
 }
 
-function Row({ meta, index, color, isBm, isAct, onBm, onAct, onOpen }: {
-    meta: CollectionMeta; index: number; color: string; isBm: boolean; isAct: boolean;
+function CollectionList({ metas, color, header, bookmarks, active, onBm, onAct, onOpen }:
+    RowProps & { metas: CollectionMeta[] | null; color: string; header: React.ReactElement }) {
+    const [visibleIds, setVisibleIds] = useState<string[]>([]);
+    const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken<CollectionMeta>[] }) => {
+        setVisibleIds(viewableItems.map(item => item.item.id));
+    }, []);
+    const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 10, minimumViewTime: 200 }).current;
+    return (
+        <FlatList data={metas ?? []} keyExtractor={item => item.id}
+            contentContainerStyle={{ padding: 14, paddingBottom: 32 }} ListHeaderComponent={header}
+            onViewableItemsChanged={onViewableItemsChanged} viewabilityConfig={viewabilityConfig}
+            extraData={{ visibleIds, bookmarks, active }}
+            renderItem={({ item }) => (
+                <Row meta={item} visible={visibleIds.includes(item.id)} color={color}
+                    isBm={bookmarks.includes(item.id)} isAct={active.includes(item.id)}
+                    onBm={onBm} onAct={onAct} onOpen={onOpen} />
+            )} />
+    );
+}
+
+function Row({ meta, visible, color, isBm, isAct, onBm, onAct, onOpen }: {
+    meta: CollectionMeta; visible: boolean; color: string; isBm: boolean; isAct: boolean;
     onBm: (id: string) => void; onAct: (id: string) => void; onOpen: (c: CollectionMeta) => void;
 }) {
     const [examples, setExamples] = useState<string[]>([]);
-    // Приклади (перші 3 фото) — ліниво-cap: лише для перших рядків + стаґер, щоб не
-    // вибухнути запитами. Кеш спільний із фото-гридом (тап → миттєво).
+    // Прев’ю завантажуємо лише для видимих рядків; кеш спільний із фото-гридом.
     useEffect(() => {
-        if (index >= 8) return;
+        if (!visible) return;
         let alive = true;
         const timer = setTimeout(() => {
             getCollectionPhotos(meta.id)
                 .then(ps => { if (alive) setExamples(ps.slice(0, 3).map(p => p.urls.small)); })
                 .catch(() => { });
-        }, index * 220);
+        }, 150);
         return () => { alive = false; clearTimeout(timer); };
-    }, [meta.id, index]);
+    }, [meta.id, visible]);
 
     return (
         <View style={styles.ac}>
@@ -276,14 +289,12 @@ function Row({ meta, index, color, isBm, isAct, onBm, onAct, onOpen }: {
                     <Text style={styles.at} numberOfLines={1}>{meta.title || 'Колекція'}</Text>
                     {!!meta.curator && <Text style={styles.au} numberOfLines={1}>куратор · {meta.curator}</Text>}
                 </Pressable>
-                {index < 8 && (
-                    <Pressable onPress={() => onOpen(meta)} style={styles.strip}>
-                        {(examples.length ? examples : ['', '', '']).map((u, i) => (
-                            u ? <Image key={i} source={{ uri: u }} style={styles.thumb} />
-                              : <View key={i} style={styles.thumb} />
-                        ))}
-                    </Pressable>
-                )}
+                <Pressable onPress={() => onOpen(meta)} style={styles.strip}>
+                    {(examples.length ? examples : ['', '', '']).map((u, i) => (
+                        u ? <Image key={i} source={{ uri: u }} style={styles.thumb} />
+                          : <View key={i} style={styles.thumb} />
+                    ))}
+                </Pressable>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 }}>
                     <Pressable onPress={() => onAct(meta.id)} style={[styles.actPill, isAct && styles.actPillOn]}>
                         <Ionicons name={isAct ? 'checkmark' : 'add'} size={13} color={isAct ? '#fff' : '#AFA9EC'} />
