@@ -7,12 +7,18 @@ import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
 import com.facebook.react.bridge.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
+
+    private val rotationLock = Any()
+    private var refreshJob: Job? = null
 
     override fun getName() = "WallpaperModule"
 
@@ -49,12 +55,34 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
     @ReactMethod
     fun stopRotation(promise: Promise) {
         try {
-            WallpaperWorker.cancel(reactApplicationContext)
-            val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
-            prefs.edit().putInt("intervalMinutes", 0).apply()
+            synchronized(rotationLock) {
+                refreshJob?.cancel()
+                WallpaperWorker.cancel(reactApplicationContext)
+                val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+                prefs.edit().putInt("intervalMinutes", 0).apply()
+            }
             promise.resolve(null)
         } catch (e: Exception) {
             promise.reject("STOP_ERROR", e.message, e)
+        }
+    }
+
+    // Інтервал і екран незалежні від пулу: жодних API-запитів чи скидання poolIndex.
+    @ReactMethod
+    fun updateRotationSettings(intervalMinutes: Int, target: String, promise: Promise) {
+        try {
+            synchronized(rotationLock) {
+                val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+                prefs.edit()
+                    .putInt("intervalMinutes", maxOf(intervalMinutes, 15))
+                    .putString("target", target)
+                    .apply()
+                val hasPool = org.json.JSONArray(prefs.getString("photoPool", "[]") ?: "[]").length() > 0
+                if (hasPool) WallpaperWorker.schedule(reactApplicationContext, intervalMinutes, false, false)
+                promise.resolve(hasPool)
+            }
+        } catch (e: Exception) {
+            promise.reject("ROTATION_SETTINGS_ERROR", e.message, e)
         }
     }
 
@@ -88,21 +116,33 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
     // Миттєвий перезбір пулу (на активацію/зняття колекції) + застосувати наступну шпалеру.
     @ReactMethod
     fun refreshPool(promise: Promise) {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val rebuilt = WallpaperWorker.rebuildNow(reactApplicationContext)
-                if (rebuilt) {
-                    // Option B: активація колекції сама вмикає ротацію — плануємо воркер
-                    // (інтервал з prefs, дефолт 30 хв якщо ще не налаштовано).
-                    val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
-                    val interval = prefs.getInt("intervalMinutes", 0).let { if (it >= 15) it else 30 }
-                    prefs.edit().putInt("intervalMinutes", interval).apply()
-                    WallpaperWorker.schedule(reactApplicationContext, interval, false, false)
+        synchronized(rotationLock) {
+            refreshJob?.cancel()
+            refreshJob = CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val rebuilt = WallpaperWorker.rebuildNow(reactApplicationContext)
+                    synchronized(rotationLock) {
+                        ensureActive()
+                        if (rebuilt) {
+                            val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+                            val interval = prefs.getInt("intervalMinutes", 0).let { if (it >= 15) it else 30 }
+                            prefs.edit().putInt("intervalMinutes", interval).apply()
+                            WallpaperWorker.schedule(reactApplicationContext, interval, false, false)
+                        }
+                    }
+                    ensureActive()
+                    val applied = if (rebuilt) WallpaperWorker.applyNext(reactApplicationContext, manual = true) else false
+                    promise.resolve(applied)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    promise.reject("REFRESH_POOL_ERROR", e.message, e)
                 }
-                val applied = if (rebuilt) WallpaperWorker.applyNext(reactApplicationContext, manual = true) else false
-                withContext(Dispatchers.Main) { promise.resolve(applied) }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) { promise.reject("REFRESH_POOL_ERROR", e.message, e) }
+            }.also { job ->
+                // Завершуємо Promise навіть якщо job скасовано до запуску тіла.
+                job.invokeOnCompletion { cause ->
+                    if (cause is CancellationException) promise.resolve(false)
+                }
             }
         }
     }
