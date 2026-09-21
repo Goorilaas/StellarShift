@@ -7,6 +7,8 @@ import android.graphics.BitmapFactory
 import android.graphics.Rect
 import android.os.Build
 import androidx.work.*
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -273,6 +275,7 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
             return try {
                 val fresh = buildPool(prefs) ?: return false
                 if (fresh.length() == 0) return false
+                currentCoroutineContext().ensureActive()
                 prefs.edit()
                     .putString("photoPool", fresh.toString())
                     .putInt("poolIndex", 0)

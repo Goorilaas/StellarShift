@@ -42,7 +42,7 @@ import Toast, { useToastQueue } from '../components/Toast';
 
 import { Blessing, nextBlessingFromQueue } from '../components/blessings';
 import { GREETING_ENABLED_KEY } from '../components/LaunchGreeting';
-import { changeWallpaperNow, clearHistory, disableLiveWallpaper, drainPendingActions, getHistory, HistoryEntry, isIgnoringBatteryOptimization, isLiveWallpaperActive, openLiveWallpaperPicker, PoolItem, refreshPoolNative, requestIgnoreBatteryOptimization, setLiveIntensityNative, setNotificationsEnabledNative, setNotificationStrings, setPoolRecipeNative, setSleepHoursNative, setUnsplashKeyNative, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation, syncNativeHistory } from '../services/wallpaperService';
+import { changeWallpaperNow, clearHistory, disableLiveWallpaper, drainPendingActions, getHistory, HistoryEntry, isIgnoringBatteryOptimization, isLiveWallpaperActive, openLiveWallpaperPicker, PoolItem, refreshPoolNative, requestIgnoreBatteryOptimization, setLiveIntensityNative, setNotificationsEnabledNative, setNotificationStrings, setPoolRecipeNative, setSleepHoursNative, setUnsplashKeyNative, setWallpaperFromUrl, startWallpaperRotation, stopWallpaperRotation, syncNativeHistory, updateRotationSettingsNative } from '../services/wallpaperService';
 
 const DEFAULT_MIX = CATEGORIES.filter(c => c.id !== 'mix').map(c => c.id);
 
@@ -131,6 +131,8 @@ export default function SettingsScreen() {
         JSON.stringify([p.activeCategories, p.mixCategories, p.interval, p.applyTo]);
     const autoChangeRef = useRef(false);
     const poolAbortRef = useRef<AbortController | null>(null);
+    const rotationRequestRef = useRef(0);
+    const loadAndStartRef = useRef<(rebuild?: boolean) => Promise<void>>(async () => {});
 
     // Reapply / clear-history dialogs
     const [reapplyEntry, setReapplyEntry] = useState<HistoryEntry | null>(null);
@@ -353,7 +355,7 @@ export default function SettingsScreen() {
             AsyncStorage.getItem('pool_dirty').then(async dirty => {
                 if (dirty === '1' && autoChangeRef.current) {
                     await AsyncStorage.removeItem('pool_dirty');
-                    loadAndStart();
+                    loadAndStartRef.current();
                 } else if (dirty === '1') {
                     await AsyncStorage.removeItem('pool_dirty');
                 }
@@ -412,7 +414,12 @@ export default function SettingsScreen() {
         const key = poolKeyOf({ activeCategories, mixCategories, interval, applyTo });
         if (key === appliedPoolKeyRef.current) return;
         if (reloadTimer.current) clearTimeout(reloadTimer.current);
-        reloadTimer.current = setTimeout(() => loadAndStart(), 1500);
+        // Інвалідуємо старе завантаження одразу, а не після debounce.
+        rotationRequestRef.current += 1;
+        poolAbortRef.current?.abort();
+        const previous = appliedPoolKeyRef.current ? JSON.parse(appliedPoolKeyRef.current) : null;
+        const sourceChanged = !previous || JSON.stringify(previous.slice(0, 2)) !== JSON.stringify([activeCategories, mixCategories]);
+        reloadTimer.current = setTimeout(() => loadAndStartRef.current(sourceChanged), 1500);
         return () => { if (reloadTimer.current) clearTimeout(reloadTimer.current); };
     }, [activeCategories, mixCategories, interval, applyTo]);
 
@@ -605,31 +612,56 @@ export default function SettingsScreen() {
         return JSON.stringify({ subCount, peopleKeywords: PEOPLE_TAGS, blockedIds, favorites, jobs });
     };
 
-    const loadAndStart = async () => {
-        // Model B: активні колекції перебивають категорії — не пушимо категорійний
-        // пул (бо перебив би колекційну шпалеру). Лише тримаємо рецепт свіжим для
-        // фолбеку, коли юзер зніме всі колекції.
-        const activeColl = await getActiveCollections();
-        if (activeColl.length > 0) {
-            appliedPoolKeyRef.current = poolKeyOf({ activeCategories, mixCategories, interval, applyTo });
-            // Рецепт свіжий для фолбеку + перезбір/планування воркера на колекційному джерелі.
-            try { await setPoolRecipeNative(await buildPoolRecipe(activeCategories)); } catch { /* best-effort */ }
-            try { await setUnsplashKeyNative(await getUnsplashKey()); await refreshPoolNative(); } catch { /* best-effort */ }
-            return;
+    const loadAndStart = async (rebuild = true) => {
+        if (!autoChangeRef.current) return;
+        const request = ++rotationRequestRef.current;
+        const current = () => autoChangeRef.current && request === rotationRequestRef.current;
+        try {
+            const key = poolKeyOf({ activeCategories, mixCategories, interval, applyTo });
+            // Інтервал/екран не змінюють склад пулу й не потребують Unsplash.
+            if (!rebuild) {
+                const reused = await updateRotationSettingsNative(interval, applyTo);
+                if (!current()) return;
+                if (reused) { appliedPoolKeyRef.current = key; return; }
+            }
+            const activeColl = await getActiveCollections();
+            if (!current()) return;
+            if (activeColl.length > 0) {
+                const recipe = await buildPoolRecipe(activeCategories);
+                if (!current()) return;
+                await setPoolRecipeNative(recipe);
+                if (!current()) return;
+                const apiKey = await getUnsplashKey();
+                if (!current()) return;
+                await setUnsplashKeyNative(apiKey);
+                if (!current()) return;
+                await updateRotationSettingsNative(interval, applyTo);
+                if (!current()) return;
+                const applied = await refreshPoolNative();
+                if (current() && applied) appliedPoolKeyRef.current = key;
+                return;
+            }
+            const pool = await loadPhotoPool(activeCategories);
+            if (!pool || !current()) return;
+            const apiKey = await getUnsplashKey();
+            if (!current()) return;
+            await setUnsplashKeyNative(apiKey);
+            if (!current()) return;
+            const recipe = await buildPoolRecipe(activeCategories);
+            if (!current()) return;
+            await setPoolRecipeNative(recipe);
+            if (!current()) return;
+            await startWallpaperRotation(pool, interval, applyTo, false, false);
+            if (!current()) return;
+            appliedPoolKeyRef.current = key;
+            showToast(t('settings.toast.poolReady', { count: pool.length }));
+        } catch {
+            if (current()) showToast(t('settings.toast.poolFail'));
         }
-        const pool = await loadPhotoPool(activeCategories);
-        if (!pool) return;
-        // Sync current Unsplash key into native prefs so WallpaperWorker can fire
-        // download-tracking pings on each rotation tick (required by Unsplash ToS).
-        try { await setUnsplashKeyNative(await getUnsplashKey()); } catch { /* non-fatal */ }
-        // wifiOnly / chargingOnly removed as a feature (redundant for users) — pass false,
-        // false so WorkManager has no network/charging constraints (rotate always).
-        await startWallpaperRotation(pool, interval, applyTo, false, false);
-        appliedPoolKeyRef.current = poolKeyOf({ activeCategories, mixCategories, interval, applyTo });
-        // Зберігаємо рецепт у native prefs → Worker перезбере пул сам раз на добу.
-        try { await setPoolRecipeNative(await buildPoolRecipe(activeCategories)); } catch { /* recipe best-effort */ }
-        showToast(t('settings.toast.poolReady', { count: pool.length }));
     };
+
+    // Focus/debounce звертаються до останніх налаштувань, а не mount-closure.
+    useEffect(() => { loadAndStartRef.current = loadAndStart; });
 
     // Android 13+: нотифікації потребують runtime-дозволу. До 13 — завжди true.
     const ensureNotifPermission = async (): Promise<boolean> => {
@@ -654,6 +686,8 @@ export default function SettingsScreen() {
     };
 
     const handleAutoChangeToggle = async (value: boolean) => {
+        const request = ++rotationRequestRef.current;
+        poolAbortRef.current?.abort();
         autoChangeRef.current = value;
         setAutoChange(value);
         if (value) {
@@ -662,9 +696,10 @@ export default function SettingsScreen() {
             if (!ignoring) {
                 await requestIgnoreBatteryOptimization();
             }
+            if (!autoChangeRef.current || request !== rotationRequestRef.current) return;
             // Сповіщення-компаньйон: best-effort запит дозволу (без revert)
             if (notifyEnabled) ensureNotifPermission().catch(() => { });
-            await loadAndStart();
+            await loadAndStartRef.current();
         } else {
             if (reloadTimer.current) clearTimeout(reloadTimer.current);
             await stopWallpaperRotation();

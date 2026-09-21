@@ -10,6 +10,7 @@ declare module 'react-native' {
                 wifiOnly: boolean,
                 chargingOnly: boolean
             ): Promise<void>;
+            updateRotationSettings(intervalMinutes: number, target: string): Promise<boolean>;
             stopRotation(): Promise<void>;
             setFromUrl(url: string, target: string): Promise<boolean>;
             setUnsplashKey(key: string): Promise<void>;

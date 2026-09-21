@@ -34,6 +34,10 @@ export const setActiveCollectionsNative = (json: string): Promise<void> =>
 export const refreshPoolNative = (): Promise<boolean> =>
     WallpaperModule.refreshPool();
 
+// Оновлює розклад і екран без перезбору. false означає відсутній пул.
+export const updateRotationSettingsNative = (intervalMinutes: number, target: string): Promise<boolean> =>
+    WallpaperModule.updateRotationSettings(intervalMinutes, target);
+
 export const stopWallpaperRotation = (): Promise<void> =>
     WallpaperModule.stopRotation();
 
