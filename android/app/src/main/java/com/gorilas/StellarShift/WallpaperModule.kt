@@ -33,16 +33,12 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
     ) {
         try {
             val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+            BlockedPhotos.replacePool(prefs, org.json.JSONArray(poolJson), System.currentTimeMillis())
             prefs.edit()
-                .putString("photoPool", poolJson)
-                .putInt("poolIndex", 0)
                 .putString("target", target)
                 .putInt("intervalMinutes", intervalMinutes)
                 .putBoolean("wifiOnly", wifiOnly)
                 .putBoolean("chargingOnly", chargingOnly)
-                // Свіжий пул щойно зібрано в JS → запускаємо 24h-годинник фонового
-                // перезбору від цього моменту (Worker перевіряє lastPoolBuild).
-                .putLong("lastPoolBuild", System.currentTimeMillis())
                 .apply()
 
             WallpaperWorker.schedule(reactApplicationContext, intervalMinutes, wifiOnly, chargingOnly)
@@ -258,15 +254,34 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
         }
     }
 
-    // Віддає {favorites:[{id,url}], blocked:[{id,url}]} і чистить обидва буфери.
+    @ReactMethod
+    fun getBlockedPhotos(legacyJson: String, promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+            promise.resolve(BlockedPhotos.migrate(prefs, legacyJson))
+        } catch (e: Exception) {
+            promise.reject("BLOCKED_ERROR", e.message, e)
+        }
+    }
+
+    @ReactMethod
+    fun mutateBlockedPhotos(operation: String, photosJson: String, promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+            promise.resolve(BlockedPhotos.mutate(prefs, operation, photosJson))
+        } catch (e: Exception) {
+            promise.reject("BLOCKED_ERROR", e.message, e)
+        }
+    }
+
+    // Приховані вже зберігаються в BlockedPhotos; старий буфер забирає міграція.
     @ReactMethod
     fun drainPendingActions(promise: Promise) {
         try {
             val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
             val favorites = prefs.getString("pendingFavorites", "[]") ?: "[]"
-            val blocked = prefs.getString("pendingBlocked", "[]") ?: "[]"
-            prefs.edit().remove("pendingFavorites").remove("pendingBlocked").apply()
-            promise.resolve("""{"favorites":$favorites,"blocked":$blocked}""")
+            prefs.edit().remove("pendingFavorites").apply()
+            promise.resolve("""{"favorites":$favorites,"blocked":[]}""")
         } catch (e: Exception) {
             promise.reject("ACTIONS_ERROR", e.message, e)
         }

@@ -2,13 +2,17 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, BackHandler, FlatList, Image, Pressable, ScrollView, StyleSheet, Text, View, ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Photo } from '../components/categories';
 import { Mood, MOODS } from '../components/collections';
 import FavoriteHeart from '../components/FavoriteHeart';
 import PhotoViewer from '../components/PhotoViewer';
+import Toast, { useToastQueue } from '../components/Toast';
+import { BlockedPhoto, filterBlockedPhotos, isBlockedCover, unblockPhoto } from '../services/blocked';
+import { useBlockedPhotos } from '../services/useBlockedPhotos';
 import { CollectionMeta, getCollectionMeta, getCollectionPhotos } from '../services/collectionService';
 import { fetchFirstCover, loadCoversMap, mergeMoodCovers } from '../services/moodCovers';
 import { getActiveCollections, getBookmarkedCollections, toggleActiveCollection, toggleBookmarkCollection } from '../services/collectionSubs';
@@ -40,8 +44,15 @@ const STYLE: Record<string, { color: string; icon: IconName }> = {
 };
 const FALLBACK = { color: '#2A2350', icon: 'images-outline' as IconName };
 const colorFor = (moodId: string) => (STYLE[moodId] ?? FALLBACK).color;
+const BlockedContext = createContext<BlockedPhoto[]>([]);
 
 export default function CollectionsScreen() {
+    const blocked = useBlockedPhotos();
+    if (blocked === null) return <View style={styles.screen}><ActivityIndicator color="#7F77DD" /></View>;
+    return <BlockedContext.Provider value={blocked}><CollectionsContent /></BlockedContext.Provider>;
+}
+
+function CollectionsContent() {
     const insets = useSafeAreaInsets();
     const [mood, setMood] = useState<Mood | null>(null);
     const [moodCover, setMoodCover] = useState<string | undefined>(undefined);
@@ -120,6 +131,7 @@ function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () 
 }
 
 function Grid({ onPick }: { onPick: (m: Mood, cover?: string) => void }) {
+    const blocked = useContext(BlockedContext);
     const [covers, setCovers] = useState<Record<string, string>>({});
 
     // Шафл на focus: щоразу як відкриваєш таб — випадкова обкладинка кожного
@@ -149,7 +161,7 @@ function Grid({ onPick }: { onPick: (m: Mood, cover?: string) => void }) {
             <View style={styles.grid}>
                 {MOODS.map(m => {
                     const s = STYLE[m.id] ?? FALLBACK;
-                    const cover = covers[m.id];
+                    const cover = isBlockedCover(covers[m.id], blocked) ? undefined : covers[m.id];
                     return (
                         <Pressable key={m.id} style={[styles.card, { backgroundColor: s.color }]} onPress={() => onPick(m, cover)}>
                             {cover
@@ -179,7 +191,8 @@ function MoodDetail({ mood, heroCover, top, onBack, bookmarks, active, onBm, onA
     const [metas, setMetas] = useState<CollectionMeta[] | null>(null);
     const color = colorFor(mood.id);
     const s = STYLE[mood.id] ?? FALLBACK;
-    const hero = heroCover ?? (metas && metas.length > 0 ? metas[0].cover : undefined);
+    const blocked = useContext(BlockedContext);
+    const hero = [heroCover, ...(metas ?? []).map(m => m.cover)].find(url => url && !isBlockedCover(url, blocked));
 
     useEffect(() => {
         let alive = true;
@@ -264,14 +277,17 @@ function Row({ meta, visible, color, isBm, isAct, onBm, onAct, onOpen }: {
     meta: CollectionMeta; visible: boolean; color: string; isBm: boolean; isAct: boolean;
     onBm: (id: string) => void; onAct: (id: string) => void; onOpen: (c: CollectionMeta) => void;
 }) {
-    const [examples, setExamples] = useState<string[]>([]);
+    const blocked = useContext(BlockedContext);
+    const [photos, setPhotos] = useState<Photo[]>([]);
+    const examples = filterBlockedPhotos(photos, blocked).slice(0, 3).map(p => p.urls.small);
+    const cover = isBlockedCover(meta.cover, blocked) ? examples[0] : meta.cover;
     // Прев’ю завантажуємо лише для видимих рядків; кеш спільний із фото-гридом.
     useEffect(() => {
         if (!visible) return;
         let alive = true;
         const timer = setTimeout(() => {
             getCollectionPhotos(meta.id)
-                .then(ps => { if (alive) setExamples(ps.slice(0, 3).map(p => p.urls.small)); })
+                .then(ps => { if (alive) setPhotos(ps); })
                 .catch(() => { });
         }, 150);
         return () => { alive = false; clearTimeout(timer); };
@@ -280,8 +296,8 @@ function Row({ meta, visible, color, isBm, isAct, onBm, onAct, onOpen }: {
     return (
         <View style={styles.ac}>
             <Pressable onPress={() => onOpen(meta)}>
-                {meta.cover
-                    ? <Image source={{ uri: meta.cover }} style={styles.cov} />
+                {cover
+                    ? <Image source={{ uri: cover }} style={styles.cov} />
                     : <View style={[styles.cov, { backgroundColor: color }]} />}
             </Pressable>
             <View style={{ flex: 1, minWidth: 0 }}>
@@ -314,8 +330,15 @@ function PhotoGrid({ collection, top, onBack, favIds, onFav }: {
     collection: CollectionMeta; top: number; onBack: () => void;
     favIds: string[]; onFav: (p: Photo) => void;
 }) {
+    const { t } = useTranslation();
+    const { toast, showToast, dismissToast } = useToastQueue();
+    const blocked = useContext(BlockedContext);
     const [photos, setPhotos] = useState<Photo[] | null>(null);
     const [viewing, setViewing] = useState<Photo | null>(null);
+    const visiblePhotos = photos && filterBlockedPhotos(photos, blocked);
+    useEffect(() => {
+        if (viewing && blocked.some(p => p.id === viewing.id)) setViewing(null);
+    }, [blocked, viewing]);
     useEffect(() => {
         let alive = true;
         getCollectionPhotos(collection.id, 1, 30)
@@ -332,9 +355,9 @@ function PhotoGrid({ collection, top, onBack, favIds, onFav }: {
             </View>
             {photos === null && <ActivityIndicator color="#7F77DD" style={{ marginTop: 28 }} />}
             <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 24 }}>
-                {photos?.length === 0 && <Text style={styles.empty}>Не вдалося завантажити фото.</Text>}
+                {visiblePhotos?.length === 0 && <Text style={styles.empty}>Немає доступних фото.</Text>}
                 <View style={styles.grid}>
-                    {photos?.map(p => (
+                    {visiblePhotos?.map(p => (
                         <Pressable key={p.id} style={styles.tile} onPress={() => setViewing(p)}>
                             <Image source={{ uri: p.urls.small }} style={styles.tileImg} />
                             <FavoriteHeart active={favIds.includes(p.id)} onToggle={() => onFav(p)} />
@@ -342,15 +365,23 @@ function PhotoGrid({ collection, top, onBack, favIds, onFav }: {
                     ))}
                 </View>
             </ScrollView>
-            {viewing && (
+            {viewing && !blocked.some(p => p.id === viewing.id) && (
                 <PhotoViewer
                     photo={viewing}
                     isFav={favIds.includes(viewing.id)}
                     onClose={() => setViewing(null)}
                     onToggleFav={() => onFav(viewing)}
-                    onBlocked={() => { setPhotos(prev => prev?.filter(x => x.id !== viewing.id) ?? null); setViewing(null); }}
+                    onBlocked={() => {
+                        const id = viewing.id;
+                        setViewing(null);
+                        showToast(t('catalog.toast.blocked'), {
+                            label: t('common.undo'),
+                            onPress: async () => { await unblockPhoto(id); dismissToast(); },
+                        }, 5000);
+                    }}
                 />
             )}
+            <Toast message={toast?.message ?? null} action={toast?.action} />
         </View>
     );
 }

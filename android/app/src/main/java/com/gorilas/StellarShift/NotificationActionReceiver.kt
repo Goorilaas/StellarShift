@@ -12,10 +12,8 @@ import org.json.JSONObject
 
 /**
  * Дії нотифікації-компаньйона. Застосунок може бути не запущений, тож:
- * - ❤️ і 🚫 пишуться у pending-буфери (pendingFavorites / pendingBlocked)
- *   у WallpaperPrefs — JS зливає їх у свої стори на focus Settings
- *   (той самий патерн, що pendingHistory);
- * - 🚫 додатково ОДРАЗУ видаляє фото з native-пулу і перемикає шпалеру —
+ * - ❤️ пишеться у pendingFavorites; JS забирає його на focus Settings;
+ * - 🚫 зберігається у спільному BlockedPhotos, видаляє фото з пулу і перемикає шпалеру —
  *   «гидота» зникає з екрана негайно, не чекаючи відкриття застосунку;
  * - ⏭ просто перемикає на наступну (applyNext сам оновить нотифікацію).
  */
@@ -41,18 +39,6 @@ class NotificationActionReceiver : BroadcastReceiver() {
             } catch (_: Exception) { }
         }
 
-        /** Прибирає фото з photoPool, щоб ротація його більше не показала. */
-        private fun removeFromPool(prefs: SharedPreferences, id: String) {
-            try {
-                val pool = JSONArray(prefs.getString("photoPool", "[]"))
-                val next = JSONArray()
-                for (i in 0 until pool.length()) {
-                    val item = pool.getJSONObject(i)
-                    if (item.optString("id") != id) next.put(item)
-                }
-                prefs.edit().putString("photoPool", next.toString()).apply()
-            } catch (_: Exception) { }
-        }
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -69,8 +55,9 @@ class NotificationActionReceiver : BroadcastReceiver() {
                         WallpaperWorker.applyNext(context, manual = true)
                     }
                     ACTION_BLOCK -> {
-                        appendPending(prefs, "pendingBlocked", photoId, photoUrl)
-                        removeFromPool(prefs, photoId)
+                        BlockedPhotos.mutate(prefs, "add", JSONArray().put(
+                            JSONObject().put("id", photoId).put("small", photoUrl)
+                        ).toString())
                         // Гидота зникає з екрана негайно. Порожній пул — прибираємо нотифікацію.
                         val applied = WallpaperWorker.applyNext(context, manual = true)
                         if (!applied) NotificationHelper.cancel(context)
