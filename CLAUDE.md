@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+Current planning and release workflow: [roadmap.md](roadmap.md) and [docs/development.md](docs/development.md). Architecture/history below contain older snapshots; verify details against the current code. APK builds require a separate owner decision.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 1. Think Before Coding
 Don't assume. Don't hide confusion. Surface tradeoffs.
@@ -58,13 +60,15 @@ npx expo run:android      # Full rebuild — required when Kotlin/manifest/asset
 npm run lint              # ESLint
 ```
 
-There are no automated tests in this project.
+Automated regression tests are in `scripts/catalog-cache.test.cjs`, `scripts/catalog-loading.test.cjs`, `scripts/blocked.test.cjs`, and `scripts/rotation.test.cjs`; native blocked checks use `scripts/test-blocked-native.sh`. See `docs/development.md` for scope and prerequisites.
 
 ## Architecture
 
 StellarShift is an Expo (React Native) wallpaper app targeting **Android only**. Uses **expo-router** with a file-based tab layout under `app/`.
 
-**Three tabs:**
+**Four tabs:**
+
+- `app/collections.tsx` — curated moods, collection bookmarks, active rotation sources, and photo grids/viewer.
 - `app/index.tsx` — Catalog: Unsplash API, category filtering, search (SVG icon), infinite scroll, long-press (grid) or double-tap (modal, `Pressable`) to **add** to favorites with heart animation (`Animated` spring+fade). Double-tap only adds, never removes. Set wallpaper button with loading state, closes modal + toast "Красу встановлено!" on success. All buttons use SVG icons from `ICON`.
 - `app/favorites.tsx` — Favorites: reads from AsyncStorage, full-screen preview (absoluteFill), buttons absolutely positioned at bottom via `useSafeAreaInsets`. [wallpaper SVG Встановити] + [heartBroken SVG Зняти з улюблених]. Title row uses SVG heart.
 - `app/settings.tsx` — Settings: language switcher, launch-greeting toggle, auto-change toggle (triggers pool load + WorkManager), interval, target screen (SVG icons: lock/phone/both). **No save button — auto-saves.** Battery optimization on first enable. "Про застосунок" section at bottom with logo SVG + version + "Зроблено з ❤️ в Україні".

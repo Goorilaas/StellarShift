@@ -1,5 +1,8 @@
 # LAUNCH.md — submission day runbook
 
+> **ІСТОРИЧНИЙ СЦЕНАРІЙ (2026-09-24).** Старі кроки, строки й припущення про Unsplash/Google Play не є поточним планом; цей документ не запускаємо автоматично.
+> Актуальні документи: [Roadmap](roadmap.md) · [Розробка та випуск версій](docs/development.md).
+
 > Один документ на весь шлях від «v3.7.3 у master» до «Unsplash production application submitted».
 > Виконується **сьогодні**. Орієнтовний час — 4-6 годин активної роботи + 30-45 хв чекань (EAS build, Play Console review).
 

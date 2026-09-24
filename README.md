@@ -2,7 +2,9 @@
 
 > **Тисячі настроїв, що оновлюються самі.**
 
-Android-застосунок, який автоматично змінює шпалери на свіжі HD-фото з Unsplash. Без реклами, без акаунтів, без трекерів. Pet-проєкт, зроблений в Україні.
+Android-застосунок для добірок і автоматичної зміни шпалер. Без реклами та обов'язкового акаунта користувача. Pet-проєкт, зроблений в Україні.
+
+Поточний напрямок: надійність ротації, якість контенту, завершені колекції та власна бібліотека. Документація 4.0.11 спирається на кодову базу 4.0.10; APK на паузі. Публічний запуск і погодження джерел контенту — окремий напрямок у [Roadmap](roadmap.md).
 
 ---
 
@@ -13,10 +15,12 @@ Android-застосунок, який автоматично змінює шп�
 - **Улюблені** з подвійним тапом, окремий екран з обраним.
 - **Цільовий екран:** головний, локскрін або обидва.
 - **Сховати фото** яке не подобається — більше ніколи не з'явиться.
-- **BYO Unsplash API key** для зняття rate-limit'у.
+- **BYO Unsplash API key** — опційний власний ключ; його квота також обмежена.
+- **Колекції за настроями:** збереження на свою полицю та окреме ввімкнення в автозміну.
+- **Кеш добірок на 24 години** для повторного перегляду з меншою кількістю API-запитів.
 - **Привітання при запуску** — благословення раз на день (опційний ритуал).
 - **i18n:** українська + англійська, авто-детект з override.
-- **Локально first:** усі дані тільки в AsyncStorage пристрою.
+- **Локальне збереження вподобань і налаштувань:** AsyncStorage та Android SharedPreferences; контент завантажується з Unsplash.
 
 ---
 
@@ -36,9 +40,8 @@ Android-застосунок, який автоматично змінює шп�
 ## 🚀 Розробка
 
 ```bash
-npm install
-npx expo start            # JS-only зміни
-npx expo run:android      # повний rebuild (Kotlin / manifest / assets)
+npm ci
+npx expo start            # Metro для сумісної development-збірки
 npm run lint
 ```
 
@@ -49,14 +52,14 @@ EXPO_PUBLIC_UNSPLASH_KEY=...
 EXPO_PUBLIC_SENTRY_DSN=...
 ```
 
-Автоматичних тестів немає.
+Є 4 набори JS-регресійних тестів і native-перевірки приховування. Команди, умови запуску та порядок PR/версій — у [Розробці та випуску версій](docs/development.md). Власні Kotlin-модулі потребують відповідної збірки; звичайний Expo Go не замінює її.
 
 ---
 
 ## 📂 Структура
 
 ```
-app/         tabs (index / favorites / settings) + _layout
+app/         tabs (index / collections / favorites / settings) + _layout
 components/  UI-компоненти, SVG-іконки, категорії, blessings, LaunchGreeting
 services/    blocked, unsplashKey, unsplashTracking, galleryPermission, wallpaperService
 i18n/        locales/{uk,en}.json + init
@@ -71,10 +74,11 @@ docs/        Privacy Policy (UA+EN), feature-graphic brief
 ## 📚 Документація
 
 - [CHANGELOG.md](CHANGELOG.md) — повна історія релізів.
-- [roadmap.md](roadmap.md) — куди йдемо: Phase 3 (Beta + Unsplash submit) → 3.8.0 public launch → 3.9.0 Premium → 4.0.0 Live Wallpaper.
-- [STORE.md](STORE.md) — тексти для Play Store listing (UA + EN).
-- [LAUNCH.md](LAUNCH.md) — submission-day runbook.
-- [RELEASE.md](RELEASE.md) — інструкція по keystore.
+- [roadmap.md](roadmap.md) — єдиний актуальний план, статуси та критерії перевірки; точна копія підтримується в Obsidian.
+- [docs/development.md](docs/development.md) — актуальний порядок роботи, версій, PR і погоджених збірок.
+- [STORE.md](STORE.md) — історичні тексти магазину; перед публікацією потребують перегляду.
+- [LAUNCH.md](LAUNCH.md) — історичний сценарій запуску, не поточна інструкція.
+- [RELEASE.md](RELEASE.md) — історичні нотатки підпису, не команда створити новий ключ.
 - [docs/privacy.md](docs/privacy.md) — Політика конфіденційності (UA).
 - [docs/privacy-en.md](docs/privacy-en.md) — Privacy Policy (EN).
 
