@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeModules } from 'react-native';
 import { bumpSetWallpaperCount } from './rateApp';
 import { trackDownload } from './unsplashTracking';
+import { getBlocked } from './blocked';
 
 export type PoolItem = { id: string; url: string; downloadLocation?: string };
 export type HistoryEntry = { id: string; url: string; small?: string; target: string; appliedAt: number; downloadLocation?: string };
@@ -102,6 +103,7 @@ export const setNotificationStrings = (s: {
 // Дії з шторки (❤️/🚫), накопичені поки застосунок не відкривали.
 export const drainPendingActions = async (): Promise<{ favorites: PendingAction[]; blocked: PendingAction[] }> => {
     try {
+        await getBlocked(); // Переносимо старий pendingBlocked до очищення буфера.
         const raw: string = await WallpaperModule.drainPendingActions();
         const parsed = JSON.parse(raw || '{}');
         return { favorites: parsed.favorites ?? [], blocked: parsed.blocked ?? [] };

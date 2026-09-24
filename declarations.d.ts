@@ -27,6 +27,8 @@ declare module 'react-native' {
             setNotificationsEnabled(enabled: boolean): Promise<void>;
             setNotificationStrings(title: string, fav: string, block: string, next: string, favDone: string, channelName: string): Promise<void>;
             drainPendingActions(): Promise<string>;
+            getBlockedPhotos(legacyJson: string): Promise<string>;
+            mutateBlockedPhotos(operation: string, photosJson: string): Promise<string>;
             isIgnoringBatteryOptimization(): Promise<boolean>;
             requestIgnoreBatteryOptimization(): Promise<void>;
         };

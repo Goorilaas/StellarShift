@@ -137,13 +137,17 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
          */
         suspend fun applyWallpaper(context: Context, url: String, target: String): Bitmap {
             val bitmap = downloadBitmap(url)
+            applyBitmap(context, bitmap, target)
+            return bitmap
+        }
+
+        private fun applyBitmap(context: Context, bitmap: Bitmap, target: String) {
             if (isOurLiveWallpaper(context)) {
                 applyLockIfSeparate(context, bitmap, target)
             } else {
                 applyStatic(context, bitmap, target)
             }
             NotificationHelper.saveCurrentToFile(context, bitmap)
-            return bitmap
         }
 
         /**
@@ -172,26 +176,23 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
             // Щоденний перезбір пулу (тільки плановий тік): свіжий контент + нова
             // ротація під-запитів без відкриття застосунку. Swap-on-success.
             if (!manual) maybeRebuildPool(context, prefs)
-            val poolJson = prefs.getString("photoPool", null) ?: return false
             val target = prefs.getString("target", "both") ?: "both"
-
-            val pool = JSONArray(poolJson)
-            if (pool.length() == 0) return false
-
-            val index = prefs.getInt("poolIndex", 0)
-            val item = pool.getJSONObject(index % pool.length())
+            val item = BlockedPhotos.next(prefs) ?: return false
             val id = item.getString("id")
             val url = item.getString("url")
             val downloadLocation = item.optString("downloadLocation", "").takeIf { it.isNotBlank() }
 
-            val bitmap = applyWallpaper(context, url, target)
+            val bitmap = downloadBitmap(url)
+            synchronized(BlockedPhotos) {
+                // Фото могли приховати, поки тривало завантаження.
+                if (id in BlockedPhotos.ids(prefs)) return false
+                applyBitmap(context, bitmap, target)
+                appendPendingHistory(prefs, id, url, target)
+                BlockedPhotos.advance(prefs, id)
+                NotificationHelper.showApplied(context, bitmap, id, url)
+            }
             // Fire Unsplash download-tracking after successful apply.
             trackUnsplashDownload(context, downloadLocation)
-            appendPendingHistory(prefs, id, url, target)
-            prefs.edit().putInt("poolIndex", (index + 1) % pool.length()).apply()
-            // Нотифікація-компаньйон (no-op якщо toggle off / нема дозволу);
-            // файл уже закешований усередині applyWallpaper.
-            NotificationHelper.showApplied(context, bitmap, id, url)
             return true
         }
 
@@ -259,11 +260,7 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
             try {
                 val fresh = buildPool(prefs) ?: return
                 if (fresh.length() == 0) return
-                prefs.edit()
-                    .putString("photoPool", fresh.toString())
-                    .putInt("poolIndex", 0)
-                    .putLong("lastPoolBuild", now)
-                    .apply()
+                BlockedPhotos.replacePool(prefs, fresh, now)
             } catch (_: Exception) {
                 // лишаємо старий пул; наступна спроба за REBUILD_BACKOFF_MS
             }
@@ -276,11 +273,7 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
                 val fresh = buildPool(prefs) ?: return false
                 if (fresh.length() == 0) return false
                 currentCoroutineContext().ensureActive()
-                prefs.edit()
-                    .putString("photoPool", fresh.toString())
-                    .putInt("poolIndex", 0)
-                    .putLong("lastPoolBuild", System.currentTimeMillis())
-                    .apply()
+                BlockedPhotos.replacePool(prefs, fresh, System.currentTimeMillis())
                 true
             } catch (_: Exception) {
                 false
@@ -295,7 +288,6 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
             val key = prefs.getString("unsplashKey", null)?.takeIf { it.isNotBlank() } ?: return@withContext null
             val jobs = recipe.optJSONArray("jobs") ?: return@withContext null
             val peopleKeywords = jsonToLowerList(recipe.optJSONArray("peopleKeywords"))
-            val blocked = jsonToStringSet(recipe.optJSONArray("blockedIds"))
 
             // Розгортаємо рецепт у пласкі fetch-задачі (query, page, excludePeople).
             // Ротацію (який під-запит брати) робимо ТУТ — тож щодня інший зріз.
@@ -341,7 +333,7 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
             val pool = JSONArray()
             for (p in collected) {
                 val id = p.optString("id", "")
-                if (id.isBlank() || id in blocked || id in seen) continue
+                if (id.isBlank() || id in seen) continue
                 // ≤2 фото на автора — розбиваємо «шпалерні ферми». Favorites без
                 // поля author (порожнє) → не лімітуються.
                 val author = p.optString("author", "")
@@ -362,9 +354,6 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
             collectionIds: List<String>
         ): JSONArray? = withContext(Dispatchers.IO) {
             val key = prefs.getString("unsplashKey", null)?.takeIf { it.isNotBlank() } ?: return@withContext null
-            val blocked = try {
-                jsonToStringSet(JSONObject(prefs.getString("poolRecipe", "{}")).optJSONArray("blockedIds"))
-            } catch (_: Exception) { HashSet<String>() }
 
             // 2 випадкові сторінки на колекцію (колекції зазвичай на 100+ фото).
             val tasks = ArrayList<Pair<String, Int>>()
@@ -385,7 +374,7 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
             val pool = JSONArray()
             for (p in collected) {
                 val id = p.optString("id", "")
-                if (id.isBlank() || id in blocked || id in seen) continue
+                if (id.isBlank() || id in seen) continue
                 val author = p.optString("author", "")
                 val n = authorCount[author] ?: 0
                 if (author.isNotBlank() && n >= 2) continue
@@ -472,8 +461,6 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
             if (arr == null) emptyList() else (0 until arr.length()).map { arr.optString(it, "") }.filter { it.isNotBlank() }
 
         private fun jsonToLowerList(arr: JSONArray?): List<String> = jsonToStringList(arr).map { it.lowercase() }
-
-        private fun jsonToStringSet(arr: JSONArray?): HashSet<String> = HashSet(jsonToStringList(arr))
 
         fun schedule(context: Context, intervalMinutes: Int, wifiOnly: Boolean, chargingOnly: Boolean) {
             val constraints = Constraints.Builder()

@@ -29,7 +29,8 @@ import {
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { CATEGORIES, CATEGORY_QUERIES, Category, CHAOS_CATEGORY, CHAOS_QUERIES, FAVORITES_CATEGORY, filterNoPeople, PEOPLE_TAGS, pickCategoryQueries, sortCategoriesByLabel, subCountForMix } from '../components/categories';
-import { blockPhoto, BlockedPhoto, clearBlocked, getBlocked, getBlockedIds, setBlockedAll, unblockPhoto } from '../services/blocked';
+import { blockPhoto, BlockedPhoto, clearBlocked, getBlockedIds, restoreBlocked, unblockPhoto } from '../services/blocked';
+import { useBlockedPhotos } from '../services/useBlockedPhotos';
 import { getActiveCollections } from '../services/collectionSubs';
 import { clearUserKey, getUnsplashKey, getUserKey, setUserKey, useUnsplashKey, validateKey } from '../services/unsplashKey';
 import { openUnsplashHome } from '../services/unsplashTracking';
@@ -113,7 +114,7 @@ export default function SettingsScreen() {
     const [lwIntensity, setLwIntensity] = useState(60);
     const { toast, showToast, dismissToast } = useToastQueue();
     const [history, setHistory] = useState<HistoryEntry[]>([]);
-    const [blocked, setBlocked] = useState<BlockedPhoto[]>([]);
+    const blocked = useBlockedPhotos() ?? [];
     const [blockedSheetOpen, setBlockedSheetOpen] = useState(false);
     const [hiddenCats, setHiddenCats] = useState<string[]>([]);
     const [hiddenCatsSheetOpen, setHiddenCatsSheetOpen] = useState(false);
@@ -345,21 +346,11 @@ export default function SettingsScreen() {
             loadSettings();
             // спершу зливаємо native-буфер (WorkManager-тіки), тоді читаємо
             syncNativeHistory().then(() => getHistory().then(setHistory));
-            getBlocked().then(setBlocked);
             AsyncStorage.getItem('favorites').then(v => setFavIds(v ? JSON.parse(v) : [])).catch(() => { });
             isLiveWallpaperActive().then(setLwActive).catch(() => { });
             AsyncStorage.getItem('lw_intensity').then(v => { if (v) setLwIntensity(parseInt(v, 10)); }).catch(() => { });
             drainShadeActions().catch(() => { });
             AsyncStorage.getItem('hidden_categories').then(v => setHiddenCats(v ? JSON.parse(v) : [])).catch(() => { });
-            // Якщо catalog заблокував фото — пул автозміни треба перебудувати
-            AsyncStorage.getItem('pool_dirty').then(async dirty => {
-                if (dirty === '1' && autoChangeRef.current) {
-                    await AsyncStorage.removeItem('pool_dirty');
-                    loadAndStartRef.current();
-                } else if (dirty === '1') {
-                    await AsyncStorage.removeItem('pool_dirty');
-                }
-            });
         }, [])
     );
 
@@ -511,12 +502,12 @@ export default function SettingsScreen() {
             // Дедуп по id + ліміт ≤2 фото на автора — розбиваємо «шпалерні ферми»
             // (один автор флудить усі запити). Author беремо з сирих Unsplash-фото
             // ДО мапи в PoolItem (там автора вже нема).
-            const blockedSet = await getBlockedIds();
+            // Приховані відсіює native при збереженні пулу; джерело лишаємо для Undo.
             const seenId = new Set<string>();
             const authorCount = new Map<string, number>();
             const apiPool: PoolItem[] = [];
             for (const p of responses.flatMap(r => (r.excludePeople ? filterNoPeople(r.data) : r.data)) as any[]) {
-                if (blockedSet.has(p.id) || seenId.has(p.id)) continue;
+                if (seenId.has(p.id)) continue;
                 const author = p.user?.username ?? '';
                 const n = authorCount.get(author) ?? 0;
                 if (author && n >= 2) continue;
@@ -529,7 +520,7 @@ export default function SettingsScreen() {
             const pool: PoolItem[] = [];
             const finalSeen = new Set<string>();
             for (const p of [...favoritesPool, ...apiPool]) {
-                if (blockedSet.has(p.id) || finalSeen.has(p.id)) continue;
+                if (finalSeen.has(p.id)) continue;
                 finalSeen.add(p.id);
                 pool.push(p);
             }
@@ -765,16 +756,11 @@ export default function SettingsScreen() {
         }).catch(() => { });
     }, [lang, t]);
 
-    // Дії з шторки (❤️/🚫), накопичені поки застосунок був закритий.
-    // Blocked: native-пул уже почистив receiver — тут синхронізуємо store і перебудовуємо пул.
+    // Приховані та пул уже оновлені receiver; тут забираємо лише улюблені.
     // Favorites: тягнемо повне фото по id; офлайн → мінімальний обʼєкт, лайк не губиться.
     const drainShadeActions = async () => {
-        const { favorites: pendFav, blocked: pendBlocked } = await drainPendingActions();
-        if (pendFav.length === 0 && pendBlocked.length === 0) return;
-        for (const b of pendBlocked) {
-            await blockPhoto({ id: b.id, small: b.url });
-        }
-        if (pendBlocked.length > 0) setBlocked(await getBlocked());
+        const { favorites: pendFav } = await drainPendingActions();
+        if (pendFav.length === 0) return;
         if (pendFav.length > 0) {
             const raw = await AsyncStorage.getItem('favorites_data');
             const data: any[] = raw ? JSON.parse(raw) : [];
@@ -799,7 +785,6 @@ export default function SettingsScreen() {
                 setFavIds(data.map(p => p.id));
             }
         }
-        if (pendBlocked.length > 0 && autoChangeRef.current) loadAndStart();
         showToast(t('settings.toast.shadeSynced'));
     };
 
@@ -866,7 +851,6 @@ export default function SettingsScreen() {
         setHistMenuTarget(null);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => { });
         await blockPhoto({ id: h.id, small: h.small ?? h.url });
-        setBlocked(await getBlocked());
         // silent з улюблених, як у каталозі
         if (favIds.includes(h.id)) {
             const raw = await AsyncStorage.getItem('favorites_data');
@@ -878,8 +862,6 @@ export default function SettingsScreen() {
         }
         const isCurrent = history[0]?.id === h.id;
         if (autoChangeRef.current) {
-            // перебудувати пул БЕЗ заблокованого перед зміною, щоб воно не випало знову
-            await loadAndStart();
             if (isCurrent) {
                 // «Прибрати гидоту»: заблокував поточну → вона зникає з екрана негайно
                 try {
@@ -915,8 +897,6 @@ export default function SettingsScreen() {
     const handleUnblock = async (id: string) => {
         const removed = blocked.find(p => p.id === id);
         await unblockPhoto(id);
-        setBlocked(prev => prev.filter(p => p.id !== id));
-        if (autoChangeRef.current) loadAndStart();
         if (removed) {
             showToast(t('settings.toast.unblockedOne'), {
                 label: t('common.undo'),
@@ -927,20 +907,12 @@ export default function SettingsScreen() {
 
     const undoUnblockOne = async (photo: BlockedPhoto) => {
         dismissToast();
-        const current = await getBlocked();
-        if (current.some(p => p.id === photo.id)) return;
-        const next = [...current, photo];
-        await setBlockedAll(next);
-        setBlocked(next);
-        if (autoChangeRef.current) loadAndStart();
+        await blockPhoto(photo);
     };
 
     const confirmClearBlocked = async () => {
         setClearBlockedOpen(false);
-        const snapshot = blocked;
-        await clearBlocked();
-        setBlocked([]);
-        if (autoChangeRef.current) loadAndStart();
+        const snapshot = await clearBlocked();
         showToast(t('settings.toast.unblockedAll', { count: snapshot.length }), {
             label: t('common.undo'),
             onPress: () => undoClearBlocked(snapshot),
@@ -949,9 +921,7 @@ export default function SettingsScreen() {
 
     const undoClearBlocked = async (snapshot: BlockedPhoto[]) => {
         dismissToast();
-        await setBlockedAll(snapshot);
-        setBlocked(snapshot);
-        if (autoChangeRef.current) loadAndStart();
+        await restoreBlocked(snapshot);
     };
 
     return (

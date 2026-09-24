@@ -38,7 +38,8 @@ import { getUnsplashKey, useUnsplashKey } from '../services/unsplashKey';
 import { ICON } from '../components/icons';
 import SkeletonCard from '../components/SkeletonCard';
 import Toast, { useToastQueue } from '../components/Toast';
-import { blockPhoto as blockPhotoStore, getBlockedIds, unblockPhoto as unblockPhotoStore } from '../services/blocked';
+import { blockPhoto as blockPhotoStore, unblockPhoto as unblockPhotoStore } from '../services/blocked';
+import { useBlockedPhotos } from '../services/useBlockedPhotos';
 import { setWallpaperFromUrl } from '../services/wallpaperService';
 import { trackDownload } from '../services/unsplashTracking';
 
@@ -117,7 +118,11 @@ export default function HomeScreen() {
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [authorInfoOpen, setAuthorInfoOpen] = useState(false);
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
+  const blocked = useBlockedPhotos();
+  const blockedIds = new Set(blocked?.map(p => p.id));
+  useEffect(() => {
+    if (selectedPhoto && blocked?.some(p => p.id === selectedPhoto.id)) setSelectedPhoto(null);
+  }, [blocked, selectedPhoto]);
   const [blockConfirm, setBlockConfirm] = useState<Photo | null>(null);
   const { toast, showToast, dismissToast } = useToastQueue();
   const [searchText, setSearchText] = useState('');
@@ -221,7 +226,6 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       AsyncStorage.getItem('easter_unlocked').then(v => setChaosUnlocked(v === '1'));
-      getBlockedIds().then(setBlockedIds);
       // pin/hide перечитуємо на focus — Settings міг повернути приховані
       AsyncStorage.getItem('pinned_categories').then(v => setPinnedCats(v ? JSON.parse(v) : [])).catch(() => { });
       AsyncStorage.getItem('hidden_categories').then(v => setHiddenCats(v ? JSON.parse(v) : [])).catch(() => { });
@@ -589,7 +593,7 @@ export default function HomeScreen() {
       swipeCategory(e.translationX < 0 ? 1 : -1);
     });
 
-  const visiblePhotos = photos.filter(p => !blockedIds.has(p.id));
+  const visiblePhotos = blocked === null ? [] : photos.filter(p => !blockedIds.has(p.id));
 
   const handleBlockConfirm = async () => {
     const photo = blockConfirm;
@@ -599,7 +603,6 @@ export default function HomeScreen() {
     const wasFav = favorites.includes(photo.id);
     // Add to blocked store
     await blockPhotoStore({ id: photo.id, small: photo.urls.small });
-    setBlockedIds(prev => new Set(prev).add(photo.id));
     // Silently remove from favorites if present
     if (wasFav) {
       const raw = await AsyncStorage.getItem('favorites_data');
@@ -610,10 +613,6 @@ export default function HomeScreen() {
       await AsyncStorage.setItem('favorites', JSON.stringify(newIds));
       await AsyncStorage.setItem('favorites_data', JSON.stringify(newData));
     }
-    // Mark that autoChange pool needs rebuild — settings.tsx читає на focus
-    try {
-      await AsyncStorage.setItem('pool_dirty', '1');
-    } catch { /* ігнор */ }
     setSelectedPhoto(null);
     showToast(t('catalog.toast.blocked'), {
       label: t('common.undo'),
@@ -624,11 +623,6 @@ export default function HomeScreen() {
   const undoBlock = async (photo: Photo, wasFav: boolean) => {
     dismissToast();
     await unblockPhotoStore(photo.id);
-    setBlockedIds(prev => {
-      const next = new Set(prev);
-      next.delete(photo.id);
-      return next;
-    });
     if (wasFav) {
       const raw = await AsyncStorage.getItem('favorites_data');
       const data: Photo[] = raw ? JSON.parse(raw) : [];
@@ -640,7 +634,6 @@ export default function HomeScreen() {
         await AsyncStorage.setItem('favorites_data', JSON.stringify(newData));
       }
     }
-    try { await AsyncStorage.setItem('pool_dirty', '1'); } catch { /* ігнор */ }
     showToast(t('settings.toast.undone'));
   };
 
@@ -888,7 +881,7 @@ export default function HomeScreen() {
       )}
 
       {/* Модальне вікно */}
-      <Modal visible={!!selectedPhoto} transparent animationType="fade" onRequestClose={() => setSelectedPhoto(null)}>
+      <Modal visible={!!selectedPhoto && !blockedIds.has(selectedPhoto.id)} transparent animationType="fade" onRequestClose={() => setSelectedPhoto(null)}>
         <View style={styles.modalBg}>
 
           <Image
