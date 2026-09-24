@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
+import axios, { CanceledError } from 'axios';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
@@ -40,6 +40,7 @@ import SkeletonCard from '../components/SkeletonCard';
 import Toast, { useToastQueue } from '../components/Toast';
 import { blockPhoto as blockPhotoStore, unblockPhoto as unblockPhotoStore } from '../services/blocked';
 import { useBlockedPhotos } from '../services/useBlockedPhotos';
+import { CatalogPage, loadCatalogPage } from '../services/catalogCache';
 import { setWallpaperFromUrl } from '../services/wallpaperService';
 import { trackDownload } from '../services/unsplashTracking';
 
@@ -114,7 +115,6 @@ export default function HomeScreen() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(false);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
-  const [page, setPage] = useState(1);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [authorInfoOpen, setAuthorInfoOpen] = useState(false);
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -142,9 +142,8 @@ export default function HomeScreen() {
   const lastTapRef = useRef<number>(0);
   const catListRef = useRef<FlatList<Category>>(null);
   const abortRef = useRef<AbortController | null>(null);
-  // Активний під-запит ротаційної категорії — тримаємо стабільним для infinite
-  // scroll, перевибираємо на pull-to-refresh. Для не-ротаційних = base query.
-  const catalogQueryRef = useRef<string>('');
+  const catalogRequestRef = useRef<{ key: string; abort: AbortController } | null>(null);
+  const catalogPageRef = useRef<(CatalogPage & { viewKey: string }) | null>(null);
 
   // Easter на лого головної: tap = blessing, 3 tap = blessing + spin (без unlock — той окремо в settings)
   const logoTapCountRef = useRef(0);
@@ -255,14 +254,7 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
-    if (activeCategory.id === 'mix') {
-      loadMix();
-    } else if (activeCategory.id === 'chaos') {
-      loadChaos();
-    } else if (activeCategory.id !== 'search') {
-      catalogQueryRef.current = pickCategoryQueries(activeCategory.id, 1)[0] ?? activeCategory.query;
-      loadPhotos(catalogQueryRef.current, 1, activeCategory);
-    }
+    loadCatalog(activeCategory);
   }, [activeCategory]);
 
   const loadFavorites = async () => {
@@ -315,117 +307,89 @@ export default function HomeScreen() {
     }
   };
 
-  const loadMix = async () => {
+  const loadCatalog = async (category: Category, { refresh = false, nextPage = false } = {}) => {
+    const viewKey = JSON.stringify([category.id, category.query, !!category.excludePeople]);
+    const previous = catalogPageRef.current;
+    if (nextPage && (catalogRequestRef.current || previous?.viewKey !== viewKey || !previous.hasMore)) return;
+    const requestKey = JSON.stringify([viewKey, nextPage ? previous!.page + 1 : 'first']);
+    if (catalogRequestRef.current?.key === requestKey && !catalogRequestRef.current.abort.signal.aborted) return;
     abortRef.current?.abort();
-    abortRef.current = new AbortController();
-    setLoading(true);
-    setPhotos([]);
-    try {
-      const s = await AsyncStorage.getItem('settings');
-      const mixIds: string[] = s
-        ? (JSON.parse(s).mixCategories ?? CATEGORIES.filter(c => c.id !== 'mix').map(c => c.id))
-        : CATEGORIES.filter(c => c.id !== 'mix').map(c => c.id);
-      // Беремо subCountForMix під-запитів на категорію (легший cap ≤3, бо браузинг
-      // рефрешиться частіше за пул), далі ≤12 запитів усього → грид ~80+, не 31.
-      const per = Math.min(subCountForMix(mixIds.filter(id => id !== 'favorites').length), 3);
-      const allQueries = mixIds.flatMap(id => {
-        const subs = pickCategoryQueries(id, per);
-        return subs.length > 0 ? subs : [CATEGORIES.find(c => c.id === id)?.query].filter((q): q is string => !!q);
-      });
-      const pool = allQueries.length > 0 ? allQueries : CATEGORIES.filter(c => c.query).map(c => c.query);
-      const randomQueries = shuffle(pool).slice(0, 12);
-      const key = await getUnsplashKey();
-      const results = await Promise.all(
-        randomQueries.map(q =>
-          axios.get('https://api.unsplash.com/search/photos', {
-            params: { query: q, page: Math.ceil(Math.random() * 3), per_page: 10, orientation: 'portrait' },
-            headers: { Authorization: `Client-ID ${key}` },
-            signal: abortRef.current?.signal,
-          })
-        )
-      );
-      const flat: Photo[] = results.flatMap(r => r.data.results);
-      const filtered = filterNoPeople(flat);
-      setPhotos(shuffle(dedupAndCapByAuthor(filtered.length >= 8 ? filtered : flat)));
-    } catch (e: any) {
-      if (e?.code === 'ERR_CANCELED') return;
-      if (e?.response?.status === 403) { trigger403(); return; }
-      showToast(t(mapFetchError(e)));
-    } finally {
-      setLoading(false);
-      setIsFetchingMore(false);
-    }
-  };
-
-  const loadChaos = async () => {
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
-    setLoading(true);
-    setPhotos([]);
-    try {
-      const queries = shuffle([...CHAOS_QUERIES]).slice(0, 6);
-      const key = await getUnsplashKey();
-      const results = await Promise.all(
-        queries.map(q =>
-          axios.get('https://api.unsplash.com/search/photos', {
-            params: { query: q, page: Math.ceil(Math.random() * 3), per_page: 12, orientation: 'portrait' },
-            headers: { Authorization: `Client-ID ${key}` },
-            signal: abortRef.current?.signal,
-          })
-        )
-      );
-      const flat: Photo[] = results.flatMap(r => r.data.results);
-      const filtered = filterNoPeople(flat);
-      const dedup = dedupAndCapByAuthor(filtered.length >= 8 ? filtered : flat);
-      setPhotos(shuffle(dedup));
-    } catch (e: any) {
-      if (e?.code === 'ERR_CANCELED') return;
-      if (e?.response?.status === 403) { trigger403(); return; }
-      showToast(t(mapFetchError(e)));
-    } finally {
-      setLoading(false);
-      setIsFetchingMore(false);
-    }
-  };
-
-  const loadPhotos = async (query: string, pageNum: number, category?: Category) => {
-    if (pageNum === 1) {
+    const abort = new AbortController();
+    abortRef.current = abort;
+    const request = { key: requestKey, abort };
+    catalogRequestRef.current = request;
+    const current = () => catalogRequestRef.current === request && !abort.signal.aborted;
+    if (nextPage) setIsFetchingMore(true);
+    else {
       setLoading(true);
-      setPhotos([]);
-    } else {
-      if (isFetchingMore) return;
-      setIsFetchingMore(true);
+      setIsFetchingMore(false);
+      if (previous?.viewKey !== viewKey) { setPhotos([]); catalogPageRef.current = null; }
     }
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
     try {
-      const cat = category ?? CATEGORIES.find(c => c.query === query);
-      const perPage = cat?.excludePeople ? 30 : 20;
-      // На першому завантаженні беремо рандомну сторінку 1-3, щоб одна категорія
-      // не була завжди тими ж 30 фото. Infinite scroll далі додає послідовно.
-      const apiPage = pageNum === 1 ? Math.ceil(Math.random() * 3) : pageNum;
-      const key = await getUnsplashKey();
-      const res = await axios.get('https://api.unsplash.com/search/photos', {
-        params: { query, page: apiPage, per_page: perPage, orientation: 'portrait' },
-        headers: { Authorization: `Client-ID ${key}` },
-        signal: abortRef.current?.signal,
-      });
-      const incoming: Photo[] = res.data.results;
-      const filtered = cat?.excludePeople ? filterNoPeople(incoming) : incoming;
-      const final = cat?.excludePeople && filtered.length < 6 ? incoming : filtered;
-      if (pageNum === 1) {
-        setPhotos(final);
-      } else {
-        setPhotos(prev => [...prev, ...final]);
+      const mix = category.id === 'mix';
+      const chaos = category.id === 'chaos';
+      let mixIds: string[] = [];
+      if (mix) {
+        const s = await AsyncStorage.getItem('settings');
+        if (!current()) return;
+        const defaults = CATEGORIES.filter(c => c.id !== 'mix').map(c => c.id);
+        mixIds = s ? JSON.parse(s).mixCategories ?? defaults : defaults;
+        mixIds = [...new Set(mixIds)].sort();
       }
-      setPage(apiPage);
+      const perPage = category.excludePeople ? 30 : 20;
+      const cacheKey = nextPage
+        ? JSON.stringify(['page', previous!.query, perPage, previous!.page + 1])
+        : JSON.stringify(['first', viewKey, mixIds]);
+      const result = await loadCatalogPage(cacheKey, async () => {
+        const key = await getUnsplashKey();
+        if (!current()) throw new CanceledError('Catalog request canceled');
+        if (mix || chaos) {
+          let queries: string[];
+          if (mix) {
+            const per = Math.min(subCountForMix(mixIds.filter(id => id !== 'favorites').length), 3);
+            const all = mixIds.flatMap(id => {
+              const subs = pickCategoryQueries(id, per);
+              return subs.length ? subs : [CATEGORIES.find(c => c.id === id)?.query].filter((q): q is string => !!q);
+            });
+            queries = shuffle(all.length ? all : CATEGORIES.filter(c => c.query).map(c => c.query)).slice(0, 12);
+          } else queries = shuffle([...CHAOS_QUERIES]).slice(0, 6);
+          const results = await Promise.all(queries.map(query => axios.get('https://api.unsplash.com/search/photos', {
+            params: { query, page: Math.ceil(Math.random() * 3), per_page: mix ? 10 : 12, orientation: 'portrait' },
+            headers: { Authorization: `Client-ID ${key}` }, signal: abort.signal,
+          })));
+          const flat: Photo[] = results.flatMap(r => r.data.results);
+          const filtered = filterNoPeople(flat);
+          return { photos: shuffle(dedupAndCapByAuthor(filtered.length >= 8 ? filtered : flat)), query: '', page: 0, hasMore: false };
+        }
+        // Вибираємо під-запит і стартову сторінку лише при cache miss або ручному оновленні.
+        const query = nextPage ? previous!.query : category.id === 'search' ? category.query
+          : pickCategoryQueries(category.id, 1)[0] ?? category.query;
+        const apiPage = nextPage ? previous!.page + 1 : Math.ceil(Math.random() * 3);
+        const res = await axios.get('https://api.unsplash.com/search/photos', {
+          params: { query, page: apiPage, per_page: perPage, orientation: 'portrait' },
+          headers: { Authorization: `Client-ID ${key}` }, signal: abort.signal,
+        });
+        const incoming: Photo[] = res.data.results;
+        const filtered = category.excludePeople ? filterNoPeople(incoming) : incoming;
+        return { photos: category.excludePeople && filtered.length < 6 ? incoming : filtered, query, page: apiPage,
+          hasMore: incoming.length > 0 && apiPage < res.data.total_pages };
+      }, abort.signal, refresh);
+      if (!current()) return;
+      catalogPageRef.current = { ...result, viewKey };
+      setPhotos(prev => nextPage
+        ? [...new Map([...prev, ...result.photos].map(photo => [photo.id, photo])).values()]
+        : result.photos);
     } catch (e: any) {
-      if (e?.code === 'ERR_CANCELED') return;
+      if (!current() || e?.code === 'ERR_CANCELED') return;
       if (e?.response?.status === 403) { trigger403(); return; }
       showToast(t(mapFetchError(e)));
+    } finally {
+      if (current()) {
+        catalogRequestRef.current = null;
+        setLoading(false);
+        setIsFetchingMore(false);
+      }
     }
-    setLoading(false);
-    setIsFetchingMore(false);
   };
 
   const toggleFavorite = async (photo: Photo) => {
@@ -504,9 +468,7 @@ export default function HomeScreen() {
     const query = (q ?? searchText).trim();
     if (!query) return;
     if (q) setSearchText(q);
-    setActiveCategory({ id: 'search', labelKey: 'categories.search', label: t('categories.search'), query, icon: '' });
-    setPhotos([]);
-    loadPhotos(query, 1);
+    handleCategory({ id: 'search', labelKey: 'categories.search', label: t('categories.search'), query, icon: '' });
     // Історія: останні 5 унікальних, найсвіжіший перший
     setSearchHistory(prev => {
       const next = [query, ...prev.filter(x => x !== query)].slice(0, 5);
@@ -522,20 +484,21 @@ export default function HomeScreen() {
 
   const clearSearch = () => {
     setSearchText('');
-    setActiveCategory(CATEGORIES[0]);
+    handleCategory(CATEGORIES[0]);
   };
 
   const handleCategory = (cat: Category) => {
-    if (cat.id === activeCategory.id && cat.id === 'mix') {
-      loadMix();
+    if (cat.id === activeCategory.id && cat.query === activeCategory.query) {
+      loadCatalog(cat, { refresh: cat.id === 'mix' || cat.id === 'chaos' });
       return;
     }
-    if (cat.id === activeCategory.id && cat.id === 'chaos') {
-      loadChaos();
-      return;
-    }
+    // Скасовуємо одразу в обробнику, до effect наступного рендера.
+    abortRef.current?.abort();
+    catalogRequestRef.current = null;
+    catalogPageRef.current = null;
     setActiveCategory(cat);
     setPhotos([]);
+    setLoading(true);
   };
 
   const persistPinned = (next: string[]) => {
@@ -684,7 +647,7 @@ export default function HomeScreen() {
           ))}
         </TouchableOpacity>
         {activeCategory.id === 'mix' && (
-          <TouchableOpacity style={styles.shuffleBtn} onPress={loadMix}>
+          <TouchableOpacity style={styles.shuffleBtn} onPress={() => loadCatalog(activeCategory, { refresh: true })}>
             <SvgXml xml={`<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1,3 L3,3 Q6,3 8,7 Q6,11 3,11 L1,11" fill="none" stroke="#AFA9EC" stroke-width="1.3" stroke-linecap="round"/><path d="M10,1 L13,3 L10,5" fill="none" stroke="#AFA9EC" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M10,9 L13,11 L10,13" fill="none" stroke="#AFA9EC" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><line x1="8" y1="3" x2="13" y2="3" stroke="#AFA9EC" stroke-width="1.3" stroke-linecap="round"/><line x1="8" y1="11" x2="13" y2="11" stroke="#AFA9EC" stroke-width="1.3" stroke-linecap="round"/></svg>`} width={14} height={14} />
             <Text style={styles.shuffleBtnText}>{t('catalog.shuffle')}</Text>
           </TouchableOpacity>
@@ -811,24 +774,13 @@ export default function HomeScreen() {
             windowSize={5}
             removeClippedSubviews={true}
             onEndReached={() => {
-              if (activeCategory.id !== 'mix' && activeCategory.id !== 'chaos' && !loading) {
-                loadPhotos(catalogQueryRef.current || activeCategory.query, page + 1, activeCategory);
-              }
+              loadCatalog(activeCategory, { nextPage: true });
             }}
             onEndReachedThreshold={0.5}
             refreshControl={
               <RefreshControl
                 refreshing={loading && photos.length > 0}
-                onRefresh={() => {
-                  if (activeCategory.id === 'mix') {
-                    loadMix();
-                  } else if (activeCategory.id === 'chaos') {
-                    loadChaos();
-                  } else {
-                    catalogQueryRef.current = pickCategoryQueries(activeCategory.id, 1)[0] ?? activeCategory.query;
-                    loadPhotos(catalogQueryRef.current, 1, activeCategory);
-                  }
-                }}
+                onRefresh={() => loadCatalog(activeCategory, { refresh: true })}
                 colors={['#FFD700', '#534AB7', '#7F77DD']}
                 progressBackgroundColor="#15152a"
                 tintColor="#FFD700"
@@ -843,11 +795,7 @@ export default function HomeScreen() {
                   <Text style={styles.gridEmptySub}>{t('catalog.empty.sub')}</Text>
                   <TouchableOpacity
                     style={styles.gridEmptyCta}
-                    onPress={() => {
-                      if (activeCategory.id === 'mix') loadMix();
-                      else if (activeCategory.id === 'chaos') loadChaos();
-                      else loadPhotos(activeCategory.query, 1);
-                    }}
+                    onPress={() => loadCatalog(activeCategory, { refresh: true })}
                   >
                     <SvgXml xml={ICON.refresh} width={16} height={16} />
                     <Text style={styles.gridEmptyCtaText}>{t('catalog.empty.cta')}</Text>
