@@ -17,23 +17,35 @@ type CacheEntry<T> = { savedAt: number; value: T };
 const memory = new Map<string, CacheEntry<unknown>>();
 const pending = new Map<string, Promise<unknown>>();
 
+// Лише локальне читання: відсутній/прострочений кеш не запускає API-запит.
+async function readCache<T>(storageKey: string): Promise<T | undefined> {
+    let entry = memory.get(storageKey) as CacheEntry<T> | undefined;
+    if (!entry) {
+        try {
+            const raw = await AsyncStorage.getItem(storageKey);
+            const parsed = raw ? JSON.parse(raw) : null;
+            // За час читання диска інший споживач міг уже оновити пам’ять.
+            entry = memory.get(storageKey) as CacheEntry<T> | undefined;
+            if (!entry && parsed && typeof parsed.savedAt === 'number' && parsed.value != null) {
+                entry = parsed;
+                memory.set(storageKey, parsed);
+            }
+        } catch { /* Несправний кеш не блокує мережу. */ }
+    }
+    if (entry && Date.now() - entry.savedAt >= 0 && Date.now() - entry.savedAt < CACHE_TTL) {
+        return entry.value;
+    }
+}
+
+// Перша сторінка спільна з відкладеним запитом прев’ю та фото-гридом.
+export const getCachedCollectionPhotos = async (collectionId: string): Promise<Photo[] | null> =>
+    (await readCache<Photo[]>(`collection_cache_v1:photos:${collectionId}:1:30`)) ?? null;
+
 async function cached<T>(id: string, fetchValue: () => Promise<T>, signal?: AbortSignal): Promise<T> {
     const storageKey = `collection_cache_v1:${id}`;
     const read = async (): Promise<T> => {
-        let entry = memory.get(storageKey) as CacheEntry<T> | undefined;
-        if (!entry) {
-            try {
-                const raw = await AsyncStorage.getItem(storageKey);
-                const parsed = raw ? JSON.parse(raw) : null;
-                if (parsed && typeof parsed.savedAt === 'number' && parsed.value != null) {
-                    entry = parsed;
-                    memory.set(storageKey, parsed);
-                }
-            } catch { /* Несправний кеш не блокує мережу. */ }
-        }
-        if (entry && Date.now() - entry.savedAt >= 0 && Date.now() - entry.savedAt < CACHE_TTL) {
-            return entry.value;
-        }
+        const valueFromCache = await readCache<T>(storageKey);
+        if (valueFromCache !== undefined) return valueFromCache;
         const value = await fetchValue();
         const next = { savedAt: Date.now(), value };
         memory.set(storageKey, next);

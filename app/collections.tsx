@@ -13,7 +13,7 @@ import PhotoViewer from '../components/PhotoViewer';
 import Toast, { useToastQueue } from '../components/Toast';
 import { BlockedPhoto, filterBlockedPhotos, isBlockedCover, unblockPhoto } from '../services/blocked';
 import { useBlockedPhotos } from '../services/useBlockedPhotos';
-import { CollectionMeta, getCollectionMeta, getCollectionPhotos } from '../services/collectionService';
+import { CollectionMeta, getCachedCollectionPhotos, getCollectionMeta, getCollectionPhotos } from '../services/collectionService';
 import { fetchFirstCover, loadCoversMap, mergeMoodCovers } from '../services/moodCovers';
 import { getActiveCollections, getBookmarkedCollections, toggleActiveCollection, toggleBookmarkCollection } from '../services/collectionSubs';
 import { getFavoriteIds, toggleFavoritePhoto } from '../services/favorites';
@@ -281,7 +281,16 @@ function Row({ meta, visible, color, isBm, isAct, onBm, onAct, onOpen }: {
     const [photos, setPhotos] = useState<Photo[]>([]);
     const examples = filterBlockedPhotos(photos, blocked).slice(0, 3).map(p => p.urls.small);
     const cover = isBlockedCover(meta.cover, blocked) ? examples[0] : meta.cover;
-    // Прев’ю завантажуємо лише для видимих рядків; кеш спільний із фото-гридом.
+    // Кеш показуємо відразу після монтування, не очікуючи видимості й таймера.
+    useEffect(() => {
+        let alive = true;
+        getCachedCollectionPhotos(meta.id)
+            .then(ps => { if (alive && ps !== null) setPhotos(ps); })
+            .catch(() => { });
+        return () => { alive = false; };
+    }, [meta.id]);
+
+    // Мережеве завантаження залишається відкладеним і лише для видимих рядків.
     useEffect(() => {
         if (!visible) return;
         let alive = true;

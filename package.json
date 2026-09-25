@@ -1,7 +1,7 @@
 {
   "name": "stellarshift",
   "main": "expo-router/entry",
-  "version": "4.0.12",
+  "version": "4.0.13",
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
