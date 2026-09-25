@@ -190,7 +190,7 @@ export default function FavoritesScreen() {
                                     style={styles.authorChipAvatar}
                                 />
                             )}
-                            <View style={{ flex: 1 }}>
+                            <View style={{ flexShrink: 1 }}>
                                 <Text style={styles.authorChipName} numberOfLines={1}>
                                     {selectedPhoto.user.name}
                                 </Text>
@@ -259,8 +259,8 @@ const styles = StyleSheet.create({
     iconBtn: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(0,0,0,0.6)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' },
     closeTop: { position: 'absolute', right: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
     closeTopText: { color: '#fff', fontSize: 16 },
-    authorChip: { position: 'absolute', left: 12, right: 60, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 22, paddingVertical: 6, paddingHorizontal: 8, paddingRight: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
-    authorChipAvatar: { width: 32, height: 32, borderRadius: 16 },
-    authorChipName: { color: '#fff', fontSize: 13, fontWeight: '700' },
-    authorChipHandle: { color: '#bbb', fontSize: 11, marginTop: 1 },
+    authorChip: { position: 'absolute', left: 16, maxWidth: width - 82, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 14, padding: 8 },
+    authorChipAvatar: { width: 36, height: 36, borderRadius: 18 },
+    authorChipName: { color: '#fff', fontSize: 13, fontWeight: '600' },
+    authorChipHandle: { color: '#aaa', fontSize: 11 },
 });
