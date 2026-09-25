@@ -888,9 +888,9 @@ export default function HomeScreen() {
               onPress={() => setAuthorInfoOpen(true)}
             >
               <Image source={{ uri: selectedPhoto.user.profile_image?.small }} style={styles.authorAvatar} />
-              <View>
-                <Text style={styles.authorName}>{selectedPhoto.user.name}</Text>
-                <Text style={styles.authorUsername}>@{selectedPhoto.user.username} · Unsplash ›</Text>
+              <View style={{ flexShrink: 1 }}>
+                <Text style={styles.authorName} numberOfLines={1}>{selectedPhoto.user.name}</Text>
+                <Text style={styles.authorUsername} numberOfLines={1}>@{selectedPhoto.user.username} · Unsplash ›</Text>
               </View>
             </TouchableOpacity>
           )}
@@ -1040,7 +1040,7 @@ const styles = StyleSheet.create({
   logoBlessingText: { color: '#fff', fontSize: 20, fontWeight: '700', fontStyle: 'italic', lineHeight: 26, textAlign: 'center', width: width - 64, textShadowColor: 'rgba(0,0,0,0.95)', textShadowRadius: 12, textShadowOffset: { width: 0, height: 2 } },
   closeTop: { position: 'absolute', top: 50, right: 20, backgroundColor: 'rgba(0,0,0,0.5)', width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   closeTopText: { color: '#fff', fontSize: 16 },
-  authorRow: { position: 'absolute', top: 50, left: 16, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(0,0,0,0.55)', padding: 8, borderRadius: 14 },
+  authorRow: { position: 'absolute', top: 50, left: 16, maxWidth: width - 82, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(0,0,0,0.55)', padding: 8, borderRadius: 14 },
   authorAvatar: { width: 36, height: 36, borderRadius: 18 },
   authorName: { color: '#fff', fontSize: 13, fontWeight: '600' },
   authorUsername: { color: '#aaa', fontSize: 11 },

@@ -328,7 +328,7 @@ function Row({ meta, visible, color, isBm, isAct, onBm, onAct, onOpen }: {
 
 function PhotoGrid({ collection, top, onBack, favIds, onFav }: {
     collection: CollectionMeta; top: number; onBack: () => void;
-    favIds: string[]; onFav: (p: Photo) => void;
+    favIds: string[]; onFav: (p: Photo) => Promise<void>;
 }) {
     const { t } = useTranslation();
     const { toast, showToast, dismissToast } = useToastQueue();
@@ -370,6 +370,10 @@ function PhotoGrid({ collection, top, onBack, favIds, onFav }: {
                     photo={viewing}
                     isFav={favIds.includes(viewing.id)}
                     onClose={() => setViewing(null)}
+                    onApplied={() => {
+                        setViewing(null);
+                        showToast(t('catalog.toast.applied'));
+                    }}
                     onToggleFav={() => onFav(viewing)}
                     onBlocked={() => {
                         const id = viewing.id;

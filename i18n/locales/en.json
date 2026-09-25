@@ -235,6 +235,7 @@
       "setting": "Setting..."
     },
     "toast": {
+      "favoriteFail": "❌ Could not update favorites",
       "applied": "✅ Wallpaper set!",
       "applyFail": "❌ Failed to set wallpaper",
       "saved": "✅ Saved to gallery!",
