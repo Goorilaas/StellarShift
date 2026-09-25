@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Animated, Dimensions, Image, Modal, Pressable, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
+import { randomCheer } from '../services/cheer';
 import { blockPhoto } from '../services/blocked';
 import { savePhotoToGallery, sharePhoto } from '../services/photoActions';
 import { setWallpaperFromUrl } from '../services/wallpaperService';
@@ -20,8 +21,8 @@ const { width, height } = Dimensions.get('window');
 // (SVG-іконки, розкладка кнопок, політ серця, дабл-тап, інфо автора), логіку
 // смикає зі спільних сервісів. Окремий від каталогу навмисно (A1) — якщо міняєш
 // тут UI/кнопки/анімації, дзеркаль у каталог/улюблені. Див. memory.
-export default function PhotoViewer({ photo, isFav, onClose, onToggleFav, onBlocked }: {
-    photo: Photo; isFav: boolean; onClose: () => void; onToggleFav: () => void; onBlocked: () => void;
+export default function PhotoViewer({ photo, isFav, onClose, onToggleFav, onBlocked, onApplied }: {
+    photo: Photo; isFav: boolean; onClose: () => void; onToggleFav: () => Promise<void>; onBlocked: () => void; onApplied: () => void;
 }) {
     const insets = useSafeAreaInsets();
     const { t } = useTranslation();
@@ -34,6 +35,7 @@ export default function PhotoViewer({ photo, isFav, onClose, onToggleFav, onBloc
     const heartTranslateY = useRef(new Animated.Value(0)).current;
     const heartRotate = useRef(new Animated.Value(0)).current;
     const lastTapRef = useRef(0);
+    const favoritePending = useRef(false);
 
     // Політ серця — той самий, що в каталозі (pop + плавний підйом + легке гойдання).
     const triggerHeartAnim = () => {
@@ -69,20 +71,32 @@ export default function PhotoViewer({ photo, isFav, onClose, onToggleFav, onBloc
         const now = Date.now();
         if (now - lastTapRef.current < 350) {
             lastTapRef.current = 0;
-            if (!isFav) { onToggleFav(); triggerHeartAnim(); }
+            if (!isFav) void onFavPress();
         } else {
             lastTapRef.current = now;
         }
     };
 
-    const onFavPress = () => {
+    const onFavPress = async () => {
+        if (favoritePending.current) return;
+        favoritePending.current = true;
         const wasFav = isFav;
-        onToggleFav();
-        if (!wasFav) triggerHeartAnim();
+        try {
+            await onToggleFav();
+            if (!wasFav) {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
+                triggerHeartAnim();
+            }
+        } catch {
+            showToast(t('catalog.toast.favoriteFail'));
+        } finally {
+            favoritePending.current = false;
+        }
     };
 
     const onSet = async () => {
         setSetting(true);
+        showToast(randomCheer(t));
         try {
             const raw = await AsyncStorage.getItem('settings');
             const target = raw ? (JSON.parse(raw).applyTo ?? 'both') : 'both';
@@ -90,7 +104,7 @@ export default function PhotoViewer({ photo, isFav, onClose, onToggleFav, onBloc
                 id: photo.id, small: photo.urls.small, downloadLocation: photo.links?.download_location,
             });
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
-            showToast(t('catalog.toast.applied'));
+            onApplied();
         } catch {
             showToast(t('catalog.toast.applyFail'));
         } finally {
@@ -124,7 +138,7 @@ export default function PhotoViewer({ photo, isFav, onClose, onToggleFav, onBloc
                         {!!photo.user.profile_image?.small && (
                             <Image source={{ uri: photo.user.profile_image.small }} style={styles.authorAvatar} />
                         )}
-                        <View style={{ flex: 1 }}>
+                        <View style={{ flexShrink: 1 }}>
                             <Text style={styles.authorName} numberOfLines={1}>{photo.user.name}</Text>
                             <Text style={styles.authorUsername} numberOfLines={1}>@{photo.user.username} · Unsplash ›</Text>
                         </View>
@@ -172,7 +186,7 @@ const styles = StyleSheet.create({
     topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
     closeTop: { position: 'absolute', right: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', zIndex: 6 },
     closeTopText: { color: '#fff', fontSize: 16 },
-    authorRow: { position: 'absolute', left: 16, right: 66, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(0,0,0,0.55)', padding: 8, borderRadius: 14, zIndex: 6 },
+    authorRow: { position: 'absolute', left: 16, maxWidth: width - 82, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(0,0,0,0.55)', padding: 8, borderRadius: 14, zIndex: 6 },
     authorAvatar: { width: 36, height: 36, borderRadius: 18 },
     authorName: { color: '#fff', fontSize: 13, fontWeight: '600' },
     authorUsername: { color: '#aaa', fontSize: 11 },
