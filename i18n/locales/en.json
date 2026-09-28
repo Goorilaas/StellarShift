@@ -271,7 +271,19 @@
     }
   },
   "collections": {
-    "title": "Collections"
+    "title": "Collections",
+    "retry": "Try again",
+    "emptyPhotos": "Unsplash returned no available photos for this collection.",
+    "allHidden": "All loaded photos in this collection are hidden.",
+    "errors": {
+      "rateLimit": "The Unsplash request limit has been reached. Try later; cached collections remain available.",
+      "unavailable": "Unsplash could not find this collection or it is no longer available.",
+      "access": "Unsplash denied access to this collection’s photos. The reason is not confirmed.",
+      "auth": "Unsplash did not accept the access key. Check it in settings.",
+      "network": "Could not reach Unsplash. Check your connection and try again.",
+      "server": "Unsplash cannot load photos right now. Try later.",
+      "unknown": "Could not load photos. Try again."
+    }
   },
   "favorites": {
     "title": "Favorites",
