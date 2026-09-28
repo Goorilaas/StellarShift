@@ -6,13 +6,23 @@ import { getCollectionMeta } from './collectionService';
 // миттєвий показ між сесіями. Наповнюється: Фаза 1 (перша обкладинка) + органічно
 // при браузингу деталей (mergeMoodCovers з metas, які там і так тягнуться).
 const KEY = 'mood_covers';
+const EARTH_MOVE_KEY = 'mood_covers_earth_move_4015';
 let memo: Record<string, string[]> | null = null;
 
 export const loadCoversMap = async (): Promise<Record<string, string[]>> => {
     if (memo) return memo;
     try {
         const raw = await AsyncStorage.getItem(KEY);
-        memo = raw ? JSON.parse(raw) : {};
+        const map: Record<string, string[]> = raw ? JSON.parse(raw) : {};
+        if (await AsyncStorage.getItem(EARTH_MOVE_KEY) !== 'done') {
+            // Старі URL не містять ID колекцій: прибираємо лише кеш космічного настрою.
+            delete map.milkyway;
+            try {
+                await AsyncStorage.setItem(KEY, JSON.stringify(map));
+                await AsyncStorage.setItem(EARTH_MOVE_KEY, 'done');
+            } catch { /* Повторимо міграцію після перезапуску; поточний екран уже без старих URL. */ }
+        }
+        memo = map;
     } catch {
         memo = {};
     }
