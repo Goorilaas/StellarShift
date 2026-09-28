@@ -17,6 +17,7 @@ import { SvgXml } from 'react-native-svg';
 import { BlockedPhoto } from '../services/blocked';
 import { ICON } from './icons';
 import Toast, { ToastAction } from './Toast';
+import RestoreFeedback from './RestoreFeedback';
 
 type Props = {
     visible: boolean;
@@ -24,7 +25,7 @@ type Props = {
     onUnblock: (id: string) => void;
     onClearAll: () => void;
     onClose: () => void;
-    feedback?: { message: string; action?: ToastAction | null } | null;
+    feedback?: { message: string; action?: ToastAction | null; presentation?: 'restore' } | null;
 };
 
 export default function BlockedManagerSheet({ visible, blocked, onUnblock, onClearAll, onClose, feedback }: Props) {
@@ -83,7 +84,11 @@ export default function BlockedManagerSheet({ visible, blocked, onUnblock, onCle
                         }
                     />
                     <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-                        <Toast inline message={feedback?.message ?? null} action={feedback?.action} />
+                        {feedback?.presentation === 'restore' ? (
+                            <RestoreFeedback message={feedback.message} action={feedback.action} />
+                        ) : (
+                            <Toast inline message={feedback?.message ?? null} action={feedback?.action} />
+                        )}
                         {blocked.length > 0 && (
                             <TouchableOpacity style={styles.clearAllBtn} onPress={onClearAll}>
                                 <Text style={styles.clearAllText}>{t('blockedSheet.clearAll', { count: blocked.length })}</Text>
