@@ -19,7 +19,7 @@ export const MOODS: Mood[] = [
     {
         id: 'milkyway', name: 'Шлях чумацький', subtitle: 'Молочний Шлях, туманності, зоряне небо',
         collectionIds: ['4332580', 'WbwC4ffeUNQ', '_UYE3W-Rj7s', '3354505', 'cL2CEdP-n2E',
-            'E6tFOlBYe_A', 'mCxOIZM8G8A', 'mqgMJzgvG_U', '795671', '1595272', '894', '1538150'],
+            'mqgMJzgvG_U', '795671', '1595272', '894', '1538150'],
     },
     {
         id: 'mountains', name: 'Тиша гір', subtitle: 'туманні вершини, альпійський спокій',
@@ -76,7 +76,8 @@ export const MOODS: Mood[] = [
     {
         id: 'horizons', name: 'Обрії', subtitle: 'мандри, далекі краї, види з висоти',
         collectionIds: ['399194', '8864495', 'IcazNA_0f7E', '2141901', '1DZS3aBkRLc', 'kKxpdZb6BFM',
-            '494263', '11649432', '162468', '1166960', '2183135', '410546', '1922729', '1075856', '220381'],
+            '494263', '11649432', '162468', '1166960', '2183135', '410546', '1922729', '1075856', '220381',
+            'E6tFOlBYe_A', 'mCxOIZM8G8A'], // Planet Earth, Earth
     },
     {
         id: 'golden', name: 'Golden hour', subtitle: 'захід, світанок, тепле світло',
