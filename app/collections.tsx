@@ -14,6 +14,7 @@ import Toast, { useToastQueue } from '../components/Toast';
 import { BlockedPhoto, filterBlockedPhotos, isBlockedCover, unblockPhoto } from '../services/blocked';
 import { useBlockedPhotos } from '../services/useBlockedPhotos';
 import { CollectionMeta, getCachedCollectionPhotos, getCollectionMeta, getCollectionPhotos } from '../services/collectionService';
+import { classifyCollectionError, CollectionError } from '../services/collectionError';
 import { fetchFirstCover, loadCoversMap, mergeMoodCovers } from '../services/moodCovers';
 import { getActiveCollections, getBookmarkedCollections, toggleActiveCollection, toggleBookmarkCollection } from '../services/collectionSubs';
 import { getFavoriteIds, toggleFavoritePhoto } from '../services/favorites';
@@ -343,6 +344,8 @@ function PhotoGrid({ collection, top, onBack, favIds, onFav }: {
     const { toast, showToast, dismissToast } = useToastQueue();
     const blocked = useContext(BlockedContext);
     const [photos, setPhotos] = useState<Photo[] | null>(null);
+    const [loadError, setLoadError] = useState<CollectionError | null>(null);
+    const [retryCount, setRetryCount] = useState(0);
     const [viewing, setViewing] = useState<Photo | null>(null);
     const visiblePhotos = photos && filterBlockedPhotos(photos, blocked);
     useEffect(() => {
@@ -350,11 +353,24 @@ function PhotoGrid({ collection, top, onBack, favIds, onFav }: {
     }, [blocked, viewing]);
     useEffect(() => {
         let alive = true;
+        setPhotos(null);
+        setLoadError(null);
         getCollectionPhotos(collection.id, 1, 30)
             .then(r => { if (alive) setPhotos(r); })
-            .catch(() => { if (alive) setPhotos([]); });
+            .catch(error => {
+                if (alive) {
+                    setLoadError(classifyCollectionError(error));
+                    setPhotos([]);
+                }
+            });
         return () => { alive = false; };
-    }, [collection]);
+    }, [collection.id, retryCount]);
+
+    const retryLoad = () => {
+        setPhotos(null);
+        setLoadError(null);
+        setRetryCount(count => count + 1);
+    };
 
     return (
         <View style={styles.screen}>
@@ -364,7 +380,17 @@ function PhotoGrid({ collection, top, onBack, favIds, onFav }: {
             </View>
             {photos === null && <ActivityIndicator color="#7F77DD" style={{ marginTop: 28 }} />}
             <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 24 }}>
-                {visiblePhotos?.length === 0 && <Text style={styles.empty}>Немає доступних фото.</Text>}
+                {loadError && (
+                    <View>
+                        <Text style={styles.empty} accessibilityRole="alert">{t(`collections.errors.${loadError}`)}</Text>
+                        <Pressable style={styles.retryButton} onPress={retryLoad} accessibilityRole="button">
+                            <Text style={styles.retryText}>{t('collections.retry')}</Text>
+                        </Pressable>
+                    </View>
+                )}
+                {!loadError && visiblePhotos?.length === 0 && (
+                    <Text style={styles.empty}>{t(photos?.length ? 'collections.allHidden' : 'collections.emptyPhotos')}</Text>
+                )}
                 <View style={styles.grid}>
                     {visiblePhotos?.map(p => (
                         <Pressable key={p.id} style={styles.tile} onPress={() => setViewing(p)}>
@@ -400,6 +426,8 @@ function PhotoGrid({ collection, top, onBack, favIds, onFav }: {
 }
 
 const styles = StyleSheet.create({
+    retryButton: { alignSelf: 'flex-start', marginTop: 14, paddingVertical: 12, paddingHorizontal: 18, borderRadius: 20, backgroundColor: '#534AB7' },
+    retryText: { color: '#fff', fontSize: 14, fontWeight: '600' },
     screen: { flex: 1, backgroundColor: '#0a0a1a' },
     head: { paddingHorizontal: 16, paddingBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 10 },
     h1: { color: '#fff', fontSize: 22, fontWeight: '600' },
