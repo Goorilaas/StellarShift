@@ -116,6 +116,7 @@ export default function SettingsScreen() {
     const [history, setHistory] = useState<HistoryEntry[]>([]);
     const blocked = useBlockedPhotos() ?? [];
     const [blockedSheetOpen, setBlockedSheetOpen] = useState(false);
+    const restoringBlockedRef = useRef(new Set<string>());
     const [hiddenCats, setHiddenCats] = useState<string[]>([]);
     const [hiddenCatsSheetOpen, setHiddenCatsSheetOpen] = useState(false);
     const [favIds, setFavIds] = useState<string[]>([]);
@@ -895,13 +896,21 @@ export default function SettingsScreen() {
     };
 
     const handleUnblock = async (id: string) => {
+        if (restoringBlockedRef.current.has(id)) return;
         const removed = blocked.find(p => p.id === id);
-        await unblockPhoto(id);
-        if (removed) {
+        if (!removed) return;
+        restoringBlockedRef.current.add(id);
+        try {
+            await unblockPhoto(id);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
             showToast(t('settings.toast.unblockedOne'), {
                 label: t('common.undo'),
                 onPress: () => undoUnblockOne(removed),
             }, 5000);
+        } catch {
+            showToast(t('blockedSheet.restoreFailed'));
+        } finally {
+            restoringBlockedRef.current.delete(id);
         }
     };
 
@@ -1476,7 +1485,7 @@ export default function SettingsScreen() {
             </View>
 
         </ScrollView>
-        <Toast message={toast?.message ?? null} action={toast?.action} />
+        {!blockedSheetOpen && <Toast message={toast?.message ?? null} action={toast?.action} />}
         <ConfirmDialog
             visible={!!reapplyEntry}
             title={t('settings.dialog.reapplyTitle')}
@@ -1532,6 +1541,7 @@ export default function SettingsScreen() {
         />
         <BlockedManagerSheet
             visible={blockedSheetOpen}
+            feedback={toast}
             blocked={blocked}
             onUnblock={handleUnblock}
             onClearAll={() => { setBlockedSheetOpen(false); setClearBlockedOpen(true); }}

@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     Animated,
-    Dimensions,
     FlatList,
     Image,
     Modal,
@@ -10,15 +9,14 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
+    useWindowDimensions,
     View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import { BlockedPhoto } from '../services/blocked';
 import { ICON } from './icons';
-
-const { width, height } = Dimensions.get('window');
-const SHEET_HEIGHT = height * 0.85;
-const TILE_SIZE = (width - 18 * 2 - 12 * 2) / 3;
+import Toast, { ToastAction } from './Toast';
 
 type Props = {
     visible: boolean;
@@ -26,27 +24,29 @@ type Props = {
     onUnblock: (id: string) => void;
     onClearAll: () => void;
     onClose: () => void;
+    feedback?: { message: string; action?: ToastAction | null } | null;
 };
 
-export default function BlockedManagerSheet({ visible, blocked, onUnblock, onClearAll, onClose }: Props) {
+export default function BlockedManagerSheet({ visible, blocked, onUnblock, onClearAll, onClose, feedback }: Props) {
     const { t } = useTranslation();
-    const slide = useRef(new Animated.Value(SHEET_HEIGHT)).current;
+    const { width, height } = useWindowDimensions();
+    const insets = useSafeAreaInsets();
+    const sheetHeight = Math.min(height * 0.85, height - insets.top);
+    const tileSize = (width - 18 * 2 - 12 * 2) / 3;
+    const slide = useRef(new Animated.Value(sheetHeight)).current;
 
     useEffect(() => {
         Animated.timing(slide, {
-            toValue: visible ? 0 : SHEET_HEIGHT,
+            toValue: visible ? 0 : sheetHeight,
             duration: 240,
             useNativeDriver: true,
         }).start();
-    }, [visible, slide]);
+    }, [visible, slide, sheetHeight]);
 
     const renderItem = ({ item }: { item: BlockedPhoto }) => (
-        <View style={styles.tile}>
-            <Image source={{ uri: item.small }} style={styles.tileImg} />
-            <View style={styles.tileBadge}>
-                <SvgXml xml={ICON.blocked} width={16} height={16} />
-            </View>
-            <TouchableOpacity style={styles.unblockBtn} onPress={() => onUnblock(item.id)}>
+        <View style={[styles.tile, { width: tileSize }]}>
+            <Image source={{ uri: item.small }} style={[styles.tileImg, { width: tileSize, height: tileSize * 1.4 }]} />
+            <TouchableOpacity style={styles.unblockBtn} onPress={() => onUnblock(item.id)} accessibilityRole="button">
                 <Text style={styles.unblockText}>{t('blockedSheet.unblock')}</Text>
             </TouchableOpacity>
         </View>
@@ -54,46 +54,44 @@ export default function BlockedManagerSheet({ visible, blocked, onUnblock, onCle
 
     return (
         <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-            <Pressable style={styles.backdrop} onPress={onClose}>
-                <Animated.View
-                    style={[styles.sheet, { transform: [{ translateY: slide }] }]}
-                    onStartShouldSetResponder={() => true}
-                >
-                    <Pressable onPress={(e) => e.stopPropagation?.()}>
-                        <View style={styles.handle} />
-                        <View style={styles.header}>
-                            <Text style={styles.title}>{t('blockedSheet.title')}</Text>
-                            <TouchableOpacity onPress={onClose} style={styles.doneBtn}>
-                                <Text style={styles.doneText}>{t('common.done')}</Text>
-                            </TouchableOpacity>
-                        </View>
+            <View style={styles.backdrop}>
+                <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel={t('common.close')} />
+                <Animated.View style={[styles.sheet, { height: sheetHeight, transform: [{ translateY: slide }] }]}>
+                    <View style={styles.handle} />
+                    <View style={styles.header}>
+                        <Text style={styles.title}>{t('blockedSheet.title')}</Text>
+                        <TouchableOpacity onPress={onClose} style={styles.doneBtn}>
+                            <Text style={styles.doneText}>{t('common.done')}</Text>
+                        </TouchableOpacity>
+                    </View>
 
-                        <View style={{ height: SHEET_HEIGHT - 70 }}>
-                            {blocked.length === 0 ? (
-                                <View style={styles.emptyWrap}>
-                                    <SvgXml xml={ICON.blocked} width={56} height={56} />
-                                    <Text style={styles.emptyTitle}>{t('blockedSheet.empty.title')}</Text>
-                                    <Text style={styles.emptyText}>{t('blockedSheet.empty.sub')}</Text>
-                                </View>
-                            ) : (
-                                <>
-                                    <FlatList
-                                        data={blocked}
-                                        keyExtractor={(item) => item.id}
-                                        renderItem={renderItem}
-                                        numColumns={3}
-                                        columnWrapperStyle={{ gap: 12, paddingHorizontal: 18 }}
-                                        contentContainerStyle={{ paddingTop: 16, paddingBottom: 80, gap: 12 }}
-                                    />
-                                    <TouchableOpacity style={styles.clearAllBtn} onPress={onClearAll}>
-                                        <Text style={styles.clearAllText}>{t('blockedSheet.clearAll', { count: blocked.length })}</Text>
-                                    </TouchableOpacity>
-                                </>
-                            )}
-                        </View>
-                    </Pressable>
+                    <FlatList
+                        style={styles.list}
+                        data={blocked}
+                        keyExtractor={(item) => item.id}
+                        renderItem={renderItem}
+                        numColumns={3}
+                        removeClippedSubviews={false}
+                        columnWrapperStyle={{ gap: 12, paddingHorizontal: 18 }}
+                        contentContainerStyle={{ paddingTop: 16, paddingBottom: 16, gap: 12 }}
+                        ListEmptyComponent={
+                            <View style={styles.emptyWrap}>
+                                <SvgXml xml={ICON.blocked} width={56} height={56} />
+                                <Text style={styles.emptyTitle}>{t('blockedSheet.empty.title')}</Text>
+                                <Text style={styles.emptyText}>{t('blockedSheet.empty.sub')}</Text>
+                            </View>
+                        }
+                    />
+                    <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+                        <Toast inline message={feedback?.message ?? null} action={feedback?.action} />
+                        {blocked.length > 0 && (
+                            <TouchableOpacity style={styles.clearAllBtn} onPress={onClearAll}>
+                                <Text style={styles.clearAllText}>{t('blockedSheet.clearAll', { count: blocked.length })}</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
                 </Animated.View>
-            </Pressable>
+            </View>
         </Modal>
     );
 }
@@ -101,12 +99,13 @@ export default function BlockedManagerSheet({ visible, blocked, onUnblock, onCle
 const styles = StyleSheet.create({
     backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
     sheet: {
-        height: SHEET_HEIGHT,
         backgroundColor: '#0f0f1f',
         borderTopLeftRadius: 22, borderTopRightRadius: 22,
         borderTopWidth: 1, borderColor: '#2a2a4e',
         paddingTop: 8,
     },
+    list: { flex: 1, minHeight: 0 },
+    footer: { paddingTop: 8, paddingHorizontal: 18, borderTopWidth: 1, borderTopColor: '#1a1a2e' },
     handle: { alignSelf: 'center', width: 40, height: 4, backgroundColor: '#3a3a5e', borderRadius: 2, marginBottom: 8 },
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#1a1a2e' },
     title: { color: '#fff', fontSize: 17, fontWeight: '700' },
@@ -115,11 +114,10 @@ const styles = StyleSheet.create({
     emptyWrap: { alignItems: 'center', justifyContent: 'center', gap: 10, paddingTop: 60, paddingHorizontal: 32 },
     emptyTitle: { color: '#fff', fontSize: 16, fontWeight: '700', marginTop: 4 },
     emptyText: { color: '#7a7a90', fontSize: 13, lineHeight: 19, textAlign: 'center' },
-    tile: { width: TILE_SIZE, alignItems: 'center', position: 'relative' },
-    tileImg: { width: TILE_SIZE, height: TILE_SIZE * 1.4, borderRadius: 10, backgroundColor: '#1a1a2e' },
-    tileBadge: { position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 12, padding: 3 },
+    tile: { alignItems: 'center' },
+    tileImg: { borderRadius: 10, backgroundColor: '#1a1a2e' },
     unblockBtn: { marginTop: 6, backgroundColor: '#2a2a4e', borderRadius: 8, paddingVertical: 6, paddingHorizontal: 8, width: '100%', alignItems: 'center' },
     unblockText: { color: '#AFA9EC', fontSize: 11, fontWeight: '700' },
-    clearAllBtn: { position: 'absolute', bottom: 16, left: 18, right: 18, backgroundColor: 'rgba(204,51,85,0.15)', borderColor: '#cc3355', borderWidth: 1, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
+    clearAllBtn: { backgroundColor: 'rgba(204,51,85,0.15)', borderColor: '#cc3355', borderWidth: 1, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
     clearAllText: { color: '#cc3355', fontSize: 14, fontWeight: '700' },
 });

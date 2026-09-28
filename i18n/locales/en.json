@@ -192,7 +192,7 @@
       "favExists": "Already in favorites",
       "favFetchFail": "❌ Couldn't fetch photo data",
       "nastyGone": "🧹 Nasty one is gone!",
-      "unblockedOne": "↺ Unblocked",
+      "unblockedOne": "Beauty restored",
       "unblockedAll": "🗑 Unblocked {{count}}",
       "undone": "↺ Reverted"
     },
@@ -325,6 +325,7 @@
   "blockedSheet": {
     "title": "Hidden photos",
     "unblock": "Restore",
+    "restoreFailed": "Could not restore the photo. Try again.",
     "clearAll": "Restore all ({{count}})",
     "empty": {
       "title": "Nothing hidden",

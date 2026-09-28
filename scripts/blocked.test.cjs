@@ -124,8 +124,11 @@ test('focused screen refreshes after shade/resume and ignores older reads and un
     assert.deepEqual(updates, [['shade']]);
     events.get('change')('active');
     reads[2].resolve([{ id: 'resume' }]); await settle();
-    listener(); cleanup(); reads[3].resolve([]); await settle();
-    assert.deepEqual(updates, [['shade'], ['resume']]);
+    // Повернення фото оновлює відкриту сітку через підписку, без нового focus.
+    listener(); reads[3].resolve([]); await settle();
+    assert.deepEqual(updates, [['shade'], ['resume'], []]);
+    listener(); cleanup(); reads[4].resolve([{ id: 'late' }]); await settle();
+    assert.deepEqual(updates, [['shade'], ['resume'], []]);
     assert.equal(events.size, 0);
     assert.equal(listener, null);
 });
@@ -142,6 +145,8 @@ test('settings unblock/clear/Undo never reload Unsplash; Undo merges instead of 
     const hidden = new Map([['a', { id: 'a', small: 'a' }]]), toasts = [];
     const ctx = vm.createContext({
         blocked: [...hidden.values()], autoChangeRef: { current: true },
+        restoringBlockedRef: { current: new Set() },
+        Haptics: { impactAsync: async () => {}, ImpactFeedbackStyle: { Light: 'light' } },
         unblockPhoto: async id => hidden.delete(id),
         clearBlocked: async () => { const snapshot = [...hidden.values()]; hidden.clear(); return snapshot; },
         blockPhoto: async p => hidden.set(p.id, p), restoreBlocked: async list => list.forEach(p => hidden.set(p.id, p)),
