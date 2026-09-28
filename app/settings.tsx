@@ -906,7 +906,7 @@ export default function SettingsScreen() {
             showToast(t('settings.toast.unblockedOne'), {
                 label: t('common.undo'),
                 onPress: () => undoUnblockOne(removed),
-            }, 5000);
+            }, 5000, 'restore');
         } catch {
             showToast(t('blockedSheet.restoreFailed'));
         } finally {

@@ -3,7 +3,7 @@ import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 export type ToastAction = { label: string; onPress: () => void };
 
-type QueuedToast = { message: string; action?: ToastAction | null; duration: number };
+type QueuedToast = { message: string; action?: ToastAction | null; duration: number; presentation?: 'restore' };
 
 /**
  * FIFO toast queue. Prevents new toasts from clobbering an active one with
@@ -35,8 +35,8 @@ export function useToastQueue() {
         }, next.duration);
     }, []);
 
-    const showToast = useCallback((message: string, action?: ToastAction | null, duration = 3000) => {
-        queueRef.current.push({ message, action, duration });
+    const showToast = useCallback((message: string, action?: ToastAction | null, duration = 3000, presentation?: 'restore') => {
+        queueRef.current.push({ message, action, duration, presentation });
         if (!playingRef.current) showNext();
     }, [showNext]);
 

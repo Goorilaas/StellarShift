@@ -54,7 +54,7 @@ test('stale id does not produce false success feedback or mutate storage', async
     const { context, toasts, vibrations, writes } = setup(); await context.handleUnblock('missing');
     assert.equal(writes.length, 0); assert.equal(toasts.length, 0); assert.equal(vibrations.length, 0);
 });
-function render(blocked) {
+function render(blocked, presentation) {
     const exports = {}, jsx = (type, props) => ({ type, props });
     const mocks = {
         'react/jsx-runtime': { jsx, jsxs: jsx },
@@ -68,13 +68,13 @@ function render(blocked) {
         },
         'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 24, bottom: 20 }) },
         'react-native-svg': { SvgXml: 'SvgXml' }, './icons': { ICON: { blocked: 'existing-svg' } },
-        './Toast': { default: 'Toast' },
+        './Toast': { default: 'Toast' }, './RestoreFeedback': { default: 'RestoreFeedback' },
     };
     vm.runInNewContext(ts.transpileModule(read('components/BlockedManagerSheet.tsx'), options).outputText, {
         exports, require: name => { assert.ok(mocks[name], name); return mocks[name]; },
     });
     let closes = 0, clears = 0;
-    const restored = [], feedback = { message: 'restored', action: { label: 'undo', onPress: () => {} } };
+    const restored = [], feedback = { message: 'restored', presentation, action: { label: 'undo', onPress: () => {} } };
     const tree = exports.default({ visible: true, blocked, feedback, onClose: () => { closes++; }, onClearAll: () => { clears++; }, onUnblock: id => restored.push(id) });
     return { tree, restored, feedback, closes: () => closes, clears: () => clears };
 }
@@ -109,4 +109,12 @@ test('new list after restore has stable remaining ids; empty sheet retains feedb
     const backdrop = find(empty.tree, node => node.type === 'Pressable')[0].node;
     backdrop.props.onPress(); assert.equal(empty.closes(), 1);
     assert.equal(find(empty.tree, node => node.type === 'Toast')[0].node.props.message, 'restored');
+});
+
+test('restore presentation uses the borderless component while ordinary errors keep Toast', () => {
+    const view = render([], 'restore');
+    assert.equal(find(view.tree, node => node.type === 'Toast').length, 0);
+    const feedback = find(view.tree, node => node.type === 'RestoreFeedback')[0].node;
+    assert.equal(feedback.props.message, 'restored');
+    assert.equal(feedback.props.action, view.feedback.action);
 });
