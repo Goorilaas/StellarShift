@@ -194,7 +194,7 @@
       "favExists": "Вже в улюблених",
       "favFetchFail": "❌ Не вдалось отримати дані фото",
       "nastyGone": "🧹 Гидоту прибрано!",
-      "unblockedOne": "↺ Розблоковано",
+      "unblockedOne": "Красу повернуто",
       "unblockedAll": "🗑 Розблоковано {{count}}",
       "undone": "↺ Повернули"
     },
@@ -327,6 +327,7 @@
   "blockedSheet": {
     "title": "Сховані фото",
     "unblock": "Повернути",
+    "restoreFailed": "Не вдалося повернути фото. Спробуй ще раз.",
     "clearAll": "Розблокувати все ({{count}})",
     "empty": {
       "title": "Нічого не сховано",

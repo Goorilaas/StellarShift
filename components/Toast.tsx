@@ -60,9 +60,11 @@ export function useToastQueue() {
 export default function Toast({
     message,
     action,
+    inline = false,
 }: {
     message: string | null;
     action?: ToastAction | null;
+    inline?: boolean;
 }) {
     const opacity = useRef(new Animated.Value(0)).current;
     const translateY = useRef(new Animated.Value(20)).current;
@@ -84,7 +86,7 @@ export default function Toast({
     if (!message) return null;
     return (
         <Animated.View
-            style={[styles.toast, { opacity, transform: [{ translateY }] }]}
+            style={[styles.toast, inline && styles.inlineToast, { opacity, transform: [{ translateY }] }]}
             pointerEvents={action ? 'auto' : 'none'}
         >
             <View style={styles.row}>
@@ -100,6 +102,7 @@ export default function Toast({
 }
 
 const styles = StyleSheet.create({
+    inlineToast: { position: 'relative', bottom: 0, marginBottom: 8, maxWidth: '100%' },
     toast: {
         position: 'absolute', bottom: 90, alignSelf: 'center',
         backgroundColor: 'rgba(20,20,40,0.95)', paddingHorizontal: 22, paddingVertical: 12,
