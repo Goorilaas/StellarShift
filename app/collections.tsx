@@ -8,8 +8,9 @@ import { ActivityIndicator, BackHandler, FlatList, Image, Pressable, ScrollView,
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Photo } from '../components/categories';
 import { Mood, MOODS } from '../components/collections';
-import CollectionOrderControl from '../components/CollectionOrderControl';
-import { useCollectionOrder } from '../services/useCollectionOrder';
+import CollectionOrderControl, { CollectionOrderFeedback } from '../components/CollectionOrderControl';
+import ReorderTiles from '../components/ReorderTiles';
+import { OrderEditing, useOrderEditing } from '../services/useOrderEditing';
 import FavoriteHeart from '../components/FavoriteHeart';
 import PhotoViewer from '../components/PhotoViewer';
 import Toast, { useToastQueue } from '../components/Toast';
@@ -58,6 +59,8 @@ export default function CollectionsScreen() {
 
 function CollectionsContent() {
     const insets = useSafeAreaInsets();
+    const moodOrder = useOrderEditing('moods', MOOD_IDS);
+    const { editing: orderingMoods, cancel: cancelMoodOrder } = moodOrder;
     const [mood, setMood] = useState<Mood | null>(null);
     const [moodCover, setMoodCover] = useState<string | undefined>(undefined);
     const [collection, setCollection] = useState<CollectionMeta | null>(null);
@@ -75,12 +78,13 @@ function CollectionsContent() {
     // Системний «назад»: закриваємо найглибший рівень, не виходимо з таба.
     useEffect(() => {
         const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+            if (orderingMoods) { cancelMoodOrder(); return true; }
             if (collection) { setCollection(null); return true; }
             if (mood) { setMood(null); return true; }
             return false;
         });
         return () => sub.remove();
-    }, [collection, mood]);
+    }, [collection, mood, orderingMoods, cancelMoodOrder]);
 
     const onBm = async (id: string) => setBookmarks(await toggleBookmarkCollection(id));
     const onFav = async (p: Photo) => setFavIds(await toggleFavoritePhoto(p));
@@ -104,20 +108,24 @@ function CollectionsContent() {
             onBack={() => setCollection(null)} favIds={favIds} onFav={onFav} />;
     }
     if (mood) {
-        return <MoodDetail mood={mood} heroCover={moodCover} top={insets.top} onBack={() => setMood(null)}
+        return <MoodDetail key={mood.id} mood={mood} heroCover={moodCover} top={insets.top} onBack={() => setMood(null)}
             bookmarks={bookmarks} active={active} onBm={onBm} onAct={onAct} onOpen={setCollection} />;
     }
     return (
         <View style={styles.screen}>
             <View style={{ paddingTop: insets.top + 8, paddingHorizontal: 16, paddingBottom: 4 }}>
-                <Text style={styles.h1}>Колекції</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+                <View style={styles.titleRow}>
+                    <Text style={[styles.h1, { flex: 1 }]} numberOfLines={1}>Колекції</Text>
+                    {tab === 'moods' && <CollectionOrderControl order={moodOrder} count={MOODS.length} />}
+                </View>
+                <ScrollView horizontal pointerEvents={moodOrder.editing ? "none" : "auto"} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
                     <Chip label="Настрої" on={tab === 'moods'} onPress={() => setTab('moods')} />
                     <Chip label={`Мої колекції${bookmarks.length ? ` · ${bookmarks.length}` : ''}`} on={tab === 'mine'} onPress={() => setTab('mine')} />
                     <Chip label={`У ротації${active.length ? ` · ${active.length}` : ''}`} on={tab === 'active'} onPress={() => setTab('active')} />
                 </ScrollView>
             </View>
-            {tab === 'moods' && <Grid onPick={(m, cover) => { setMood(m); setMoodCover(cover); }} />}
+            {tab === 'moods' && <CollectionOrderFeedback order={moodOrder} />}
+            {tab === 'moods' && <Grid order={moodOrder} onPick={(m, cover) => { setMood(m); setMoodCover(cover); }} />}
             {tab === 'mine' && <Shelf ids={bookmarks} emptyMsg="Полиця порожня. Збережи колекції з настроїв — і вони з'являться тут."
                 bookmarks={bookmarks} active={active} onBm={onBm} onAct={onAct} onOpen={setCollection} />}
             {tab === 'active' && <Shelf ids={active} emptyMsg="Поки нічого не в ротації. Активуй колекцію в настрої — і вона крутитиметься тут."
@@ -134,9 +142,7 @@ function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () 
     );
 }
 
-function Grid({ onPick }: { onPick: (m: Mood, cover?: string) => void }) {
-    const order = useCollectionOrder('moods', MOOD_IDS);
-    const orderedMoods = order.ids.map(id => MOODS.find(m => m.id === id)!);
+function Grid({ onPick, order }: { onPick: (m: Mood, cover?: string) => void; order: OrderEditing }) {
     const blocked = useContext(BlockedContext);
     const [covers, setCovers] = useState<Record<string, string>>({});
 
@@ -162,30 +168,22 @@ function Grid({ onPick }: { onPick: (m: Mood, cover?: string) => void }) {
         return () => { alive = false; };
     }, []));
 
-    return (
-        <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 24 }}>
-            <CollectionOrderControl order={order} items={orderedMoods.map(m => ({ id: m.id, title: m.name }))} />
-            <View style={styles.grid}>
-                {orderedMoods.map(m => {
-                    const s = STYLE[m.id] ?? FALLBACK;
-                    const cover = isBlockedCover(covers[m.id], blocked) ? undefined : covers[m.id];
-                    return (
-                        <Pressable key={m.id} style={[styles.card, { backgroundColor: s.color }]} onPress={() => onPick(m, cover)}>
-                            {cover
-                                ? <Image source={{ uri: cover }} style={StyleSheet.absoluteFill} />
-                                : <Ionicons name={s.icon} size={60} color="rgba(255,255,255,0.13)" style={styles.motif} />}
-                            <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={styles.scrim} />
-                            <View style={styles.cardBottom}>
-                                <Text style={styles.name} numberOfLines={1}>{m.name}</Text>
-                                <Text style={styles.cardSub} numberOfLines={2}>{m.subtitle}</Text>
-                                <Text style={styles.count}>{m.collectionIds.length} колекцій</Text>
-                            </View>
-                        </Pressable>
-                    );
-                })}
-            </View>
-        </ScrollView>
-    );
+    return <ReorderTiles ids={order.ids} columns={2} fallbackHeight={132} editing={order.editing} saving={order.saving}
+        onReorder={order.reorder} onDragging={order.setDragging} renderItem={id => {
+            const m = MOODS.find(item => item.id === id)!;
+            const s = STYLE[m.id] ?? FALLBACK;
+            const cover = isBlockedCover(covers[m.id], blocked) ? undefined : covers[m.id];
+            return <Pressable style={[styles.card, { width: '100%', marginBottom: 0, backgroundColor: s.color }]} onPress={() => onPick(m, cover)}>
+                {cover ? <Image source={{ uri: cover }} style={StyleSheet.absoluteFill} />
+                    : <Ionicons name={s.icon} size={60} color="rgba(255,255,255,0.13)" style={styles.motif} />}
+                <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={styles.scrim} />
+                <View style={styles.cardBottom}>
+                    <Text style={styles.name} numberOfLines={1}>{m.name}</Text>
+                    <Text style={styles.cardSub} numberOfLines={2}>{m.subtitle}</Text>
+                    <Text style={styles.count}>{m.collectionIds.length} колекцій</Text>
+                </View>
+            </Pressable>;
+        }} />;
 }
 
 type RowProps = {
@@ -196,7 +194,7 @@ type RowProps = {
 function MoodDetail({ mood, heroCover, top, onBack, bookmarks, active, onBm, onAct, onOpen }:
     RowProps & { mood: Mood; heroCover?: string; top: number; onBack: () => void }) {
     const [metas, setMetas] = useState<CollectionMeta[] | null>(null);
-    const order = useCollectionOrder(`mood:${mood.id}`, mood.collectionIds);
+    const order = useOrderEditing(`mood:${mood.id}`, mood.collectionIds);
     const orderedMetas = metas && order.ids.flatMap(id => metas.filter(meta => meta.id === id));
     const color = colorFor(mood.id);
     const s = STYLE[mood.id] ?? FALLBACK;
@@ -220,11 +218,16 @@ function MoodDetail({ mood, heroCover, top, onBack, bookmarks, active, onBm, onA
     return (
         <View style={styles.screen}>
             <View style={[styles.head, { paddingTop: top + 8 }]}>
-                <Pressable onPress={onBack} hitSlop={12}><Ionicons name="arrow-back" size={24} color="#fff" /></Pressable>
+                <Pressable onPress={order.editing ? order.cancel : onBack} disabled={order.saving} hitSlop={12}><Ionicons name="arrow-back" size={24} color="#fff" /></Pressable>
                 <Text style={styles.h2} numberOfLines={1}>{mood.name}</Text>
+                <CollectionOrderControl order={order} orbit count={orderedMetas?.length ?? 0} />
             </View>
-            <CollectionList metas={orderedMetas} color={color} bookmarks={bookmarks} active={active}
-                onBm={onBm} onAct={onAct} onOpen={onOpen} header={<>
+            <CollectionOrderFeedback order={order} orbit />
+            <ReorderTiles ids={(orderedMetas ?? []).map(meta => meta.id)} fallbackHeight={124} editing={order.editing} saving={order.saving}
+                onReorder={order.reorder} onDragging={order.setDragging}
+                renderItem={(id, visible) => <View style={{ marginBottom: -10 }}><Row meta={orderedMetas!.find(meta => meta.id === id)!}
+                    visible={visible} color={color} isBm={bookmarks.includes(id)} isAct={active.includes(id)}
+                    onBm={onBm} onAct={onAct} onOpen={onOpen} /></View>} header={<>
                 <View style={[styles.band, { backgroundColor: color }]}>
                     {hero
                         ? <Image source={{ uri: hero }} style={StyleSheet.absoluteFill} />
@@ -233,9 +236,6 @@ function MoodDetail({ mood, heroCover, top, onBack, bookmarks, active, onBm, onA
                     <Text style={styles.bandSub} numberOfLines={2}>{mood.subtitle}</Text>
                 </View>
                 <Text style={styles.section}>Колекції авторів</Text>
-                <CollectionOrderControl order={order} items={order.ids.map(id => ({
-                    id, title: metas?.find(meta => meta.id === id)?.title || `Unsplash · ${id}`,
-                }))} />
                 {mood.collectionIds.length === 0 && (
                     <Text style={styles.empty}>Збираємо власноруч — скоро тут з&apos;являться добірки.</Text>
                 )}
@@ -440,6 +440,7 @@ const styles = StyleSheet.create({
     retryButton: { alignSelf: 'flex-start', marginTop: 14, paddingVertical: 12, paddingHorizontal: 18, borderRadius: 20, backgroundColor: '#534AB7' },
     retryText: { color: '#fff', fontSize: 14, fontWeight: '600' },
     screen: { flex: 1, backgroundColor: '#0a0a1a' },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     head: { paddingHorizontal: 16, paddingBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 10 },
     h1: { color: '#fff', fontSize: 22, fontWeight: '600' },
     h2: { color: '#fff', fontSize: 18, fontWeight: '600', flex: 1 },

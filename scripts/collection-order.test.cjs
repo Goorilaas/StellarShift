@@ -67,63 +67,6 @@ function nodes(tree) {
     if (Array.isArray(tree)) return tree.flatMap(nodes);
     return [tree, ...nodes(tree.props?.children)];
 }
-function editor(onSave) {
-    const state = [], refs = []; let si, ri, closed = 0, haptics = 0;
-    const { order } = storage();
-    const component = load('components/CollectionOrderEditor.tsx', {
-        react: {
-            useState: init => { const i = si++; if (!(i in state)) state[i] = typeof init === 'function' ? init() : init; return [state[i], value => { state[i] = typeof value === 'function' ? value(state[i]) : value; }]; },
-            useRef: init => { const i = ri++; return refs[i] ?? (refs[i] = { current: init }); }, useEffect: () => {},
-        }, 'react/jsx-runtime': { jsx, jsxs: jsx },
-        'react-native': { Modal: 'Modal', View: 'View', Text: 'Text', Pressable: 'Pressable', ScrollView: 'ScrollView', StyleSheet: { create: x => x } },
-        'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
-        'react-i18next': { useTranslation: () => ({ t: key => key }) },
-        'expo-haptics': { ImpactFeedbackStyle: { Light: 'light' }, impactAsync: async () => { haptics++; } },
-        '../services/collectionOrder': order,
-    }, { setInterval, clearInterval });
-    const render = () => { si = 0; ri = 0; return component.default({ items: [{ id: 'a', title: 'A' }, { id: 'b', title: 'B' }], onSave, onClose: () => { closed++; } }); };
-    const done = tree => nodes(tree).find(n => n.type === 'Pressable' && n.props.children?.props?.children === 'common.done');
-    return { render, done, state, get closed() { return closed; }, get haptics() { return haptics; } };
-}
-test('Done awaits persistence, prevents double save/back while pending, then gives one haptic', async () => {
-    let finish, writes = 0;
-    const e = editor(() => { writes++; return new Promise(resolve => { finish = resolve; }); });
-    const tree = e.render();
-    const save = e.done(tree).props.onPress();
-    await e.done(tree).props.onPress(); tree.props.onRequestClose();
-    assert.equal(writes, 1); assert.equal(e.haptics, 0); assert.equal(e.closed, 0);
-    finish(); await save; assert.equal(e.haptics, 1);
-});
-test('save failure keeps draft, reports error, does not vibrate and can retry', async () => {
-    let fail = true;
-    const e = editor(async () => { if (fail) throw new Error('full'); });
-    let tree = e.render();
-    nodes(tree).find(n => typeof n.type === 'function' && n.props.index === 0).props.onStep(1);
-    tree = e.render(); await e.done(tree).props.onPress();
-    tree = e.render();
-    assert.deepEqual(plain(e.state[0]), ['b', 'a']);
-    assert.ok(nodes(tree).some(n => n.props?.accessibilityRole === 'alert'));
-    assert.equal(e.haptics, 0); assert.equal(e.closed, 0);
-    fail = false; await e.done(tree).props.onPress(); assert.equal(e.haptics, 1);
-});
-test('Cancel discards draft without storage write or success feedback', () => {
-    let writes = 0;
-    const e = editor(async () => { writes++; });
-    const tree = e.render();
-    nodes(tree).find(n => typeof n.type === 'function' && n.props.index === 0).props.onStep(1);
-    nodes(tree).find(n => n.type === 'Pressable' && n.props.children?.props?.children === 'common.cancel').props.onPress();
-    assert.equal(writes, 0); assert.equal(e.closed, 1); assert.equal(e.haptics, 0);
-});
-test('drag release moves the row; interrupted drag leaves the order unchanged', () => {
-    const e = editor(async () => {});
-    let tree = e.render();
-    let row = nodes(tree).find(n => typeof n.type === 'function' && n.props.index === 0);
-    row.props.onStart(100); row.props.onMove(100, 200); row.props.onCancel();
-    assert.deepEqual(plain(e.state[0]), ['a', 'b']);
-    tree = e.render(); row = nodes(tree).find(n => typeof n.type === 'function' && n.props.index === 0);
-    row.props.onStart(100); row.props.onMove(100, 200); row.props.onEnd();
-    assert.deepEqual(plain(e.state[0]), ['b', 'a']);
-});
 function constellation(animated) {
     const effects = [], started = [], stopped = [];
     const animation = config => ({ ...config, start() { started.push(config); }, stop() { stopped.push(config); } });
@@ -168,38 +111,148 @@ test('stars settle with stagger then connecting line appears; all motion uses na
     assert.equal(branches[3].children[1].useNativeDriver, true);
     cleanup(); assert.equal(stopped.length, 1);
 });
-test('control closes editor and starts success feedback only after order persistence succeeds', async () => {
-    const states = [], opacity = [];
-    let stateIndex = 0, finish;
-    const component = load('components/CollectionOrderControl.tsx', {
+const tiles = load('services/tileOrder.ts', {});
+test('two-column slots preserve image-sized cards and hit-test across columns and rows', () => {
+    const ids = ['a', 'b', 'c', 'd'];
+    const layout = tiles.tilePositions(ids, 312, 2, {}, 132);
+    assert.deepEqual(plain(layout.positions.b), { x: 162, y: 0, width: 150, height: 132 });
+    assert.equal(layout.positions.c.y, 144);
+    assert.equal(tiles.nearestTile(ids, layout.positions, 237, 210), 3);
+    assert.equal(tiles.nearestTile(ids, layout.positions, -40, -40), 0);
+    assert.equal(layout.height, 288);
+});
+test('single-column layout uses measured card heights; relayout at narrow widths stays inside screen', () => {
+    const layout = tiles.tilePositions(['a', 'b', 'c'], 280, 1, { a: 150, b: 170 }, 124);
+    assert.equal(layout.positions.b.y, 162);
+    assert.equal(layout.positions.c.y, 344);
+    assert.equal(layout.positions.c.width, 280);
+    assert.equal(tiles.nearestTile(['a', 'b', 'c'], layout.positions, 140, 900), 2);
+});
+test('reordering visible cards retains unavailable collection ids in their slots', () => {
+    assert.deepEqual(plain(tiles.mergeVisibleOrder(['a', 'missing', 'b', 'c'], ['c', 'a', 'b'])), ['c', 'missing', 'a', 'b']);
+});
+function editingHarness(saveImpl = async () => {}) {
+    let stateIndex = 0, refIndex = 0;
+    const state = [], refs = [], focusEffects = [], calls = [], haptics = [];
+    const order = { ids: ['a', 'b', 'c'], ready: true, save: async ids => { calls.push(plain(ids)); await saveImpl(ids); order.ids = [...ids]; } };
+    const hook = load('services/useOrderEditing.ts', {
         react: {
-            useState: value => { const i = stateIndex++; return [value, next => states.push({ i, next })]; },
-            useRef: current => ({ current }), useEffect: () => {},
-        }, 'react/jsx-runtime': { jsx, jsxs: jsx },
-        'react-native': { View: 'View', Text: 'Text', Pressable: 'Pressable', StyleSheet: { create: x => x }, Animated: { Value: class { setValue(value) { opacity.push(value); } } } },
-        'react-i18next': { useTranslation: () => ({ t: key => key }) },
-        './CollectionOrderEditor': { default: 'Editor' }, './OrderConstellation': { default: 'Constellation' },
-    }).default;
-    // Open editor using state setter, then rerender with editing=true.
-    const mocksTree = component({ order: { ready: true, save: () => new Promise(resolve => { finish = resolve; }) }, items: [{ id: 'a' }, { id: 'b' }] });
-    assert.ok(nodes(mocksTree).some(n => n.type === 'Constellation'));
-    // Handler integration is covered below by extracting the actual callback from the component AST.
-    const source = fs.readFileSync(path.join(__dirname, '../components/CollectionOrderControl.tsx'), 'utf8');
-    const ast = ts.createSourceFile('control.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-    let handler;
-    function visit(node) {
-        if (ts.isJsxAttribute(node) && node.name.getText(ast) === 'onSave') handler = node.initializer.expression.getText(ast);
-        ts.forEachChild(node, visit);
-    }
-    visit(ast);
-    const events = [];
-    const context = vm.createContext({ order: { save: () => new Promise(resolve => { finish = resolve; }) }, setEditing: value => events.push(['editing', value]), opacity: { setValue: value => events.push(['opacity', value]) }, setSuccess: () => events.push(['success']) });
-    vm.runInContext(ts.transpileModule(`globalThis.save = ${handler}`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context);
-    const pending = context.save(['b', 'a']); assert.equal(events.length, 0);
+            useState: initial => { const i = stateIndex++; if (!(i in state)) state[i] = initial; return [state[i], value => { state[i] = typeof value === 'function' ? value(state[i]) : value; }]; },
+            useRef: current => { const i = refIndex++; return refs[i] ?? (refs[i] = { current }); }, useCallback: callback => callback,
+        },
+        'expo-router': { useFocusEffect: fn => { focusEffects.push(fn); } },
+        'react-native': { BackHandler: { addEventListener: (_event, fn) => { back = fn; return { remove() {} }; } } },
+        'expo-haptics': { ImpactFeedbackStyle: { Light: 'light' }, impactAsync: async () => { haptics.push(true); } },
+        './tileOrder': tiles, './useCollectionOrder': { useCollectionOrder: () => order },
+    }).useOrderEditing;
+    let back;
+    function render() { stateIndex = 0; refIndex = 0; focusEffects.length = 0; return hook('moods', ['a', 'b', 'c']); }
+    return { render, state, calls, haptics, focusEffects, back: () => back() };
+}
+test('editing keeps changes as draft, system Back cancels without persistence or haptic', () => {
+    const h = editingHarness(); let api = h.render(); api.start(); api = h.render();
+    api.reorder(['c', 'a', 'b']); api = h.render();
+    assert.deepEqual(plain(api.ids), ['c', 'a', 'b']);
+    h.focusEffects[1](); assert.equal(h.back(), true);
+    api = h.render(); assert.equal(api.editing, false); assert.deepEqual(plain(api.ids), ['a', 'b', 'c']);
+    assert.equal(h.calls.length, 0); assert.equal(h.haptics.length, 0);
+});
+test('Done awaits successful persistence and guards duplicate presses; cancellation cannot interrupt save', async () => {
+    let finish;
+    const h = editingHarness(() => new Promise(resolve => { finish = resolve; }));
+    let api = h.render(); api.start(); api = h.render(); api.reorder(['b', 'a', 'c']); api = h.render();
+    const pending = api.save(); await api.save(); api.cancel();
+    assert.equal(h.calls.length, 1); assert.equal(h.haptics.length, 0); assert.equal(h.render().editing, true);
     finish(); await pending;
-    assert.deepEqual(events, [['editing', false], ['opacity', 0], ['success']]);
-    events.length = 0;
-    context.order.save = async () => { throw new Error('full'); };
-    await assert.rejects(context.save(['a', 'b']), /full/);
-    assert.equal(events.length, 0);
+    api = h.render(); assert.equal(api.editing, false); assert.equal(api.success, 1); assert.equal(h.haptics.length, 1);
+    assert.deepEqual(plain(api.ids), ['b', 'a', 'c']);
+});
+test('failed save retains tile order in edit mode; retry succeeds', async () => {
+    let fail = true;
+    const h = editingHarness(async () => { if (fail) throw new Error('full'); });
+    let api = h.render(); api.start(); api = h.render(); api.reorder(['c', 'b', 'a']); api = h.render();
+    await api.save(); api = h.render();
+    assert.equal(api.editing, true); assert.equal(api.saveError, true); assert.equal(api.success, 0); assert.equal(h.haptics.length, 0);
+    assert.deepEqual(plain(api.ids), ['c', 'b', 'a']);
+    fail = false; await api.save(); assert.equal(h.render().editing, false); assert.equal(h.haptics.length, 1);
+});
+test('Done is ignored while dragging; losing focus discards unsaved changes', async () => {
+    const h = editingHarness(); let api = h.render(); const blur = h.focusEffects[0]();
+    api.start(); api = h.render(); api.setDragging(true); api = h.render(); await api.save();
+    assert.equal(h.calls.length, 0); blur(); api = h.render(); assert.equal(api.editing, false); assert.equal(api.dragging, false);
+});
+test('orbit uses approved planet/satellite geometry and one native rotation that stops on unmount', () => {
+    let effect, started = false, stopped = false, config;
+    const component = load('components/OrderOrbit.tsx', {
+        react: { useRef: current => ({ current }), useEffect: fn => { effect = fn; } },
+        'react/jsx-runtime': { jsx, jsxs: jsx },
+        'react-native': { View: 'View', StyleSheet: { absoluteFill: {} }, Easing: { bezier: () => 'easing' }, Animated: {
+            View: 'AnimatedView', Value: class { setValue() {} interpolate(value) { return value; } },
+            timing: (_value, options) => { config = options; return { start() { started = true; }, stop() { stopped = true; } }; },
+        } }, 'react-native-svg': { default: 'Svg', Path: 'Path', Circle: 'Circle' },
+    }).default;
+    const tree = component({ animated: true }); const cleanup = effect();
+    assert.equal(nodes(tree).filter(n => n.type === 'Circle').length, 3);
+    assert.equal(config.duration, 750); assert.equal(config.useNativeDriver, true); assert.equal(started, true);
+    cleanup(); assert.equal(stopped, true);
+});
+test('header button starts editing or confirms current draft; orbit is selected for inner collections', async () => {
+    let starts = 0, saves = 0;
+    const component = load('components/CollectionOrderControl.tsx', {
+        react: {}, 'react/jsx-runtime': { jsx, jsxs: jsx },
+        'react-i18next': { useTranslation: () => ({ t: key => key }) },
+        'react-native': { Pressable: 'Pressable', View: 'View', Text: 'Text', StyleSheet: { create: x => x } },
+        './OrderConstellation': { default: 'Constellation' }, './OrderOrbit': { default: 'Orbit' },
+    }).default;
+    const order = { ready: true, editing: false, start: () => { starts++; }, save: async () => { saves++; } };
+    let tree = component({ order, orbit: true, count: 3 }); tree.props.onPress();
+    assert.equal(starts, 1); assert.ok(nodes(tree).some(n => n.type === 'Orbit'));
+    order.editing = true; tree = component({ order, orbit: true, count: 3 }); await tree.props.onPress();
+    assert.equal(saves, 1); assert.ok(nodes(tree).some(n => n.type === 'Text' && n.props.children === 'common.done'));
+    assert.equal(nodes(tree).some(n => n.type === 'Modal'), false);
+});
+function tileHarness() {
+    let si = 0, ri = 0, ids = ['a', 'b', 'c', 'd', 'e', 'f'];
+    const state = [312, {}, 0, 200, 0, null], refs = [], timers = new Map(), changes = [], scrolls = [], dragging = [];
+    const { order } = storage();
+    class ValueXY { constructor(value) { this.value = value; } setValue(value) { this.value = value; } }
+    const component = load('components/ReorderTiles.tsx', {
+        react: {
+            useState: initial => { const i = si++; if (!(i in state)) state[i] = initial; return [state[i], next => { state[i] = typeof next === 'function' ? next(state[i]) : next; }]; },
+            useRef: current => { const i = ri++; return refs[i] ?? (refs[i] = { current }); }, useMemo: fn => fn(), useEffect: () => {},
+        }, 'react/jsx-runtime': { jsx, jsxs: jsx },
+        'react-native': { View: 'View', ScrollView: 'ScrollView', StyleSheet: { create: x => x }, Animated: { ValueXY } },
+        'react-native-gesture-handler': { Gesture: { Native: () => ({}) }, GestureDetector: 'GestureDetector' },
+        'expo-haptics': { ImpactFeedbackStyle: { Light: 'light' }, impactAsync: async () => {} },
+        '../services/collectionOrder': order, '../services/tileOrder': tiles,
+    }, { setInterval: fn => { timers.set(1, fn); return 1; }, clearInterval: id => timers.delete(id) }).default;
+    function render() {
+        si = 0; ri = 0;
+        const tree = component({ ids, columns: 2, fallbackHeight: 132, editing: true, saving: false,
+            onReorder: next => { ids = [...next]; changes.push(plain(next)); }, onDragging: value => dragging.push(value), renderItem: id => jsx('ImageCard', { id }),
+        });
+        nodes(tree).find(n => n.type === 'ScrollView').props.ref.current = { scrollTo: value => scrolls.push(value.y) };
+        return tree;
+    }
+    return { render, timers, changes, scrolls, dragging, ids: () => ids };
+}
+test('actual tile drag callbacks shift neighboring slots, cancel restores draft, and timers stop', () => {
+    const h = tileHarness(); const tree = h.render();
+    const tile = nodes(tree).find(n => typeof n.type === 'function');
+    tile.props.onBegin(80); tile.props.onMove(162, 144, 80);
+    assert.deepEqual(h.ids(), ['b', 'c', 'd', 'a', 'e', 'f']);
+    h.render(); tile.props.onEnd(false);
+    assert.deepEqual(h.ids(), ['a', 'b', 'c', 'd', 'e', 'f']);
+    assert.equal(h.timers.size, 0); assert.deepEqual(h.dragging, [true, false]);
+});
+test('edge drag scrolls within content bounds and successful drop retains new order', () => {
+    const h = tileHarness(); const tile = nodes(h.render()).find(n => typeof n.type === 'function');
+    tile.props.onBegin(195); tile.props.onMove(0, 80, 195);
+    const tick = h.timers.get(1);
+    for (let i = 0; i < 50; i++) tick();
+    assert.ok(h.scrolls.length > 0);
+    assert.ok(h.scrolls.every(y => y >= 0 && y <= 256));
+    assert.equal(h.scrolls.at(-1), 256);
+    const beforeDrop = [...h.ids()]; tile.props.onEnd(true);
+    assert.deepEqual(h.ids(), beforeDrop); assert.equal(h.timers.size, 0);
 });
