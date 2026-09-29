@@ -1,54 +1,53 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useCollectionOrder } from '../services/useCollectionOrder';
-import CollectionOrderEditor from './CollectionOrderEditor';
+import { OrderEditing } from '../services/useOrderEditing';
 import OrderConstellation from './OrderConstellation';
+import OrderOrbit from './OrderOrbit';
 
-export default function CollectionOrderControl({ order, items }: {
-    order: ReturnType<typeof useCollectionOrder>; items: { id: string; title: string }[];
-}) {
+type Props = { order: OrderEditing; orbit?: boolean; count: number };
+export default function CollectionOrderControl({ order, orbit = false, count }: Props) {
     const { t } = useTranslation();
-    const [editing, setEditing] = useState(false);
-    const [success, setSuccess] = useState(0);
+    const Symbol = orbit ? OrderOrbit : OrderConstellation;
+    const disabled = !order.ready || order.saving || order.dragging || (!order.editing && count < 2);
+    return <Pressable disabled={disabled && !order.error} onPress={order.error ? order.retry : order.editing ? order.save : order.start}
+        style={styles.button} accessibilityRole="button" accessibilityState={{ disabled }}>
+        <View style={[styles.buttonContent, disabled && styles.disabled]}>
+            <Symbol size={22} />
+            <Text style={styles.link}>{t(order.error ? 'collections.retry' : order.saving ? 'collectionOrder.saving' : order.editing ? 'common.done' : 'collectionOrder.title')}</Text>
+        </View>
+    </Pressable>;
+}
+
+export function CollectionOrderFeedback({ order, orbit = false }: { order: OrderEditing; orbit?: boolean }) {
+    const { t } = useTranslation();
+    const Symbol = orbit ? OrderOrbit : OrderConstellation;
     const opacity = useRef(new Animated.Value(0)).current;
+    const clear = useRef(order.clearSuccess);
+    clear.current = order.clearSuccess;
     useEffect(() => {
-        if (!success) return;
+        if (!order.success) return;
+        opacity.setValue(0);
         const animation = Animated.sequence([
             Animated.timing(opacity, { toValue: 1, duration: 250, useNativeDriver: true }),
             Animated.delay(1800),
             Animated.timing(opacity, { toValue: 0, duration: 400, useNativeDriver: true }),
         ]);
-        animation.start(({ finished }) => { if (finished) setSuccess(0); });
+        animation.start(({ finished }) => { if (finished) clear.current(); });
         return () => animation.stop();
-    }, [success, opacity]);
-    return <View style={styles.wrap}>
-        {order.error ? <Pressable onPress={order.retry} style={styles.button} accessibilityRole="button">
-            <Text style={styles.link}>{t('collectionOrder.loadError')}</Text>
-        </Pressable> : <Pressable disabled={!order.ready || items.length < 2} onPress={() => setEditing(true)} style={styles.button} accessibilityRole="button">
-            <View style={[styles.buttonContent, (!order.ready || items.length < 2) && styles.disabled]}>
-                <OrderConstellation size={22} />
-                <Text style={styles.link}>{t('collectionOrder.title')}</Text>
-            </View>
-        </Pressable>}
-        {!!success && <Animated.View style={[styles.feedback, { opacity }]} pointerEvents="none">
-            <OrderConstellation key={success} animated />
-            <Text accessibilityLiveRegion="polite" style={styles.success}>{t('collectionOrder.success')}</Text>
-        </Animated.View>}
-        {editing && <CollectionOrderEditor items={items} onClose={() => setEditing(false)} onSave={async ids => {
-            await order.save(ids);
-            setEditing(false);
-            opacity.setValue(0);
-            setSuccess(n => n + 1);
-        }} />}
-    </View>;
+    }, [order.success, opacity]);
+    if (order.saveError || order.error) return <Text accessibilityRole="alert" style={styles.error}>{t(order.saveError ? 'collectionOrder.saveError' : 'collectionOrder.loadError')}</Text>;
+    if (!order.success) return null;
+    return <Animated.View style={[styles.feedback, { opacity }]} pointerEvents="none">
+        <Symbol key={order.success} animated />
+        <Text accessibilityLiveRegion="polite" style={styles.success}>{t('collectionOrder.success')}</Text>
+    </Animated.View>;
 }
 const styles = StyleSheet.create({
-    wrap: { paddingHorizontal: 12, paddingBottom: 8 },
-    button: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-end' },
-    buttonContent: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    feedback: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, minHeight: 54 },
-    link: { color: '#AFA9EC', fontSize: 15 },
-    disabled: { opacity: 0.4 },
-    success: { flexShrink: 1, textShadowColor: 'rgba(0,0,0,0.95)', textShadowRadius: 12, textShadowOffset: { width: 0, height: 2 }, color: '#fff', fontSize: 20, fontWeight: '700', fontStyle: 'italic', textAlign: 'center' },
+    button: { minHeight: 44, justifyContent: 'center', flexShrink: 0 },
+    buttonContent: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    feedback: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, minHeight: 54, paddingHorizontal: 12 },
+    link: { color: '#AFA9EC', fontSize: 14 }, disabled: { opacity: 0.4 },
+    error: { color: '#ffafaf', padding: 12 },
+    success: { flexShrink: 1, color: '#fff', fontSize: 20, fontWeight: '700', fontStyle: 'italic', textAlign: 'center' },
 });
