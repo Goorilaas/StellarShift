@@ -368,5 +368,15 @@
     "rain": "Rain",
     "rural": "Countryside",
     "search": "🔍 Search"
+  },
+  "collectionOrder": {
+    "title": "Reorder",
+    "hint": "Drag a title into place. Swipe to the right of the titles to scroll.",
+    "saving": "Saving…",
+    "saveError": "Could not save the order. Try again — your changes are still here.",
+    "loadError": "Could not load the order. Try again",
+    "success": "Everything in its place",
+    "up": "Up",
+    "down": "Down"
   }
 }

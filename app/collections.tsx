@@ -8,6 +8,8 @@ import { ActivityIndicator, BackHandler, FlatList, Image, Pressable, ScrollView,
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Photo } from '../components/categories';
 import { Mood, MOODS } from '../components/collections';
+import CollectionOrderControl from '../components/CollectionOrderControl';
+import { useCollectionOrder } from '../services/useCollectionOrder';
 import FavoriteHeart from '../components/FavoriteHeart';
 import PhotoViewer from '../components/PhotoViewer';
 import Toast, { useToastQueue } from '../components/Toast';
@@ -43,6 +45,7 @@ const STYLE: Record<string, { color: string; icon: IconName }> = {
     alpenglow: { color: '#C24A2E', icon: 'partly-sunny-outline' },
     treasure: { color: '#7A5A14', icon: 'diamond-outline' },
 };
+const MOOD_IDS = MOODS.map(mood => mood.id);
 const FALLBACK = { color: '#2A2350', icon: 'images-outline' as IconName };
 const colorFor = (moodId: string) => (STYLE[moodId] ?? FALLBACK).color;
 const BlockedContext = createContext<BlockedPhoto[]>([]);
@@ -132,6 +135,8 @@ function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () 
 }
 
 function Grid({ onPick }: { onPick: (m: Mood, cover?: string) => void }) {
+    const order = useCollectionOrder('moods', MOOD_IDS);
+    const orderedMoods = order.ids.map(id => MOODS.find(m => m.id === id)!);
     const blocked = useContext(BlockedContext);
     const [covers, setCovers] = useState<Record<string, string>>({});
 
@@ -159,8 +164,9 @@ function Grid({ onPick }: { onPick: (m: Mood, cover?: string) => void }) {
 
     return (
         <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 24 }}>
+            <CollectionOrderControl order={order} items={orderedMoods.map(m => ({ id: m.id, title: m.name }))} />
             <View style={styles.grid}>
-                {MOODS.map(m => {
+                {orderedMoods.map(m => {
                     const s = STYLE[m.id] ?? FALLBACK;
                     const cover = isBlockedCover(covers[m.id], blocked) ? undefined : covers[m.id];
                     return (
@@ -190,6 +196,8 @@ type RowProps = {
 function MoodDetail({ mood, heroCover, top, onBack, bookmarks, active, onBm, onAct, onOpen }:
     RowProps & { mood: Mood; heroCover?: string; top: number; onBack: () => void }) {
     const [metas, setMetas] = useState<CollectionMeta[] | null>(null);
+    const order = useCollectionOrder(`mood:${mood.id}`, mood.collectionIds);
+    const orderedMetas = metas && order.ids.flatMap(id => metas.filter(meta => meta.id === id));
     const color = colorFor(mood.id);
     const s = STYLE[mood.id] ?? FALLBACK;
     const blocked = useContext(BlockedContext);
@@ -215,7 +223,7 @@ function MoodDetail({ mood, heroCover, top, onBack, bookmarks, active, onBm, onA
                 <Pressable onPress={onBack} hitSlop={12}><Ionicons name="arrow-back" size={24} color="#fff" /></Pressable>
                 <Text style={styles.h2} numberOfLines={1}>{mood.name}</Text>
             </View>
-            <CollectionList metas={metas} color={color} bookmarks={bookmarks} active={active}
+            <CollectionList metas={orderedMetas} color={color} bookmarks={bookmarks} active={active}
                 onBm={onBm} onAct={onAct} onOpen={onOpen} header={<>
                 <View style={[styles.band, { backgroundColor: color }]}>
                     {hero
@@ -225,6 +233,9 @@ function MoodDetail({ mood, heroCover, top, onBack, bookmarks, active, onBm, onA
                     <Text style={styles.bandSub} numberOfLines={2}>{mood.subtitle}</Text>
                 </View>
                 <Text style={styles.section}>Колекції авторів</Text>
+                <CollectionOrderControl order={order} items={order.ids.map(id => ({
+                    id, title: metas?.find(meta => meta.id === id)?.title || `Unsplash · ${id}`,
+                }))} />
                 {mood.collectionIds.length === 0 && (
                     <Text style={styles.empty}>Збираємо власноруч — скоро тут з&apos;являться добірки.</Text>
                 )}
