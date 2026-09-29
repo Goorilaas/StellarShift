@@ -124,3 +124,82 @@ test('drag release moves the row; interrupted drag leaves the order unchanged', 
     row.props.onStart(100); row.props.onMove(100, 200); row.props.onEnd();
     assert.deepEqual(plain(e.state[0]), ['b', 'a']);
 });
+function constellation(animated) {
+    const effects = [], started = [], stopped = [];
+    const animation = config => ({ ...config, start() { started.push(config); }, stop() { stopped.push(config); } });
+    const component = load('components/OrderConstellation.tsx', {
+        react: { useRef: current => ({ current }), useEffect: effect => { effects.push(effect); } },
+        'react/jsx-runtime': { jsx, jsxs: jsx },
+        'react-native': {
+            View: 'View', StyleSheet: { absoluteFill: {} }, Easing: { bezier: (...values) => values },
+            Animated: {
+                View: 'AnimatedView', Value: class { constructor(value) { this.value = value; } setValue(value) { this.value = value; } interpolate(config) { return { config }; } },
+                timing: (value, config) => animation({ type: 'timing', value, ...config }),
+                delay: duration => animation({ type: 'delay', duration }),
+                sequence: children => animation({ type: 'sequence', children }),
+                parallel: children => animation({ type: 'parallel', children }),
+            },
+        },
+        'react-native-svg': { default: 'Svg', Circle: 'Circle', Path: 'Path' },
+    }).default;
+    const tree = component({ animated });
+    const cleanup = effects[0]();
+    return { tree, started, stopped, cleanup };
+}
+test('approved constellation has three stars, three white centers and a connecting path; button icon stays still', () => {
+    const { tree, started } = constellation(false);
+    const all = nodes(tree);
+    assert.equal(all.filter(n => n.type === 'Circle').length, 3);
+    assert.equal(all.filter(n => n.type === 'Path').length, 4);
+    assert.equal(all.find(n => n.type === 'Path').props.d, 'M6 23 L16 7 L26 19');
+    assert.equal(tree.props.style.width, 32);
+    assert.equal(tree.props.style.borderWidth, undefined);
+    assert.equal(started.length, 0);
+});
+test('stars settle with stagger then connecting line appears; all motion uses native driver and stops on unmount', () => {
+    const { started, stopped, cleanup } = constellation(true);
+    assert.equal(started.length, 1);
+    const branches = started[0].children;
+    assert.deepEqual(plain(branches.slice(0, 3).map(b => b.children[0].duration)), [0, 70, 140]);
+    assert.ok(branches.slice(0, 3).every(b => b.children[1].duration === 550 && b.children[1].useNativeDriver));
+    assert.equal(branches[3].children[0].duration, 500);
+    assert.equal(branches[3].children[1].toValue, 0.65);
+    assert.equal(branches[3].children[1].duration, 250);
+    assert.equal(branches[3].children[1].useNativeDriver, true);
+    cleanup(); assert.equal(stopped.length, 1);
+});
+test('control closes editor and starts success feedback only after order persistence succeeds', async () => {
+    const states = [], opacity = [];
+    let stateIndex = 0, finish;
+    const component = load('components/CollectionOrderControl.tsx', {
+        react: {
+            useState: value => { const i = stateIndex++; return [value, next => states.push({ i, next })]; },
+            useRef: current => ({ current }), useEffect: () => {},
+        }, 'react/jsx-runtime': { jsx, jsxs: jsx },
+        'react-native': { View: 'View', Text: 'Text', Pressable: 'Pressable', StyleSheet: { create: x => x }, Animated: { Value: class { setValue(value) { opacity.push(value); } } } },
+        'react-i18next': { useTranslation: () => ({ t: key => key }) },
+        './CollectionOrderEditor': { default: 'Editor' }, './OrderConstellation': { default: 'Constellation' },
+    }).default;
+    // Open editor using state setter, then rerender with editing=true.
+    const mocksTree = component({ order: { ready: true, save: () => new Promise(resolve => { finish = resolve; }) }, items: [{ id: 'a' }, { id: 'b' }] });
+    assert.ok(nodes(mocksTree).some(n => n.type === 'Constellation'));
+    // Handler integration is covered below by extracting the actual callback from the component AST.
+    const source = fs.readFileSync(path.join(__dirname, '../components/CollectionOrderControl.tsx'), 'utf8');
+    const ast = ts.createSourceFile('control.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    let handler;
+    function visit(node) {
+        if (ts.isJsxAttribute(node) && node.name.getText(ast) === 'onSave') handler = node.initializer.expression.getText(ast);
+        ts.forEachChild(node, visit);
+    }
+    visit(ast);
+    const events = [];
+    const context = vm.createContext({ order: { save: () => new Promise(resolve => { finish = resolve; }) }, setEditing: value => events.push(['editing', value]), opacity: { setValue: value => events.push(['opacity', value]) }, setSuccess: () => events.push(['success']) });
+    vm.runInContext(ts.transpileModule(`globalThis.save = ${handler}`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context);
+    const pending = context.save(['b', 'a']); assert.equal(events.length, 0);
+    finish(); await pending;
+    assert.deepEqual(events, [['editing', false], ['opacity', 0], ['success']]);
+    events.length = 0;
+    context.order.save = async () => { throw new Error('full'); };
+    await assert.rejects(context.save(['a', 'b']), /full/);
+    assert.equal(events.length, 0);
+});
