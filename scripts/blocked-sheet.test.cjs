@@ -68,6 +68,7 @@ function render(blocked, presentation) {
         },
         'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 24, bottom: 20 }) },
         'react-native-svg': { SvgXml: 'SvgXml' }, './icons': { ICON: { blocked: 'existing-svg' } },
+        '../services/useSheetDismiss': { useSheetDismiss: () => ({ slide: 0, panHandlers: { onMoveShouldSetResponder: () => true } }) },
         './Toast': { default: 'Toast' }, './RestoreFeedback': { default: 'RestoreFeedback' },
     };
     vm.runInNewContext(ts.transpileModule(read('components/BlockedManagerSheet.tsx'), options).outputText, {
@@ -117,4 +118,13 @@ test('restore presentation uses the borderless component while ordinary errors k
     const feedback = find(view.tree, node => node.type === 'RestoreFeedback')[0].node;
     assert.equal(feedback.props.message, 'restored');
     assert.equal(feedback.props.action, view.feedback.action);
+});
+
+test('drag responder belongs to the handle only, not to the grid or its ancestors', () => {
+    const { tree } = render([{ id: 'a', small: 'a' }]);
+    const handle = find(tree, node => !!node.props?.onMoveShouldSetResponder);
+    assert.equal(handle.length, 1);
+    assert.equal(handle[0].node.props.style.height, 44);
+    const { ancestors } = find(tree, node => node.type === 'FlatList')[0];
+    assert.ok(ancestors.every(node => !node.props?.onMoveShouldSetResponder));
 });

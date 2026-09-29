@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     Animated,
@@ -14,6 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
+import { useSheetDismiss } from '../services/useSheetDismiss';
 import { BlockedPhoto } from '../services/blocked';
 import { ICON } from './icons';
 import Toast, { ToastAction } from './Toast';
@@ -34,15 +34,7 @@ export default function BlockedManagerSheet({ visible, blocked, onUnblock, onCle
     const insets = useSafeAreaInsets();
     const sheetHeight = Math.min(height * 0.85, height - insets.top);
     const tileSize = (width - 18 * 2 - 12 * 2) / 3;
-    const slide = useRef(new Animated.Value(sheetHeight)).current;
-
-    useEffect(() => {
-        Animated.timing(slide, {
-            toValue: visible ? 0 : sheetHeight,
-            duration: 240,
-            useNativeDriver: true,
-        }).start();
-    }, [visible, slide, sheetHeight]);
+    const { slide, panHandlers } = useSheetDismiss(visible, sheetHeight, onClose);
 
     const renderItem = ({ item }: { item: BlockedPhoto }) => (
         <View style={[styles.tile, { width: tileSize }]}>
@@ -58,7 +50,9 @@ export default function BlockedManagerSheet({ visible, blocked, onUnblock, onCle
             <View style={styles.backdrop}>
                 <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel={t('common.close')} />
                 <Animated.View style={[styles.sheet, { height: sheetHeight, transform: [{ translateY: slide }] }]}>
-                    <View style={styles.handle} />
+                    <View style={styles.handleTouch} {...panHandlers}>
+                        <View style={styles.handle} />
+                    </View>
                     <View style={styles.header}>
                         <Text style={styles.title}>{t('blockedSheet.title')}</Text>
                         <TouchableOpacity onPress={onClose} style={styles.doneBtn}>
@@ -111,7 +105,8 @@ const styles = StyleSheet.create({
     },
     list: { flex: 1, minHeight: 0 },
     footer: { paddingTop: 8, paddingHorizontal: 18, borderTopWidth: 1, borderTopColor: '#1a1a2e' },
-    handle: { alignSelf: 'center', width: 40, height: 4, backgroundColor: '#3a3a5e', borderRadius: 2, marginBottom: 8 },
+    handleTouch: { height: 44, justifyContent: 'center', alignItems: 'center' },
+    handle: { alignSelf: 'center', width: 40, height: 4, backgroundColor: '#3a3a5e', borderRadius: 2 },
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#1a1a2e' },
     title: { color: '#fff', fontSize: 17, fontWeight: '700' },
     doneBtn: { paddingVertical: 6, paddingHorizontal: 12 },
