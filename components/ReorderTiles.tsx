@@ -1,9 +1,9 @@
 import * as Haptics from 'expo-haptics';
-import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { ReactNode, RefObject, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, ScrollView, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { moveItem } from '../services/collectionOrder';
-import { nearestTile, tilePositions, TilePosition } from '../services/tileOrder';
+import { edgeScrollStep, nearestTile, tilePositions, TilePosition } from '../services/tileOrder';
 
 type Drag = { id: string; ids: string[]; positions: Record<string, TilePosition>; from: number; target: number; offset: number; dx: number; dy: number; screenY: number };
 type Props = {
@@ -23,25 +23,28 @@ export default function ReorderTiles({ ids, columns = 1, fallbackHeight, editing
     const top = useRef(0);
     const offset = useRef(0);
     const drag = useRef<Drag | null>(null);
-    const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+    const frame = useRef<number | null>(null);
+    const requestedOffset = useRef(0);
+    const releasePosition = useRef({ x: 0, y: 0 });
+    const scrollOffset = useRef(new Animated.Value(0)).current;
     const movement = useRef(new Animated.ValueXY()).current;
     const native = useMemo(() => Gesture.Native(), []);
     const layout = tilePositions(ids, width, columns, heights, fallbackHeight);
     const current = useRef({ ids, layout, editing, saving, onReorder, onDragging, headerHeight, viewportHeight });
     current.current = { ids, layout, editing, saving, onReorder, onDragging, headerHeight, viewportHeight };
-    const stopTimer = () => { if (timer.current) clearInterval(timer.current); timer.current = null; };
-    useEffect(() => () => stopTimer(), []);
+    const stopScroll = () => { if (frame.current !== null) cancelAnimationFrame(frame.current); frame.current = null; };
+    useEffect(() => () => stopScroll(), []);
     useEffect(() => {
-        if (!editing || saving) { stopTimer(); drag.current = null; setActive(null); }
+        if (!editing || saving) { stopScroll(); drag.current = null; setActive(null); }
     }, [editing, saving]);
 
-    const update = () => {
+    const updateTarget = () => {
         const d = drag.current;
         if (!d || !current.current.editing) return;
         const start = d.positions[d.id];
         const x = start.x + d.dx;
         const y = start.y + d.dy + offset.current - d.offset;
-        movement.setValue({ x, y });
+        releasePosition.current = { x, y };
         const target = nearestTile(d.ids, d.positions, x + start.width / 2, y + start.height / 2);
         if (target !== d.target) {
             d.target = target;
@@ -53,26 +56,35 @@ export default function ReorderTiles({ ids, columns = 1, fallbackHeight, editing
         if (!c.editing || c.saving || drag.current) return;
         const p = c.layout.positions[id];
         drag.current = { id, ids: [...c.ids], positions: c.layout.positions, from: c.ids.indexOf(id), target: c.ids.indexOf(id), offset: offset.current, dx: 0, dy: 0, screenY };
-        movement.setValue({ x: p.x, y: p.y });
+        // The dragged tile stays under the finger while native scrolling moves its parent.
+        movement.setValue({ x: p.x, y: p.y - offset.current });
+        releasePosition.current = { x: p.x, y: p.y };
+        requestedOffset.current = offset.current;
         setActive(id); c.onDragging(true);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-        timer.current = setInterval(() => {
+        let previousTime: number | null = null;
+        const tick = (time: number) => {
             const d = drag.current, latest = current.current;
             if (!d) return;
-            const step = d.screenY < top.current + 64 ? -10 : d.screenY > top.current + latest.viewportHeight - 64 ? 10 : 0;
+            const elapsed = previousTime === null ? 0 : time - previousTime;
+            previousTime = time;
+            const step = edgeScrollStep(d.screenY, top.current, latest.viewportHeight, elapsed);
             const max = Math.max(0, latest.headerHeight + latest.layout.height + 24 - latest.viewportHeight);
-            const next = Math.max(0, Math.min(max, offset.current + step));
-            if (next !== offset.current) {
-                offset.current = next;
+            const next = Math.max(0, Math.min(max, requestedOffset.current + step));
+            if (next !== requestedOffset.current) {
+                requestedOffset.current = next;
                 scroll.current?.scrollTo({ y: next, animated: false });
-                setScrollY(next); update();
             }
-        }, 32);
+            frame.current = requestAnimationFrame(tick);
+        };
+        frame.current = requestAnimationFrame(tick);
     };
     const finish = (id: string, success: boolean) => {
         const d = drag.current;
         if (!d || d.id !== id) return;
-        stopTimer();
+        stopScroll();
+        updateTarget();
+        setScrollY(offset.current);
         if (!success && current.current.editing) current.current.onReorder(d.ids);
         drag.current = null;
         setActive(null); current.current.onDragging(false);
@@ -82,31 +94,45 @@ export default function ReorderTiles({ ids, columns = 1, fallbackHeight, editing
         viewport.current?.measureInWindow((_x, y) => { top.current = y; });
     }}>
         <GestureDetector gesture={native}>
-            <ScrollView ref={scroll} scrollEnabled={!active && !saving} removeClippedSubviews={false}
+            <Animated.ScrollView ref={scroll} scrollEnabled={!active && !saving} removeClippedSubviews={false}
                 contentContainerStyle={styles.content} scrollEventThrottle={16}
-                onScroll={e => { offset.current = e.nativeEvent.contentOffset.y; setScrollY(offset.current); }}>
+                onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollOffset } } }], {
+                    useNativeDriver: true,
+                    listener: (e: { nativeEvent: { contentOffset: { y: number } } }) => {
+                        offset.current = e.nativeEvent.contentOffset.y;
+                        if (drag.current) updateTarget();
+                        else setScrollY(offset.current);
+                    },
+                })}>
                 <View onLayout={e => setHeaderHeight(e.nativeEvent.layout.height)}>{header}</View>
                 <View onLayout={e => setWidth(e.nativeEvent.layout.width)} style={{ height: layout.height }}>
                     {width > 0 && ids.map(id => {
                         const position = layout.positions[id];
                         const visible = position.y + headerHeight < scrollY + viewportHeight && position.y + headerHeight + position.height > scrollY;
                         return <MovingTile key={id} position={position} editing={editing} saving={saving} active={id === active}
-                            movement={movement} native={native}
+                            movement={movement} scrollOffset={scrollOffset} releasePosition={releasePosition} native={native}
                             onHeight={height => setHeights(old => old[id] === height ? old : { ...old, [id]: height })}
                             onBegin={y => begin(id, y)} onMove={(dx, dy, y) => {
-                                if (drag.current?.id === id) { Object.assign(drag.current, { dx, dy, screenY: y }); update(); }
+                                const d = drag.current;
+                                if (d?.id === id) {
+                                    Object.assign(d, { dx, dy, screenY: y });
+                                    const start = d.positions[id];
+                                    movement.setValue({ x: start.x + dx, y: start.y + dy - d.offset });
+                                    updateTarget();
+                                }
                             }} onEnd={success => finish(id, success)}>
                             {renderItem(id, visible && !editing)}
                         </MovingTile>;
                     })}
                 </View>
-            </ScrollView>
+            </Animated.ScrollView>
         </GestureDetector>
     </View>;
 }
 
-function MovingTile({ position, editing, saving, active, movement, native, onHeight, onBegin, onMove, onEnd, children }: {
+function MovingTile({ position, editing, saving, active, movement, scrollOffset, releasePosition, native, onHeight, onBegin, onMove, onEnd, children }: {
     position: TilePosition; editing: boolean; saving: boolean; active: boolean; movement: Animated.ValueXY;
+    scrollOffset: Animated.Value; releasePosition: RefObject<{ x: number; y: number }>;
     native: ReturnType<typeof Gesture.Native>; onHeight: (height: number) => void;
     onBegin: (y: number) => void; onMove: (dx: number, dy: number, y: number) => void; onEnd: (success: boolean) => void; children: ReactNode;
 }) {
@@ -119,23 +145,14 @@ function MovingTile({ position, editing, saving, active, movement, native, onHei
         .onStart(e => callbacks.current.onBegin(e.absoluteY))
         .onUpdate(e => callbacks.current.onMove(e.translationX, e.translationY, e.absoluteY))
         .onFinalize((_e, success) => callbacks.current.onEnd(success)), [editing, saving, native]);
-    const latestPosition = useRef(position);
-    latestPosition.current = position;
-    const lastDrag = useRef({ x: position.x, y: position.y });
     const wasActive = useRef(false);
+    const dragY = useMemo(() => Animated.add(movement.y, scrollOffset), [movement, scrollOffset]);
     useEffect(() => {
-        if (!active) return;
-        wasActive.current = true;
-        lastDrag.current = { x: latestPosition.current.x, y: latestPosition.current.y };
-        const listener = movement.addListener(value => { lastDrag.current = value; });
-        return () => movement.removeListener(listener);
-    }, [active, movement]);
-    useEffect(() => {
-        if (active) { location.stopAnimation(); return; }
-        if (wasActive.current) { location.setValue(lastDrag.current); wasActive.current = false; }
+        if (active) { wasActive.current = true; location.stopAnimation(); return; }
+        if (wasActive.current) { location.setValue(releasePosition.current); wasActive.current = false; }
         const animation = Animated.spring(location, { toValue: { x: position.x, y: position.y }, useNativeDriver: true, speed: 22, bounciness: 0, isInteraction: false });
         animation.start(); return () => animation.stop();
-    }, [position.x, position.y, active, location]);
+    }, [position.x, position.y, active, location, releasePosition]);
     useEffect(() => {
         wobble.setValue(0);
         if (!editing || saving || active) return;
@@ -149,7 +166,7 @@ function MovingTile({ position, editing, saving, active, movement, native, onHei
     return <GestureDetector gesture={pan}>
         <Animated.View style={{ position: 'absolute', left: 0, top: 0, width: position.width,
             zIndex: active ? 100 : 0, elevation: active ? 12 : 0,
-            transform: [...(active ? movement : location).getTranslateTransform(), { scale: active ? 1.04 : 1 }, { rotate: wobble.interpolate({ inputRange: [-1, 1], outputRange: ['-0.7deg', '0.7deg'] }) }],
+            transform: [...(active ? [{ translateX: movement.x }, { translateY: dragY }] : location.getTranslateTransform()), { scale: active ? 1.04 : 1 }, { rotate: wobble.interpolate({ inputRange: [-1, 1], outputRange: ['-0.7deg', '0.7deg'] }) }],
         }}>
             <View onLayout={e => onHeight(e.nativeEvent.layout.height)} pointerEvents={editing ? 'none' : 'auto'}>{children}</View>
         </Animated.View>
