@@ -27,3 +27,12 @@ export function mergeVisibleOrder(all: readonly string[], visible: readonly stri
     let index = 0;
     return all.map(id => moving.has(id) ? visible[index++] : id);
 }
+
+// Pixels per frame: approach the edge gradually; cap long JS stalls to avoid jumps.
+export function edgeScrollStep(screenY: number, top: number, height: number, elapsedMs: number): number {
+    const zone = Math.min(64, height / 2);
+    if (zone <= 0) return 0;
+    const up = Math.max(0, Math.min(1, (top + zone - screenY) / zone));
+    const down = Math.max(0, Math.min(1, (screenY - (top + height - zone)) / zone));
+    return (down - up) * 360 * Math.max(0, Math.min(32, elapsedMs)) / 1000;
+}

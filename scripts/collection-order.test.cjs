@@ -211,48 +211,132 @@ test('header button starts editing or confirms current draft; orbit is selected 
     assert.equal(saves, 1); assert.ok(nodes(tree).some(n => n.type === 'Text' && n.props.children === 'common.done'));
     assert.equal(nodes(tree).some(n => n.type === 'Modal'), false);
 });
-function tileHarness() {
-    let si = 0, ri = 0, ids = ['a', 'b', 'c', 'd', 'e', 'f'];
-    const state = [312, {}, 0, 200, 0, null], refs = [], timers = new Map(), changes = [], scrolls = [], dragging = [];
+function tileHarness(columns = 2) {
+    let si = 0, ri = 0, ei = 0, ids = ['a', 'b', 'c', 'd', 'e', 'f'], clock = 0, frameId = 0;
+    const effects = [];
+    const state = [312, {}, 0, 200, 0, null], refs = [], frames = new Map(), changes = [], scrolls = [], dragging = [], writes = [];
     const { order } = storage();
-    class ValueXY { constructor(value) { this.value = value; } setValue(value) { this.value = value; } }
+    class Value { constructor(value = 0) { this.value = value; } setValue(value) { this.value = value; } }
+    class ValueXY {
+        constructor() { this.x = new Value(); this.y = new Value(); }
+        setValue({ x, y }) { this.x.setValue(x); this.y.setValue(y); }
+    }
     const component = load('components/ReorderTiles.tsx', {
         react: {
-            useState: initial => { const i = si++; if (!(i in state)) state[i] = initial; return [state[i], next => { state[i] = typeof next === 'function' ? next(state[i]) : next; }]; },
-            useRef: current => { const i = ri++; return refs[i] ?? (refs[i] = { current }); }, useMemo: fn => fn(), useEffect: () => {},
+            useState: initial => { const i = si++; if (!(i in state)) state[i] = initial; return [state[i], next => { writes.push(i); state[i] = typeof next === 'function' ? next(state[i]) : next; }]; },
+            useRef: current => { const i = ri++; return refs[i] ?? (refs[i] = { current }); }, useMemo: fn => fn(),
+            useEffect: (fn, deps) => {
+                const i = ei++, old = effects[i];
+                if (!old || deps.some((value, index) => value !== old.deps[index])) {
+                    old?.cleanup?.(); effects[i] = { deps, cleanup: fn() };
+                }
+            },
         }, 'react/jsx-runtime': { jsx, jsxs: jsx },
-        'react-native': { View: 'View', ScrollView: 'ScrollView', StyleSheet: { create: x => x }, Animated: { ValueXY } },
+        'react-native': { View: 'View', StyleSheet: { create: x => x }, Animated: {
+            ValueXY, Value, ScrollView: 'ScrollView',
+            event: (mapping, options) => {
+                assert.equal(options.useNativeDriver, true);
+                return e => { mapping[0].nativeEvent.contentOffset.y.setValue(e.nativeEvent.contentOffset.y); options.listener(e); };
+            },
+        } },
         'react-native-gesture-handler': { Gesture: { Native: () => ({}) }, GestureDetector: 'GestureDetector' },
         'expo-haptics': { ImpactFeedbackStyle: { Light: 'light' }, impactAsync: async () => {} },
         '../services/collectionOrder': order, '../services/tileOrder': tiles,
-    }, { setInterval: fn => { timers.set(1, fn); return 1; }, clearInterval: id => timers.delete(id) }).default;
+    }, {
+        requestAnimationFrame: fn => { frames.set(++frameId, fn); return frameId; },
+        cancelAnimationFrame: id => frames.delete(id),
+    }).default;
+    let scrollProps;
     function render() {
-        si = 0; ri = 0;
-        const tree = component({ ids, columns: 2, fallbackHeight: 132, editing: true, saving: false,
+        si = 0; ri = 0; ei = 0;
+        const tree = component({ ids, columns, fallbackHeight: 132, editing: true, saving: false,
             onReorder: next => { ids = [...next]; changes.push(plain(next)); }, onDragging: value => dragging.push(value), renderItem: id => jsx('ImageCard', { id }),
         });
-        nodes(tree).find(n => n.type === 'ScrollView').props.ref.current = { scrollTo: value => scrolls.push(value.y) };
+        scrollProps = nodes(tree).find(n => n.type === 'ScrollView').props;
+        scrollProps.ref.current = { scrollTo: value => scrolls.push(value.y) };
         return tree;
     }
-    return { render, timers, changes, scrolls, dragging, ids: () => ids };
+    const report = y => scrollProps.onScroll({ nativeEvent: { contentOffset: { y } } });
+    function tick(ms = 16, acknowledge = true) {
+        clock += ms;
+        const pending = [...frames.values()]; frames.clear(); pending.forEach(fn => fn(clock));
+        if (acknowledge && scrolls.length) report(scrolls.at(-1));
+    }
+    return { render, frames, changes, scrolls, dragging, writes, tick, report, ids: () => ids, unmount: () => effects.forEach(e => e.cleanup?.()) };
 }
-test('actual tile drag callbacks shift neighboring slots, cancel restores draft, and timers stop', () => {
+test('actual tile drag callbacks shift neighboring slots, cancel restores draft, and frames stop', () => {
     const h = tileHarness(); const tree = h.render();
     const tile = nodes(tree).find(n => typeof n.type === 'function');
     tile.props.onBegin(80); tile.props.onMove(162, 144, 80);
     assert.deepEqual(h.ids(), ['b', 'c', 'd', 'a', 'e', 'f']);
     h.render(); tile.props.onEnd(false);
     assert.deepEqual(h.ids(), ['a', 'b', 'c', 'd', 'e', 'f']);
-    assert.equal(h.timers.size, 0); assert.deepEqual(h.dragging, [true, false]);
+    assert.equal(h.frames.size, 0); assert.deepEqual(h.dragging, [true, false]);
 });
-test('edge drag scrolls within content bounds and successful drop retains new order', () => {
+for (const columns of [1, 2]) {
+    test(`${columns}-column drag scrolls first to last and back, then saves at the lower boundary`, () => {
+        const h = tileHarness(columns); const tile = nodes(h.render()).find(n => typeof n.type === 'function');
+        const max = Math.ceil(6 / columns) * 144 + 24 - 200;
+        tile.props.onBegin(80); tile.props.onMove(columns === 2 ? 162 : 0, 110, 199);
+        for (let i = 0; i < 200; i++) h.tick();
+        assert.ok(h.scrolls.every(y => y >= 0 && y <= max));
+        assert.equal(h.scrolls.at(-1), max);
+        assert.equal(h.ids().at(-1), 'a');
+        const nativeY = tile.props.movement.y.value + tile.props.scrollOffset.value;
+        assert.equal(nativeY - max, 110, 'tile remains under the finger as the parent scrolls');
+        tile.props.onMove(0, -80, 1);
+        for (let i = 0; i < 200; i++) h.tick();
+        assert.equal(h.scrolls.at(-1), 0);
+        assert.equal(h.ids()[0], 'a');
+        tile.props.onMove(columns === 2 ? 162 : 0, 110, 199);
+        for (let i = 0; i < 200; i++) h.tick();
+        const beforeDrop = [...h.ids()]; tile.props.onEnd(true);
+        assert.deepEqual(h.ids(), beforeDrop); assert.equal(h.frames.size, 0);
+        assert.equal(tile.props.releasePosition.current.y, 110 + max);
+    });
+}
+test('delayed scroll events do not rewind requested scrolling or rerender the list on every frame', () => {
     const h = tileHarness(); const tile = nodes(h.render()).find(n => typeof n.type === 'function');
-    tile.props.onBegin(195); tile.props.onMove(0, 80, 195);
-    const tick = h.timers.get(1);
-    for (let i = 0; i < 50; i++) tick();
-    assert.ok(h.scrolls.length > 0);
-    assert.ok(h.scrolls.every(y => y >= 0 && y <= 256));
-    assert.equal(h.scrolls.at(-1), 256);
-    const beforeDrop = [...h.ids()]; tile.props.onEnd(true);
-    assert.deepEqual(h.ids(), beforeDrop); assert.equal(h.timers.size, 0);
+    tile.props.onBegin(80); tile.props.onMove(0, 80, 199);
+    h.writes.length = 0;
+    for (let i = 0; i < 8; i++) h.tick(16, false);
+    const requested = h.scrolls.at(-1);
+    assert.ok(requested > 20);
+    assert.equal(tile.props.releasePosition.current.y, 80, 'target uses actual, not requested offset');
+    h.report(5); h.tick(16, false); h.report(10); h.tick(16, false);
+    assert.ok(h.scrolls.at(-1) > requested);
+    assert.ok(h.scrolls.every((y, i, values) => !i || y >= values[i - 1]));
+    assert.equal(tile.props.releasePosition.current.y, 90);
+    assert.deepEqual(h.writes, [], 'no per-frame React state changes');
+    tile.props.onMove(0, 0, 100);
+    const count = h.scrolls.length; h.tick(16, false); h.tick(16, false);
+    assert.equal(h.scrolls.length, count, 'leaving the edge stops new scroll commands');
+    tile.props.onEnd(false);
+    assert.deepEqual(h.ids(), ['a', 'b', 'c', 'd', 'e', 'f']);
+    assert.equal(h.frames.size, 0);
+});
+test('edge speed ramps with proximity, respects viewport origin, and caps long frame stalls', () => {
+    assert.equal(tiles.edgeScrollStep(100, 0, 200, 16), 0);
+    const near = tiles.edgeScrollStep(150, 0, 200, 16);
+    const edge = tiles.edgeScrollStep(200, 0, 200, 16);
+    assert.ok(near > 0 && near < edge);
+    assert.equal(tiles.edgeScrollStep(250, 50, 200, 16), edge);
+    assert.equal(tiles.edgeScrollStep(0, 0, 200, 16), -edge);
+    assert.equal(tiles.edgeScrollStep(200, 0, 200, 32), edge * 2);
+    assert.equal(tiles.edgeScrollStep(200, 0, 200, 500), edge * 2);
+    assert.equal(tiles.edgeScrollStep(200, 0, 0, 16), 0);
+    assert.equal(tiles.edgeScrollStep(200, 0, 200, -1), 0);
+});
+
+test('unmount cancels pending autoscroll, and late scroll events after drop do not reorder', () => {
+    const h = tileHarness(); const tile = nodes(h.render()).find(n => typeof n.type === 'function');
+    tile.props.onBegin(80); tile.props.onMove(0, 100, 199);
+    h.tick(); h.tick(); tile.props.onEnd(true);
+    const saved = [...h.ids()], changes = h.changes.length;
+    h.report(100);
+    assert.deepEqual(h.ids(), saved); assert.equal(h.changes.length, changes);
+    assert.equal(h.frames.size, 0);
+    tile.props.onBegin(199); h.tick();
+    h.unmount();
+    assert.equal(h.frames.size, 0);
 });
