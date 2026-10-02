@@ -103,11 +103,11 @@ test('stars settle with stagger then connecting line appears; all motion uses na
     const { started, stopped, cleanup } = constellation(true);
     assert.equal(started.length, 1);
     const branches = started[0].children;
-    assert.deepEqual(plain(branches.slice(0, 3).map(b => b.children[0].duration)), [0, 70, 140]);
-    assert.ok(branches.slice(0, 3).every(b => b.children[1].duration === 550 && b.children[1].useNativeDriver));
-    assert.equal(branches[3].children[0].duration, 500);
+    assert.deepEqual(plain(branches.slice(0, 3).map(b => b.children[0].duration)), [0, 140, 280]);
+    assert.ok(branches.slice(0, 3).every(b => b.children[1].duration === 1100 && b.children[1].useNativeDriver));
+    assert.equal(branches[3].children[0].duration, 1000);
     assert.equal(branches[3].children[1].toValue, 0.65);
-    assert.equal(branches[3].children[1].duration, 250);
+    assert.equal(branches[3].children[1].duration, 500);
     assert.equal(branches[3].children[1].useNativeDriver, true);
     cleanup(); assert.equal(stopped.length, 1);
 });
@@ -193,7 +193,7 @@ test('orbit uses approved planet/satellite geometry and one native rotation that
     }).default;
     const tree = component({ animated: true }); const cleanup = effect();
     assert.equal(nodes(tree).filter(n => n.type === 'Circle').length, 3);
-    assert.equal(config.duration, 750); assert.equal(config.useNativeDriver, true); assert.equal(started, true);
+    assert.equal(config.duration, 1500); assert.equal(config.useNativeDriver, true); assert.equal(started, true);
     cleanup(); assert.equal(stopped, true);
 });
 test('header button starts editing or confirms current draft; orbit is selected for inner collections', async () => {

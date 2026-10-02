@@ -22,12 +22,12 @@ export default function OrderConstellation({ animated = false, size = 32 }: { an
         connection.setValue(0);
         const animation = Animated.parallel([
             ...stars.map((value, index) => Animated.sequence([
-                Animated.delay(index * 70),
-                Animated.timing(value, { toValue: 1, duration: 550, easing: Easing.bezier(0.2, 0.7, 0.2, 1), useNativeDriver: true }),
+                Animated.delay(index * 140),
+                Animated.timing(value, { toValue: 1, duration: 1100, easing: Easing.bezier(0.2, 0.7, 0.2, 1), useNativeDriver: true }),
             ])),
             Animated.sequence([
-                Animated.delay(500),
-                Animated.timing(connection, { toValue: 0.65, duration: 250, useNativeDriver: true }),
+                Animated.delay(1000),
+                Animated.timing(connection, { toValue: 0.65, duration: 500, useNativeDriver: true }),
             ]),
         ]);
         animation.start();
