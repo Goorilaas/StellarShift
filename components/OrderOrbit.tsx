@@ -7,7 +7,7 @@ export default function OrderOrbit({ animated = false, size = 32 }: { animated?:
     useEffect(() => {
         progress.setValue(animated ? 0 : 1);
         if (!animated) return;
-        const animation = Animated.timing(progress, { toValue: 1, duration: 750, easing: Easing.bezier(0.2, 0.7, 0.2, 1), useNativeDriver: true });
+        const animation = Animated.timing(progress, { toValue: 1, duration: 1500, easing: Easing.bezier(0.2, 0.7, 0.2, 1), useNativeDriver: true });
         animation.start();
         return () => animation.stop();
     }, [animated, progress]);
