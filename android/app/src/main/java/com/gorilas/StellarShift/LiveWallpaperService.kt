@@ -14,6 +14,8 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Build
 import android.os.FileObserver
+import android.os.SystemClock
+import android.util.Log
 import android.service.wallpaper.WallpaperService
 import android.view.Choreographer
 import android.view.SurfaceHolder
@@ -52,6 +54,11 @@ class LiveWallpaperService : WallpaperService() {
         private val accelerometer by lazy { sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) }
         private val choreographer by lazy { Choreographer.getInstance() }
 
+        private val diagnosticEngine = Integer.toHexString(System.identityHashCode(this))
+        private val diagnostics = ParallaxDiagnostics { message ->
+            Log.i("StellarParallax", "engine=$diagnosticEngine $message")
+        }
+
         private var visible = false
         private var surfaceWidth = 0
         private var surfaceHeight = 0
@@ -77,6 +84,7 @@ class LiveWallpaperService : WallpaperService() {
         private val frameCallback = object : Choreographer.FrameCallback {
             override fun doFrame(frameTimeNanos: Long) {
                 if (!visible) return
+                diagnostics.frame(frameTimeNanos)
                 if (pendingReload) {
                     pendingReload = false
                     reloadBitmap(withFade = true)
@@ -86,24 +94,38 @@ class LiveWallpaperService : WallpaperService() {
                 val moving = abs(targetX - offsetX) > 0.3f || abs(targetY - offsetY) > 0.3f
                 if (!moving) { offsetX = targetX; offsetY = targetY }
                 val fading = fadeStartMs > 0L
-                if (moving || fading || needsRedraw) {
+                val drew = moving || fading || needsRedraw
+                if (drew) {
                     drawFrame()
                     needsRedraw = false
                 }
+                diagnostics.endFrame(drew)
                 choreographer.postFrameCallback(this)
             }
         }
 
         // ── lifecycle ──
 
+        override fun onSurfaceCreated(holder: SurfaceHolder) {
+            super.onSurfaceCreated(holder)
+            diagnostics.event("surface_created", "preview=$isPreview")
+        }
+
+        override fun onSurfaceDestroyed(holder: SurfaceHolder) {
+            diagnostics.event("surface_destroyed")
+            super.onSurfaceDestroyed(holder)
+        }
+
         override fun onSurfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
             super.onSurfaceChanged(holder, format, width, height)
+            diagnostics.event("surface_changed", "width=$width height=$height")
             surfaceWidth = width
             surfaceHeight = height
             needsRedraw = true
         }
 
         override fun onVisibilityChanged(isVisible: Boolean) {
+            diagnostics.visibility(isVisible)
             visible = isVisible
             if (isVisible) {
                 maxShift = prefs.getInt("lwIntensity", 60).toFloat()
@@ -112,8 +134,10 @@ class LiveWallpaperService : WallpaperService() {
                 reloadBitmap(withFade = false)
                 startFileObserver()
                 accelerometer?.let {
-                    sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
+                    val registered = sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
+                    diagnostics.event("sensor_registered", "success=$registered")
                 }
+                if (accelerometer == null) diagnostics.event("sensor_missing")
                 needsRedraw = true
                 choreographer.postFrameCallback(frameCallback)
             } else {
@@ -125,6 +149,7 @@ class LiveWallpaperService : WallpaperService() {
         }
 
         override fun onDestroy() {
+            diagnostics.destroy()
             super.onDestroy()
             choreographer.removeFrameCallback(frameCallback)
             sensorManager.unregisterListener(this)
@@ -138,6 +163,7 @@ class LiveWallpaperService : WallpaperService() {
 
         override fun onSensorChanged(event: SensorEvent) {
             if (event.sensor.type != Sensor.TYPE_ACCELEROMETER) return
+            diagnostics.sensor(event.timestamp, SystemClock.elapsedRealtimeNanos())
             // ±3 м/с² → повний зсув; знак X інверсний (нахил вправо → фото вліво)
             targetX = -clamp(event.values[0] / 3f, -1f, 1f) * maxShift
             targetY = clamp(event.values[1] / 3f, -1f, 1f) * maxShift
@@ -178,6 +204,8 @@ class LiveWallpaperService : WallpaperService() {
         }
 
         private fun reloadBitmap(withFade: Boolean) {
+            val diagnosticStart = System.nanoTime()
+            var loaded = false
             try {
                 val f = currentFile()
                 if (!f.exists()) return
@@ -187,9 +215,12 @@ class LiveWallpaperService : WallpaperService() {
                     fadeStartMs = System.currentTimeMillis()
                 }
                 currentBitmap = fresh
+                loaded = true
                 needsRedraw = true
             } catch (_: Exception) {
                 // лишаємось на старому фото
+            } finally {
+                diagnostics.reload(System.nanoTime() - diagnosticStart, loaded)
             }
         }
 
@@ -197,9 +228,16 @@ class LiveWallpaperService : WallpaperService() {
 
         private fun drawFrame() {
             val holder = surfaceHolder
+            val diagnosticStart = System.nanoTime()
+            var lockNs = 0L
+            var locked = false
+            var posted = false
             var canvas: Canvas? = null
             try {
-                canvas = holder.lockCanvas() ?: return
+                canvas = holder.lockCanvas()
+                lockNs = System.nanoTime() - diagnosticStart
+                locked = true
+                if (canvas == null) return
                 canvas.drawColor(Color.rgb(10, 10, 26)) // бренд-фон #0a0a1a
                 val cur = currentBitmap
                 if (cur != null && surfaceWidth > 0 && surfaceHeight > 0) {
@@ -220,8 +258,10 @@ class LiveWallpaperService : WallpaperService() {
                 }
             } finally {
                 if (canvas != null) {
-                    try { holder.unlockCanvasAndPost(canvas) } catch (_: IllegalStateException) { }
+                    try { holder.unlockCanvasAndPost(canvas); posted = true } catch (_: IllegalStateException) { }
                 }
+                val totalNs = System.nanoTime() - diagnosticStart
+                diagnostics.draw(if (locked) lockNs else totalNs, totalNs, posted)
             }
         }
 
