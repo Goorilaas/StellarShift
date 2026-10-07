@@ -14,17 +14,17 @@ private fun test(name: String, body: () -> Unit) { body(); passed++; println("PA
 fun main() {
     test("no frame/sensor/reload output while hidden") {
         val c = Capture(); val d = c.diagnostics
-        repeat(500) { d.frame(c.now); d.sensor(1, 2); d.draw(1, 2, true); d.reload(1, true); d.endFrame(true) }
+        repeat(500) { d.frame(c.now); d.sensor(1, 2); d.draw(1, 0, 1, 2, true, true); d.reload(1, true); d.endFrame(true) }
         check(c.lines.isEmpty())
     }
     test("sensor sampling and delivery clocks remain independent; draw and lock costs are separate") {
         val c = Capture(); val d = c.diagnostics
         d.visibility(true)
         d.frame(c.now); d.sensor(10_000_000_000L, 10_002_000_000L)
-        d.draw(2_000_000, 5_000_000, true); d.endFrame(true)
+        d.draw(2_000_000, 1_000_000, 2_000_000, 5_000_000, true, true); d.endFrame(true)
         c.now += 20_000_000
         d.frame(c.now - 12_000_000); d.sensor(10_020_000_000L, 10_062_000_000L)
-        d.draw(3_000_000, 7_000_000, false); d.endFrame(true)
+        d.draw(3_000_000, 1_000_000, 3_000_000, 7_000_000, false, false); d.endFrame(true)
         d.visibility(false)
         val s = c.sample()
         check(s["frames"] == "2" && s["sensors"] == "2" && s["posted"] == "1")
@@ -34,13 +34,15 @@ fun main() {
         check(s["sensor_gap_ms"] == "20.00/20.00/1")
         check(s["sensor_arrival_ms"] == "60.00/60.00/1")
         check(s["sensor_age_ms"] == "22.00/42.00/2")
+        check(s["render_ms"] == "1.00/1.00/2" && s["post_ms"] == "2.50/3.00/2")
+        check(s["hardware_draws"] == "1")
         check(s["lock_ms"] == "2.50/3.00/2" && s["draw_ms"] == "6.00/7.00/2")
     }
     test("30 second capture emits at most fifteen aggregate windows then stops") {
         val c = Capture(); val d = c.diagnostics; d.visibility(true)
         repeat(5000) {
             c.now += 10_000_000
-            d.frame(c.now); d.sensor(c.now, c.now); d.draw(1, 2, true); d.endFrame(true)
+            d.frame(c.now); d.sensor(c.now, c.now); d.draw(1, 0, 1, 2, true, true); d.endFrame(true)
         }
         check(c.lines.count { "event=sample" in it } == 15)
         check(c.lines.count { "event=capture_end" in it } == 1)
