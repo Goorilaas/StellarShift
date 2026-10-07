@@ -235,6 +235,7 @@ class LiveWallpaperService : WallpaperService() {
             var lockNs = 0L
             var locked = false
             var posted = false
+            var rendered = false
             var canvas: Canvas? = null
             try {
                 // Never switch renderers on a live surface. API 24–25 retain the software path.
@@ -262,6 +263,7 @@ class LiveWallpaperService : WallpaperService() {
                         drawCover(canvas, cur, 255)
                     }
                 }
+                rendered = true
             } catch (_: IllegalStateException) {
                 // Surface can disappear between the validity check and drawing; retry on a later frame.
             } finally {
@@ -275,7 +277,7 @@ class LiveWallpaperService : WallpaperService() {
                 diagnostics.draw(if (locked) lockNs else totalNs, renderNs, postNs, totalNs,
                     posted, canvas?.isHardwareAccelerated == true)
             }
-            return posted
+            return posted && rendered
         }
 
         /** Cover-скейл з полями 2*maxShift, зсув по offsetX/Y, опційна alpha для fade. */
