@@ -20,6 +20,7 @@ internal class ParallaxDiagnostics(
     private var sensors = 0
     private var skipped = 0
     private var posted = 0
+    private var hardwareDraws = 0
     private var sameVsync = 0
     private var reloadFailures = 0
     private val frameGap = Samples()
@@ -30,9 +31,11 @@ internal class ParallaxDiagnostics(
     private val sensorAge = Samples()
     private val drawTime = Samples()
     private val lockTime = Samples()
+    private val renderTime = Samples()
+    private val postTime = Samples()
     private val reloadTime = Samples()
     private val samples = listOf(frameGap, callbackGap, callbackDelay, sensorGap, sensorArrival,
-        sensorAge, drawTime, lockTime, reloadTime)
+        sensorAge, drawTime, lockTime, renderTime, postTime, reloadTime)
 
     fun visibility(value: Boolean) {
         if (value == visible) {
@@ -83,10 +86,13 @@ internal class ParallaxDiagnostics(
         lastArrival = arrivalNs
     }
 
-    fun draw(lockNs: Long, totalNs: Long, didPost: Boolean) {
+    fun draw(lockNs: Long, renderNs: Long, postNs: Long, totalNs: Long, didPost: Boolean, hardware: Boolean) {
         if (!capturing) return
         lockTime.add(lockNs)
         drawTime.add(totalNs)
+        renderTime.add(renderNs)
+        postTime.add(postNs)
+        if (hardware) hardwareDraws++
         if (didPost) posted++
     }
 
@@ -119,17 +125,17 @@ internal class ParallaxDiagnostics(
     private fun report(now: Long, reason: String) {
         emit("session=$session event=sample reason=$reason elapsed_ms=${(now - started) / 1_000_000}" +
             " window_ms=${(now - windowStarted) / 1_000_000} frames=$frames sensors=$sensors" +
-            " skipped=$skipped posted=$posted same_vsync=$sameVsync reload_failures=$reloadFailures" +
+            " skipped=$skipped posted=$posted hardware_draws=$hardwareDraws same_vsync=$sameVsync reload_failures=$reloadFailures" +
             " frame_gap_ms=${frameGap.summary()} callback_gap_ms=${callbackGap.summary()}" +
             " callback_delay_ms=${callbackDelay.summary()} sensor_gap_ms=${sensorGap.summary()}" +
             " sensor_arrival_ms=${sensorArrival.summary()} sensor_age_ms=${sensorAge.summary()}" +
-            " lock_ms=${lockTime.summary()} draw_ms=${drawTime.summary()} reload_ms=${reloadTime.summary()}")
+            " render_ms=${renderTime.summary()} post_ms=${postTime.summary()} lock_ms=${lockTime.summary()} draw_ms=${drawTime.summary()} reload_ms=${reloadTime.summary()}")
         resetWindow()
         windowStarted = now
     }
 
     private fun resetWindow() {
-        frames = 0; sensors = 0; skipped = 0; posted = 0; sameVsync = 0; reloadFailures = 0
+        frames = 0; sensors = 0; skipped = 0; posted = 0; hardwareDraws = 0; sameVsync = 0; reloadFailures = 0
         samples.forEach { it.clear() }
     }
 

@@ -96,8 +96,7 @@ class LiveWallpaperService : WallpaperService() {
                 val fading = fadeStartMs > 0L
                 val drew = moving || fading || needsRedraw
                 if (drew) {
-                    drawFrame()
-                    needsRedraw = false
+                    needsRedraw = !drawFrame()
                 }
                 diagnostics.endFrame(drew)
                 choreographer.postFrameCallback(this)
@@ -108,7 +107,7 @@ class LiveWallpaperService : WallpaperService() {
 
         override fun onSurfaceCreated(holder: SurfaceHolder) {
             super.onSurfaceCreated(holder)
-            diagnostics.event("surface_created", "preview=$isPreview")
+            diagnostics.event("surface_created", "preview=$isPreview renderer=${if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) "hardware" else "software"}")
         }
 
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {
@@ -226,18 +225,26 @@ class LiveWallpaperService : WallpaperService() {
 
         // ── рендер ──
 
-        private fun drawFrame() {
+        private fun drawFrame(): Boolean {
             val holder = surfaceHolder
+            if (!holder.surface.isValid) return false
             val diagnosticStart = System.nanoTime()
+            var renderStart = diagnosticStart
+            var renderNs = 0L
+            var postNs = 0L
             var lockNs = 0L
             var locked = false
             var posted = false
+            var rendered = false
             var canvas: Canvas? = null
             try {
-                canvas = holder.lockCanvas()
+                // Never switch renderers on a live surface. API 24–25 retain the software path.
+                canvas = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) holder.lockHardwareCanvas()
+                    else holder.lockCanvas()
                 lockNs = System.nanoTime() - diagnosticStart
                 locked = true
-                if (canvas == null) return
+                if (canvas == null) return false
+                renderStart = System.nanoTime()
                 canvas.drawColor(Color.rgb(10, 10, 26)) // бренд-фон #0a0a1a
                 val cur = currentBitmap
                 if (cur != null && surfaceWidth > 0 && surfaceHeight > 0) {
@@ -256,13 +263,21 @@ class LiveWallpaperService : WallpaperService() {
                         drawCover(canvas, cur, 255)
                     }
                 }
+                rendered = true
+            } catch (_: IllegalStateException) {
+                // Surface can disappear between the validity check and drawing; retry on a later frame.
             } finally {
                 if (canvas != null) {
+                    renderNs = System.nanoTime() - renderStart
+                    val postStart = System.nanoTime()
                     try { holder.unlockCanvasAndPost(canvas); posted = true } catch (_: IllegalStateException) { }
+                    postNs = System.nanoTime() - postStart
                 }
                 val totalNs = System.nanoTime() - diagnosticStart
-                diagnostics.draw(if (locked) lockNs else totalNs, totalNs, posted)
+                diagnostics.draw(if (locked) lockNs else totalNs, renderNs, postNs, totalNs,
+                    posted, canvas?.isHardwareAccelerated == true)
             }
+            return posted && rendered
         }
 
         /** Cover-скейл з полями 2*maxShift, зсув по offsetX/Y, опційна alpha для fade. */
