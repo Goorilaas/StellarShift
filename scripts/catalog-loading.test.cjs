@@ -42,6 +42,7 @@ function setup({ storage = new Map(), get, settings, key } = {}) {
         activeCategory: category('mix'), searchText: '',
         getUnsplashKey: key ?? (async () => 'test-key'),
         loadCatalogPage: exports.loadCatalogPage,
+        readMorningMix: async () => null, saveMorningMix: async () => {},
         axios: { CanceledError, get: async (url, config) => {
             calls.push(config);
             return get ? get(config) : response([`${config.params.query}:${config.params.page}`]);
@@ -184,4 +185,21 @@ test('unmount abort ignores a late result and does not update screen state', asy
     const work = ctx.loadCatalog(category('space')); await settle();
     ctx.abortRef.current.abort(); gate.resolve(response(['a'])); await work;
     assert.equal(state.photos.length, 0); assert.equal(state.loading, true); assert.equal(state.toasts.length, 0);
+});
+
+
+test('native morning snapshot bypasses expired catalog cache and keeps old photos on failed refresh', async () => {
+    const { ctx, calls, state } = setup({ get: async () => { throw Error('offline'); } });
+    ctx.readMorningMix = async () => ({ photos: [photo('morning')], query: '', page: 0, hasMore: false });
+    await ctx.loadCatalog(category('mix'));
+    assert.equal(calls.length, 0); assert.equal(state.photos[0].id, 'morning');
+    await ctx.loadCatalog(category('mix'), { refresh: true });
+    assert.equal(state.photos[0].id, 'morning');
+});
+test('only a successful fresh foreground mix is published to native, never an old cache hit', async () => {
+    const { ctx } = setup(); let saves = 0;
+    ctx.saveMorningMix = async () => { saves++; };
+    await ctx.loadCatalog(category('mix')); assert.equal(saves, 1);
+    await ctx.loadCatalog(category('mix')); assert.equal(saves, 1);
+    await ctx.loadCatalog(category('mix'), { refresh: true }); assert.equal(saves, 2);
 });

@@ -20,6 +20,28 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
     private val rotationLock = Any()
     private var refreshJob: Job? = null
 
+    @ReactMethod
+    fun configureMorningMix(recipe: String, key: String, promise: Promise) {
+        try {
+            MorningMixWorker.store(reactApplicationContext).configure(recipe, key)
+            MorningMixWorker.schedule(reactApplicationContext)
+            promise.resolve(null)
+        } catch (_: Exception) { promise.reject("MORNING_MIX_CONFIG", "Cannot configure morning mix") }
+    }
+
+    @ReactMethod
+    fun getMorningMix(id: String, promise: Promise) {
+        try { promise.resolve(MorningMixWorker.store(reactApplicationContext).cached(id)) }
+        catch (_: Exception) { promise.reject("MORNING_MIX_READ", "Cannot read morning mix") }
+    }
+
+    @ReactMethod
+    fun saveMorningMix(id: String, photos: String, promise: Promise) {
+        try { promise.resolve(MorningMixWorker.store(reactApplicationContext)
+            .publish(id, org.json.JSONArray(photos), System.currentTimeMillis())) }
+        catch (_: Exception) { promise.reject("MORNING_MIX_WRITE", "Cannot save morning mix") }
+    }
+
     override fun getName() = "WallpaperModule"
 
     @ReactMethod
