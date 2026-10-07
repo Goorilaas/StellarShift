@@ -3,6 +3,9 @@ import 'react-native';
 declare module 'react-native' {
     interface NativeModulesStatic {
         WallpaperModule: {
+            configureMorningMix(recipe: string, key: string): Promise<void>;
+            getMorningMix(id: string): Promise<string | null>;
+            saveMorningMix(id: string, photos: string): Promise<boolean>;
             startRotation(
                 poolJson: string,
                 intervalMinutes: number,

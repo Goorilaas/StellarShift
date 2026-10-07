@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, Tabs } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, LogBox, View } from 'react-native';
+import { ActivityIndicator, AppState, DeviceEventEmitter, LogBox, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useTranslation } from 'react-i18next';
 import ByoReminderDialog from '../components/ByoReminderDialog';
@@ -11,6 +11,8 @@ import LaunchGreeting from '../components/LaunchGreeting';
 import Onboarding, { ONBOARDING_KEY } from '../components/Onboarding';
 import { initI18n } from '../i18n';
 import { UnsplashKeyProvider, useUnsplashKey } from '../services/unsplashKey';
+
+import { MORNING_MIX_CHANGED, syncMorningMix } from '../services/morningMix';
 
 // Dev-only шум від expo-keep-awake. Ми його НЕ викликаємо у власному коді —
 // warning приходить з expo internals (router / dev-client) під час hot-reload
@@ -33,6 +35,13 @@ if (SENTRY_DSN) {
 }
 
 function TabsInner() {
+    useEffect(() => {
+        const sync = () => { syncMorningMix().catch(() => {}); };
+        sync();
+        const change = DeviceEventEmitter.addListener(MORNING_MIX_CHANGED, sync);
+        const resume = AppState.addEventListener('change', state => { if (state === 'active') sync(); });
+        return () => { change.remove(); resume.remove(); };
+    }, []);
     const { hasUserKey, dialog, dismissDialog, setOnGoToSettings } = useUnsplashKey();
     const { t } = useTranslation();
 

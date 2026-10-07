@@ -11,6 +11,7 @@ import {
     ActivityIndicator,
     Animated,
     AppState,
+    DeviceEventEmitter,
     Easing,
     Image,
     Linking,
@@ -387,7 +388,7 @@ export default function SettingsScreen() {
         AsyncStorage.setItem('settings', JSON.stringify({
             interval, applyTo, activeCategories, mixCategories, autoChange,
             sleepEnabled, sleepStart, sleepEnd,
-        }));
+        })).then(() => DeviceEventEmitter.emit('stellarshiftMorningMixConfigChanged')).catch(() => {});
     }, [interval, applyTo, activeCategories, mixCategories, autoChange, sleepEnabled, sleepStart, sleepEnd]);
 
     // Тихі години → native prefs. Без рестарту ротації — Worker читає на кожному тіку.

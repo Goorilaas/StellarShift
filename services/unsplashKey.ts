@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import { DeviceEventEmitter } from 'react-native';
 import { createContext, createElement, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { UNSPLASH_KEY as FALLBACK_KEY } from '../components/categories';
 
@@ -32,6 +33,7 @@ export async function setUserKey(key: string): Promise<void> {
     const trimmed = key.trim();
     await AsyncStorage.setItem(K_USER_KEY, trimmed);
     _cachedUserKey = trimmed;
+    DeviceEventEmitter.emit('stellarshiftMorningMixConfigChanged');
     // Reset nag counters on success
     await AsyncStorage.multiRemove([K_DISMISS_COUNT, K_LAST_DISMISSED, K_LAST_403]);
 }
@@ -39,6 +41,7 @@ export async function setUserKey(key: string): Promise<void> {
 export async function clearUserKey(): Promise<void> {
     await AsyncStorage.removeItem(K_USER_KEY);
     _cachedUserKey = null;
+    DeviceEventEmitter.emit('stellarshiftMorningMixConfigChanged');
 }
 
 export async function getUnsplashKey(): Promise<string> {
