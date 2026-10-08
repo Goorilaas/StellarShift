@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
+  AppState,
   Animated,
   Dimensions,
   Easing,
@@ -41,6 +42,7 @@ import Toast, { useToastQueue } from '../components/Toast';
 import { blockPhoto as blockPhotoStore, unblockPhoto as unblockPhotoStore } from '../services/blocked';
 import { useBlockedPhotos } from '../services/useBlockedPhotos';
 import { CatalogPage, loadCatalogPage } from '../services/catalogCache';
+import { readMorningMix, saveMorningMix } from '../services/morningMix';
 import { setWallpaperFromUrl } from '../services/wallpaperService';
 import { trackDownload } from '../services/unsplashTracking';
 
@@ -307,6 +309,18 @@ export default function HomeScreen() {
     }
   };
 
+  const refreshVisibleMix = useRef(() => {});
+  useEffect(() => {
+    refreshVisibleMix.current = () => { if (activeCategory.id === 'mix') loadCatalog(activeCategory); };
+  });
+  useFocusEffect(useCallback(() => {
+    refreshVisibleMix.current();
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') refreshVisibleMix.current();
+    });
+    return () => subscription.remove();
+  }, []));
+
   const loadCatalog = async (category: Category, { refresh = false, nextPage = false } = {}) => {
     const viewKey = JSON.stringify([category.id, category.query, !!category.excludePeople]);
     const previous = catalogPageRef.current;
@@ -340,7 +354,11 @@ export default function HomeScreen() {
       const cacheKey = nextPage
         ? JSON.stringify(['page', previous!.query, perPage, previous!.page + 1])
         : JSON.stringify(['first', viewKey, mixIds]);
-      const result = await loadCatalogPage(cacheKey, async () => {
+      const morning = mix ? await readMorningMix(mixIds).catch(() => null) : null;
+      if (!current()) return;
+      // Keep the previous complete daily selection visible even if a manual refresh fails.
+      if (morning) setPhotos(morning.photos);
+      const result = morning && !refresh ? morning : await loadCatalogPage(cacheKey, async () => {
         const key = await getUnsplashKey();
         if (!current()) throw new CanceledError('Catalog request canceled');
         if (mix || chaos) {
@@ -359,7 +377,10 @@ export default function HomeScreen() {
           })));
           const flat: Photo[] = results.flatMap(r => r.data.results);
           const filtered = filterNoPeople(flat);
-          return { photos: shuffle(dedupAndCapByAuthor(filtered.length >= 8 ? filtered : flat)), query: '', page: 0, hasMore: false };
+          const page = { photos: shuffle(dedupAndCapByAuthor(filtered.length >= 8 ? filtered : flat)), query: '', page: 0, hasMore: false };
+          if (!current()) throw new CanceledError('Catalog request canceled');
+          if (mix) await saveMorningMix(mixIds, page, abort.signal).catch(() => {});
+          return page;
         }
         // Вибираємо під-запит і стартову сторінку лише при cache miss або ручному оновленні.
         const query = nextPage ? previous!.query : category.id === 'search' ? category.query
