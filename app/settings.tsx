@@ -1116,13 +1116,13 @@ export default function SettingsScreen() {
                 </View>
                 <Text style={styles.lwIntensityLabel}>{t('settings.lw.intensity')}</Text>
                 <View style={styles.lwIntensityRow}>
-                    {[{ k: 'soft', v: 30 }, { k: 'normal', v: 60 }, { k: 'strong', v: 100 }].map(opt => (
+                    {[{ k: 'subtle', v: 15 }, { k: 'soft', v: 30 }, { k: 'normal', v: 60 }, { k: 'strong', v: 100 }].map(opt => (
                         <TouchableOpacity
                             key={opt.k}
-                            style={[styles.btn, styles.btnFlex, lwIntensity === opt.v && styles.btnActive]}
+                            style={[styles.btn, styles.btnFlex, styles.lwIntensityBtn, lwIntensity === opt.v && styles.btnActive]}
                             onPress={() => applyLwIntensity(opt.v)}
                         >
-                            <Text style={[styles.btnText, lwIntensity === opt.v && styles.btnTextActive]}>
+                            <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.btnText, lwIntensity === opt.v && styles.btnTextActive]}>
                                 {t(`settings.lw.${opt.k}`)}
                             </Text>
                         </TouchableOpacity>
@@ -1630,6 +1630,7 @@ const styles = StyleSheet.create({
     lwDisableBtn: { alignItems: 'center', marginHorizontal: 16, marginBottom: 14, marginTop: -4, paddingVertical: 10 },
     lwDisableText: { color: '#cc3355', fontSize: 13, fontWeight: '700' },
     lwIntensityLabel: { color: '#7a7a90', fontSize: 12, paddingHorizontal: 16, marginTop: 4, marginBottom: 8 },
+    lwIntensityBtn: { paddingHorizontal: 4, minWidth: 0 },
     lwIntensityRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 14 },
     sleepTimesRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 14 },
     sleepTimeBtn: { backgroundColor: '#1a1a2e', borderWidth: 1, borderColor: '#2a2a4e', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 18 },
