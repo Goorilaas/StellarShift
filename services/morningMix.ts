@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CanceledError } from 'axios';
 import { NativeModules } from 'react-native';
-import { CATEGORIES, CATEGORY_QUERIES, dedupAndCapByAuthor, filterNoPeople, Photo, subCountForMix } from '../components/categories';
+import { CATEGORIES, CATEGORY_QUERIES, dedupAndCapByAuthor, filterNoPeople, PEOPLE_TAGS, Photo, subCountForMix } from '../components/categories';
 import { getUnsplashKey } from './unsplashKey';
 import type { CatalogPage } from './catalogCache';
 
@@ -24,11 +24,14 @@ export async function syncMorningMix(): Promise<void> {
     const request = ++generation;
     if (!native?.configureMorningMix) return;
     const raw = await AsyncStorage.getItem('settings');
-    const ids = raw ? JSON.parse(raw).mixCategories ?? defaults : defaults;
+    const settings = raw ? JSON.parse(raw) : {};
+    const ids = settings.mixCategories ?? defaults;
     if (!Array.isArray(ids) || !ids.every(id => typeof id === 'string')) return;
     const key = await getUnsplashKey();
     if (request !== generation) return;
-    await native.configureMorningMix(JSON.stringify(morningRecipe(ids)), key);
+    await native.configureMorningMix(JSON.stringify({ ...morningRecipe(ids), peopleKeywords: PEOPLE_TAGS,
+        rotationMix: settings.autoChange === true && Array.isArray(settings.activeCategories)
+            && settings.activeCategories.length === 1 && settings.activeCategories[0] === 'mix' }), key);
 }
 
 function validPhoto(p: Photo): boolean {

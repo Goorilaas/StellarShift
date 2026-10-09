@@ -19,11 +19,15 @@ class MorningMixWorker(context: Context, params: WorkerParameters) : CoroutineWo
         val store = store(applicationContext)
         val now = System.currentTimeMillis()
         val previous = store.snapshot()
-        if (!store.due(now)) return@withContext Result.success()
-        val recipe = store.recipe() ?: return@withContext Result.success()
-        val key = store.key()
-        if (key.isBlank()) return@withContext Result.success()
         try {
+            if (!store.due(now)) {
+                // Also catches a pending first wallpaper after sleep/offline/process restart.
+                WallpaperWorker.applyNext(applicationContext, onlyPendingMix = true)
+                return@withContext Result.success()
+            }
+            val recipe = store.recipe() ?: return@withContext Result.success()
+            val key = store.key()
+            if (key.isBlank()) return@withContext Result.success()
             store.reserve(now)
             val config = JSONObject(recipe)
             val id = config.getString("id")
@@ -66,7 +70,8 @@ class MorningMixWorker(context: Context, params: WorkerParameters) : CoroutineWo
                 } finally { conn.disconnect() }
             }
             coroutineContext.ensureActive()
-            store.publish(id, JSONArray(photos.shuffled()), System.currentTimeMillis(), previous, true, recipe, key)
+            if (store.publish(id, JSONArray(photos.shuffled()), System.currentTimeMillis(), previous, true, recipe, key))
+                WallpaperWorker.applyNext(applicationContext, onlyPendingMix = true)
             Result.success()
         } catch (e: CancellationException) { throw e }
         catch (_: Exception) { Result.success() } // persisted one-hour cooldown; next eligible periodic tick retries
