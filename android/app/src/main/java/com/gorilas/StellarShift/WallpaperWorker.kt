@@ -7,6 +7,9 @@ import android.graphics.BitmapFactory
 import android.graphics.Rect
 import android.os.Build
 import androidx.work.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
@@ -26,8 +29,10 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
 
     override suspend fun doWork(): Result {
         return try {
-            val applied = applyNext(applicationContext)
+            val applied = applyNext(applicationContext, onlyPendingMix = inputData.getBoolean("onlyPendingMix", false))
             if (applied) Result.success() else Result.success() // empty pool is not an error
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             if (runAttemptCount < 2) Result.retry() else Result.failure()
         }
@@ -35,6 +40,8 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
 
     companion object {
         const val WORK_TAG = "WallpaperRotation"
+        private val applyMutex = Mutex()
+        @Volatile private var mixHandoff = 0L
 
         /**
          * Fire Unsplash download-tracking ping (required by API ToS for "use" events).
@@ -151,49 +158,55 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
         }
 
         /**
-         * Тихі години: true якщо «зараз» у вікні сну. Вікно в хвилинах від півночі.
-         * start < end → звичайне вікно (13:00–15:00); start > end → через північ
-         * (23:00–07:00); start == end → нульове, не діє. Час — локальний на момент
-         * виклику, тож зміна таймзони сама себе лікує.
-         */
-        private fun isInSleepWindow(prefs: android.content.SharedPreferences): Boolean {
-            if (!prefs.getBoolean("sleepEnabled", false)) return false
-            val start = prefs.getInt("sleepStart", 0)
-            val end = prefs.getInt("sleepEnd", 420)
-            if (start == end) return false
-            val cal = java.util.Calendar.getInstance()
-            val now = cal.get(java.util.Calendar.HOUR_OF_DAY) * 60 + cal.get(java.util.Calendar.MINUTE)
-            return if (start < end) now in start until end else now >= start || now < end
-        }
-
-        /**
          * @param manual true для явних дій юзера («Змінити зараз», ⏭/🚫 з шторки) —
          * вони працюють і в тихі години; спить тільки плановий тік.
          */
-        suspend fun applyNext(context: Context, manual: Boolean = false): Boolean {
+        suspend fun applyNext(context: Context, manual: Boolean = false, onlyPendingMix: Boolean = false): Boolean {
+            val observedHandoff = mixHandoff
+            return applyMutex.withLock {
+                // A scheduled tick already waiting behind the first new-mix apply must not immediately advance again.
+                if (!manual && observedHandoff != mixHandoff) false
+                else applyNextLocked(context, manual, onlyPendingMix)
+            }
+        }
+
+        private suspend fun applyNextLocked(context: Context, manual: Boolean, onlyPendingMix: Boolean): Boolean {
             val prefs = context.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
-            if (!manual && isInSleepWindow(prefs)) return true // тихий skip, не помилка
-            // Щоденний перезбір пулу (тільки плановий тік): свіжий контент + нова
-            // ротація під-запитів без відкриття застосунку. Swap-on-success.
-            if (!manual) maybeRebuildPool(context, prefs)
-            val target = prefs.getString("target", "both") ?: "both"
-            val item = BlockedPhotos.next(prefs) ?: return false
+            val store = MorningMixWorker.store(context)
+            if (!manual && (prefs.getInt("intervalMinutes", 0) <= 0 || MorningMixRotation.sleeping(prefs))) return false
+            // A catalog-driven mix must never be overwritten by the separate 24-hour recipe rebuild.
+            if (!manual && !onlyPendingMix && !MorningMixRotation.enabled(prefs, store)) maybeRebuildPool(context, prefs)
+            val selection = MorningMixRotation.select(prefs, store, onlyPendingMix) ?: return false
+            val mixToken = selection.token
+            val item = selection.item
             val id = item.getString("id")
             val url = item.getString("url")
             val downloadLocation = item.optString("downloadLocation", "").takeIf { it.isNotBlank() }
-
             val bitmap = downloadBitmap(url)
+            currentCoroutineContext().ensureActive()
             synchronized(BlockedPhotos) {
-                // Фото могли приховати, поки тривало завантаження.
-                if (id in BlockedPhotos.ids(prefs)) return false
+                if (!MorningMixRotation.valid(prefs, store, selection, manual)) return false
+                val target = prefs.getString("target", "both") ?: "both"
                 applyBitmap(context, bitmap, target)
                 appendPendingHistory(prefs, id, url, target)
                 BlockedPhotos.advance(prefs, id)
+                if (mixToken != null) {
+                    val first = prefs.getString("mixAppliedToken", null) != mixToken
+                    check(prefs.edit().putString("mixAppliedToken", mixToken).commit())
+                    if (first) mixHandoff++
+                }
                 NotificationHelper.showApplied(context, bitmap, id, url)
             }
-            // Fire Unsplash download-tracking after successful apply.
             trackUnsplashDownload(context, downloadLocation)
             return true
+        }
+
+        fun kickMorningMix(context: Context) {
+            val request = OneTimeWorkRequestBuilder<WallpaperWorker>()
+                .setInputData(workDataOf("onlyPendingMix" to true))
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                .addTag(WORK_TAG).build()
+            WorkManager.getInstance(context).enqueueUniqueWork("MorningMixApply", ExistingWorkPolicy.REPLACE, request)
         }
 
         /**
@@ -256,11 +269,15 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
             val now = System.currentTimeMillis()
             if (now - prefs.getLong("lastPoolBuild", 0L) < POOL_TTL_MS) return
             if (now - prefs.getLong("lastPoolAttempt", 0L) < REBUILD_BACKOFF_MS) return
+            val source = MorningMixRotation.source(prefs, MorningMixWorker.store(context))
             prefs.edit().putLong("lastPoolAttempt", now).apply()
             try {
                 val fresh = buildPool(prefs) ?: return
                 if (fresh.length() == 0) return
-                BlockedPhotos.replacePool(prefs, fresh, now)
+                synchronized(BlockedPhotos) {
+                    if (source == MorningMixRotation.source(prefs, MorningMixWorker.store(context)))
+                        BlockedPhotos.replacePool(prefs, fresh, now)
+                }
             } catch (_: Exception) {
                 // лишаємо старий пул; наступна спроба за REBUILD_BACKOFF_MS
             }
@@ -269,11 +286,17 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
         /** Примусовий перезбір (на дію юзера — активація колекції). Ігнорує 24h-гард. */
         suspend fun rebuildNow(context: Context): Boolean {
             val prefs = context.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+            val store = MorningMixWorker.store(context)
+            if (MorningMixRotation.enabled(prefs, store)) return MorningMixRotation.adopt(prefs, store) != null
+            val source = MorningMixRotation.source(prefs, store)
             return try {
                 val fresh = buildPool(prefs) ?: return false
                 if (fresh.length() == 0) return false
                 currentCoroutineContext().ensureActive()
-                BlockedPhotos.replacePool(prefs, fresh, System.currentTimeMillis())
+                synchronized(BlockedPhotos) {
+                    if (source != MorningMixRotation.source(prefs, store)) return false
+                    BlockedPhotos.replacePool(prefs, fresh, System.currentTimeMillis())
+                }
                 true
             } catch (_: Exception) {
                 false

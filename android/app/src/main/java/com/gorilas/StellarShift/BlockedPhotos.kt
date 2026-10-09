@@ -93,8 +93,8 @@ object BlockedPhotos {
     }
 
     @Synchronized
-    fun replacePool(prefs: SharedPreferences, source: JSONArray, builtAt: Long) {
-        val editor = prefs.edit().putLong("lastPoolBuild", builtAt)
+    fun replacePool(prefs: SharedPreferences, source: JSONArray, builtAt: Long, mixToken: String? = null) {
+        val editor = prefs.edit().putLong("lastPoolBuild", builtAt).putString("mixPoolToken", mixToken)
         updatePool(prefs, editor, source, ids(prefs), reset = true)
         check(editor.commit()) { "Cannot save photo pool" }
     }

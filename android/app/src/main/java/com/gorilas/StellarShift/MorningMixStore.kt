@@ -6,7 +6,7 @@ import org.json.JSONObject
 
 /** One atomic snapshot; worker cannot replace a newer manual shuffle or changed recipe. */
 internal class MorningMixStore(private val prefs: SharedPreferences) {
-    companion object { val lock = Any() }
+    companion object { val lock = BlockedPhotos }
     fun configure(recipe: String, key: String) = synchronized(lock) {
         val config = JSONObject(recipe)
         require(config.getJSONArray("groups").length() <= 100)

@@ -22,7 +22,7 @@ function setup({ storage, native } = {}) {
         if (name === 'axios') return { CanceledError: class extends Error { code = 'ERR_CANCELED'; } };
         if (name === './unsplashKey') return { getUnsplashKey: async () => 'test-key' };
         return { CATEGORIES: [{ id: 'mix', query: '' }, { id: 'space', query: 'stars' }, { id: 'forest', query: 'trees' }],
-            CATEGORY_QUERIES: { space: ['galaxy', 'stars'], forest: ['pine'] }, subCountForMix: () => 10,
+            PEOPLE_TAGS: ['person', 'portrait'], CATEGORY_QUERIES: { space: ['galaxy', 'stars'], forest: ['pine'] }, subCountForMix: () => 10,
             filterNoPeople: p => p, dedupAndCapByAuthor: p => p };
     } });
     return { api: exports, bridge, calls };
@@ -69,4 +69,18 @@ test('older native bridge gracefully keeps foreground-only behavior', async () =
     await api.syncMorningMix();
     assert.equal(await api.readMorningMix(['space']), null);
     await api.saveMorningMix(['space'], { photos: [photo('a')] }, new AbortController().signal);
+});
+
+
+test('native rotation follows only enabled sole Mix source; filter vocabulary is shared', async () => {
+    for (const [autoChange, activeCategories, expected] of [
+        [true, ['mix'], true], [false, ['mix'], false], [true, ['space'], false],
+        [true, ['mix', 'space'], false], [true, [], false],
+    ]) {
+        const { api, calls } = setup({ storage: async () => JSON.stringify({ autoChange, activeCategories, mixCategories: ['space'] }) });
+        await api.syncMorningMix();
+        const recipe = JSON.parse(calls[0][0]);
+        assert.equal(recipe.rotationMix, expected);
+        assert.deepEqual(recipe.peopleKeywords, ['person', 'portrait']);
+    }
 });

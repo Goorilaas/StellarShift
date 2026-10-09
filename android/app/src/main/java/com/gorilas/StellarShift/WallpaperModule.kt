@@ -17,7 +17,7 @@ import kotlinx.coroutines.withContext
 
 class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
 
-    private val rotationLock = Any()
+    private val rotationLock = BlockedPhotos
     private var refreshJob: Job? = null
 
     @ReactMethod
@@ -37,8 +37,12 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
 
     @ReactMethod
     fun saveMorningMix(id: String, photos: String, promise: Promise) {
-        try { promise.resolve(MorningMixWorker.store(reactApplicationContext)
-            .publish(id, org.json.JSONArray(photos), System.currentTimeMillis())) }
+        try {
+            val saved = MorningMixWorker.store(reactApplicationContext)
+                .publish(id, org.json.JSONArray(photos), System.currentTimeMillis())
+            if (saved) WallpaperWorker.kickMorningMix(reactApplicationContext)
+            promise.resolve(saved)
+        }
         catch (_: Exception) { promise.reject("MORNING_MIX_WRITE", "Cannot save morning mix") }
     }
 
@@ -55,14 +59,15 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
     ) {
         try {
             val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
-            BlockedPhotos.replacePool(prefs, org.json.JSONArray(poolJson), System.currentTimeMillis())
-            prefs.edit()
-                .putString("target", target)
-                .putInt("intervalMinutes", intervalMinutes)
-                .putBoolean("wifiOnly", wifiOnly)
-                .putBoolean("chargingOnly", chargingOnly)
-                .apply()
-
+            synchronized(rotationLock) {
+                BlockedPhotos.replacePool(prefs, org.json.JSONArray(poolJson), System.currentTimeMillis())
+                prefs.edit()
+                    .putString("target", target)
+                    .putInt("intervalMinutes", intervalMinutes)
+                    .putBoolean("wifiOnly", wifiOnly)
+                    .putBoolean("chargingOnly", chargingOnly)
+                    .apply()
+            }
             WallpaperWorker.schedule(reactApplicationContext, intervalMinutes, wifiOnly, chargingOnly)
             promise.resolve(null)
         } catch (e: Exception) {
@@ -111,7 +116,7 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
     fun setPoolRecipe(recipeJson: String, promise: Promise) {
         try {
             val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
-            prefs.edit().putString("poolRecipe", recipeJson).apply()
+            synchronized(rotationLock) { prefs.edit().putString("poolRecipe", recipeJson).apply() }
             promise.resolve(null)
         } catch (e: Exception) {
             promise.reject("RECIPE_ERROR", e.message, e)
@@ -124,7 +129,7 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
     fun setActiveCollections(json: String, promise: Promise) {
         try {
             val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
-            prefs.edit().putString("activeCollections", json).apply()
+            synchronized(rotationLock) { prefs.edit().putString("activeCollections", json).apply() }
             promise.resolve(null)
         } catch (e: Exception) {
             promise.reject("ACTIVE_COLL_ERROR", e.message, e)
