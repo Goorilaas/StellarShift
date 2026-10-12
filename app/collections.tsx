@@ -1,14 +1,17 @@
+import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { ReactNode, createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, BackHandler, FlatList, Image, Pressable, ScrollView, StyleSheet, Text, View, ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Photo } from '../components/categories';
 import { Mood, MOODS } from '../components/collections';
-import CollectionOrderControl, { CollectionOrderFeedback } from '../components/CollectionOrderControl';
+import CollectionOrderControl, { CollectionOrderFeedback, CollectionAlphabetize } from '../components/CollectionOrderControl';
+import CollectionName from '../components/CollectionName';
+import { alphabeticIds, readCollectionNames, saveCollectionName } from '../services/collectionNames';
 import ReorderTiles from '../components/ReorderTiles';
 import { OrderEditing, useOrderEditing } from '../services/useOrderEditing';
 import FavoriteHeart from '../components/FavoriteHeart';
@@ -51,16 +54,42 @@ const FALLBACK = { color: '#2A2350', icon: 'images-outline' as IconName };
 const colorFor = (moodId: string) => (STYLE[moodId] ?? FALLBACK).color;
 const BlockedContext = createContext<BlockedPhoto[]>([]);
 
+const NAME_KEYS = [...MOODS.map(m => `mood:${m.id}`), ...new Set(MOODS.flatMap(m => m.collectionIds).map(id => `collection:${id}`))];
+const NamesContext = createContext({ names: {} as Record<string, string>, save: async (_key: string, _name: string) => {} });
+function beginEditing(order: OrderEditing) {
+    if (!order.ready || order.saving || order.editing) return;
+    order.start();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+}
+
 export default function CollectionsScreen() {
     const blocked = useBlockedPhotos();
-    if (blocked === null) return <View style={styles.screen}><ActivityIndicator color="#7F77DD" /></View>;
-    return <BlockedContext.Provider value={blocked}><CollectionsContent /></BlockedContext.Provider>;
+    const [names, setNames] = useState<Record<string, string> | null>(null);
+    const [nameError, setNameError] = useState(false);
+    const [attempt, setAttempt] = useState(0);
+    const { t } = useTranslation();
+    useEffect(() => {
+        let alive = true;
+        setNameError(false);
+        readCollectionNames(NAME_KEYS).then(value => { if (alive) setNames(value); })
+            .catch(() => { if (alive) setNameError(true); });
+        return () => { alive = false; };
+    }, [attempt]);
+    const save = async (key: string, value: string) => {
+        const name = await saveCollectionName(key, value);
+        setNames(old => ({ ...old, [key]: name }));
+    };
+    if (nameError) return <View style={styles.screen}><Text style={styles.empty}>{t('collectionOrder.nameLoadError')}</Text>
+        <Pressable onPress={() => setAttempt(n => n + 1)} style={styles.retryButton}><Text style={{ color: '#fff' }}>{t('collections.retry')}</Text></Pressable></View>;
+    if (blocked === null || names === null) return <View style={styles.screen}><ActivityIndicator color="#7F77DD" /></View>;
+    return <NamesContext.Provider value={{ names, save }}><BlockedContext.Provider value={blocked}><CollectionsContent /></BlockedContext.Provider></NamesContext.Provider>;
 }
 
 function CollectionsContent() {
     const insets = useSafeAreaInsets();
-    const moodOrder = useOrderEditing('moods', MOOD_IDS);
-    const { editing: orderingMoods, cancel: cancelMoodOrder } = moodOrder;
+    const { names } = useContext(NamesContext);
+    const moodOrder = useOrderEditing('moods', alphabeticIds(MOOD_IDS, Object.fromEntries(MOODS.map(m => [m.id, names[`mood:${m.id}`] ?? m.name]))));
+    const { editing: orderingMoods } = moodOrder;
     const [mood, setMood] = useState<Mood | null>(null);
     const [moodCover, setMoodCover] = useState<string | undefined>(undefined);
     const [collection, setCollection] = useState<CollectionMeta | null>(null);
@@ -78,13 +107,13 @@ function CollectionsContent() {
     // Системний «назад»: закриваємо найглибший рівень, не виходимо з таба.
     useEffect(() => {
         const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-            if (orderingMoods) { cancelMoodOrder(); return true; }
+            if (orderingMoods) return false;
             if (collection) { setCollection(null); return true; }
             if (mood) { setMood(null); return true; }
             return false;
         });
         return () => sub.remove();
-    }, [collection, mood, orderingMoods, cancelMoodOrder]);
+    }, [collection, mood, orderingMoods]);
 
     const onBm = async (id: string) => setBookmarks(await toggleBookmarkCollection(id));
     const onFav = async (p: Photo) => setFavIds(await toggleFavoritePhoto(p));
@@ -124,6 +153,7 @@ function CollectionsContent() {
                     <Chip label={`У ротації${active.length ? ` · ${active.length}` : ''}`} on={tab === 'active'} onPress={() => setTab('active')} />
                 </ScrollView>
             </View>
+            {tab === 'moods' && <CollectionAlphabetize order={moodOrder} />}
             {tab === 'moods' && <CollectionOrderFeedback order={moodOrder} />}
             {tab === 'moods' && <Grid order={moodOrder} onPick={(m, cover) => { setMood(m); setMoodCover(cover); }} />}
             {tab === 'mine' && <Shelf ids={bookmarks} emptyMsg="Полиця порожня. Збережи колекції з настроїв — і вони з'являться тут."
@@ -143,6 +173,7 @@ function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () 
 }
 
 function Grid({ onPick, order }: { onPick: (m: Mood, cover?: string) => void; order: OrderEditing }) {
+    const { names, save } = useContext(NamesContext);
     const blocked = useContext(BlockedContext);
     const [covers, setCovers] = useState<Record<string, string>>({});
 
@@ -168,21 +199,26 @@ function Grid({ onPick, order }: { onPick: (m: Mood, cover?: string) => void; or
         return () => { alive = false; };
     }, []));
 
-    return <ReorderTiles ids={order.ids} columns={2} fallbackHeight={132} editing={order.editing} saving={order.saving}
-        onReorder={order.reorder} onDragging={order.setDragging} renderItem={id => {
+    return <ReorderTiles ids={order.ids} columns={2} fallbackHeight={132} editing={order.editing} saving={order.saving} renaming={order.renaming}
+        onReorder={order.reorder} onReorderCancel={order.cancelReorder} onDragging={order.setDragging} renderItem={(id, _visible, handle) => {
             const m = MOODS.find(item => item.id === id)!;
             const s = STYLE[m.id] ?? FALLBACK;
             const cover = isBlockedCover(covers[m.id], blocked) ? undefined : covers[m.id];
-            return <Pressable style={[styles.card, { width: '100%', marginBottom: 0, backgroundColor: s.color }]} onPress={() => onPick(m, cover)}>
+            return <View style={[styles.card, { width: '100%', padding: 0, marginBottom: 0, backgroundColor: s.color }]}>
+                {handle(<Pressable disabled={order.saving || order.renaming} onLongPress={() => beginEditing(order)} delayLongPress={400}
+                    onPress={() => { if (!order.editing) onPick(m, cover); }} style={{ height: 132 }}>
                 {cover ? <Image source={{ uri: cover }} style={StyleSheet.absoluteFill} />
                     : <Ionicons name={s.icon} size={60} color="rgba(255,255,255,0.13)" style={styles.motif} />}
                 <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={styles.scrim} />
+                </Pressable>)}
                 <View style={styles.cardBottom}>
-                    <Text style={styles.name} numberOfLines={1}>{m.name}</Text>
-                    <Text style={styles.cardSub} numberOfLines={2}>{m.subtitle}</Text>
-                    <Text style={styles.count}>{m.collectionIds.length} колекцій</Text>
+                    <CollectionName name={names[`mood:${m.id}`] ?? m.name} lines={2} editing={order.editing} disabled={order.saving || order.dragging || order.renaming}
+                        onEditingChange={order.setRenaming} onLongPress={() => beginEditing(order)} onOpen={() => onPick(m, cover)}
+                        onSave={value => save(`mood:${m.id}`, value)} />
+                    <View pointerEvents="none"><Text style={styles.cardSub} numberOfLines={2}>{m.subtitle}</Text>
+                    <Text style={styles.count}>{m.collectionIds.length} колекцій</Text></View>
                 </View>
-            </Pressable>;
+            </View>;
         }} />;
 }
 
@@ -194,7 +230,8 @@ type RowProps = {
 function MoodDetail({ mood, heroCover, top, onBack, bookmarks, active, onBm, onAct, onOpen }:
     RowProps & { mood: Mood; heroCover?: string; top: number; onBack: () => void }) {
     const [metas, setMetas] = useState<CollectionMeta[] | null>(null);
-    const order = useOrderEditing(`mood:${mood.id}`, mood.collectionIds);
+    const { names } = useContext(NamesContext);
+    const order = useOrderEditing(`mood:${mood.id}`, alphabeticIds(mood.collectionIds, Object.fromEntries(mood.collectionIds.map(id => [id, names[`collection:${id}`] ?? metas?.find(m => m.id === id)?.title ?? '']))));
     const orderedMetas = metas && order.ids.flatMap(id => metas.filter(meta => meta.id === id));
     const color = colorFor(mood.id);
     const s = STYLE[mood.id] ?? FALLBACK;
@@ -218,15 +255,16 @@ function MoodDetail({ mood, heroCover, top, onBack, bookmarks, active, onBm, onA
     return (
         <View style={styles.screen}>
             <View style={[styles.head, { paddingTop: top + 8 }]}>
-                <Pressable onPress={order.editing ? order.cancel : onBack} disabled={order.saving} hitSlop={12}><Ionicons name="arrow-back" size={24} color="#fff" /></Pressable>
-                <Text style={styles.h2} numberOfLines={1}>{mood.name}</Text>
+                <Pressable onPress={order.editing ? order.cancel : onBack} disabled={order.saving || order.renaming} hitSlop={12}><Ionicons name="arrow-back" size={24} color="#fff" /></Pressable>
+                <Text style={styles.h2} numberOfLines={1}>{names[`mood:${mood.id}`] ?? mood.name}</Text>
                 <CollectionOrderControl order={order} orbit count={orderedMetas?.length ?? 0} />
             </View>
+            <CollectionAlphabetize order={order} />
             <CollectionOrderFeedback order={order} orbit />
-            <ReorderTiles ids={(orderedMetas ?? []).map(meta => meta.id)} fallbackHeight={124} editing={order.editing} saving={order.saving}
-                onReorder={order.reorder} onDragging={order.setDragging}
-                renderItem={(id, visible) => <View style={{ marginBottom: -10 }}><Row meta={orderedMetas!.find(meta => meta.id === id)!}
-                    visible={visible} color={color} isBm={bookmarks.includes(id)} isAct={active.includes(id)}
+            <ReorderTiles ids={(orderedMetas ?? []).map(meta => meta.id)} fallbackHeight={124} editing={order.editing} saving={order.saving} renaming={order.renaming}
+                onReorder={order.reorder} onReorderCancel={order.cancelReorder} onDragging={order.setDragging}
+                renderItem={(id, visible, handle) => <View style={{ marginBottom: -10 }}><Row meta={orderedMetas!.find(meta => meta.id === id)!}
+                    order={order} handle={handle} visible={visible} color={color} isBm={bookmarks.includes(id)} isAct={active.includes(id)}
                     onBm={onBm} onAct={onAct} onOpen={onOpen} /></View>} header={<>
                 <View style={[styles.band, { backgroundColor: color }]}>
                     {hero
@@ -285,12 +323,17 @@ function CollectionList({ metas, color, header, bookmarks, active, onBm, onAct, 
     );
 }
 
-function Row({ meta, visible, color, isBm, isAct, onBm, onAct, onOpen }: {
+function Row({ meta, visible, color, isBm, isAct, onBm, onAct, onOpen, order, handle = child => child }: {
+    order?: OrderEditing; handle?: (child: ReactNode) => ReactNode;
     meta: CollectionMeta; visible: boolean; color: string; isBm: boolean; isAct: boolean;
     onBm: (id: string) => void; onAct: (id: string) => void; onOpen: (c: CollectionMeta) => void;
 }) {
     const blocked = useContext(BlockedContext);
     const [photos, setPhotos] = useState<Photo[]>([]);
+    const { names, save } = useContext(NamesContext);
+    const title = names[`collection:${meta.id}`] ?? meta.title ?? 'Колекція';
+    const open = () => { if (!order?.editing) onOpen(meta); };
+    const longPress = () => { if (order) beginEditing(order); };
     const examples = filterBlockedPhotos(photos, blocked).slice(0, 3).map(p => p.urls.small);
     const cover = isBlockedCover(meta.cover, blocked) ? examples[0] : meta.cover;
     // Кеш показуємо відразу після монтування, не очікуючи видимості й таймера.
@@ -316,31 +359,31 @@ function Row({ meta, visible, color, isBm, isAct, onBm, onAct, onOpen }: {
 
     return (
         <View style={styles.ac}>
-            <Pressable onPress={() => onOpen(meta)}>
+            <>{handle(<Pressable disabled={order?.saving || order?.renaming} onPress={open} onLongPress={longPress} delayLongPress={400}>
                 {cover
                     ? <Image source={{ uri: cover }} style={styles.cov} />
                     : <View style={[styles.cov, { backgroundColor: color }]} />}
-            </Pressable>
+            </Pressable>)}</>
             <View style={{ flex: 1, minWidth: 0 }}>
-                <Pressable onPress={() => onOpen(meta)}>
-                    <Text style={styles.at} numberOfLines={1}>{meta.title || 'Колекція'}</Text>
-                    {!!meta.curator && <Text style={styles.au} numberOfLines={1}>куратор · {meta.curator}</Text>}
-                </Pressable>
-                <Pressable onPress={() => onOpen(meta)} style={styles.strip}>
+                <CollectionName name={title} editing={order?.editing} disabled={order?.saving || order?.dragging || order?.renaming}
+                    onEditingChange={order?.setRenaming} onLongPress={longPress} onOpen={open}
+                    onSave={value => save(`collection:${meta.id}`, value)} />
+                {!!meta.curator && <Text style={styles.au} numberOfLines={1}>куратор · {meta.curator}</Text>}
+                <Pressable disabled={order?.editing} onPress={open} onLongPress={longPress} style={styles.strip}>
                     {(examples.length ? examples : ['', '', '']).map((u, i) => (
                         u ? <Image key={i} source={{ uri: u }} style={styles.thumb} />
                           : <View key={i} style={styles.thumb} />
                     ))}
                 </Pressable>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 }}>
-                    <Pressable onPress={() => onAct(meta.id)} style={[styles.actPill, isAct && styles.actPillOn]}>
+                    <Pressable disabled={order?.editing} onPress={() => onAct(meta.id)} style={[styles.actPill, isAct && styles.actPillOn]}>
                         <Ionicons name={isAct ? 'checkmark' : 'add'} size={13} color={isAct ? '#fff' : '#AFA9EC'} />
                         <Text style={[styles.actTxt, isAct && { color: '#fff' }]}>{isAct ? 'У ротації' : 'В ротацію'}</Text>
                     </Pressable>
                     <Text style={styles.ap}>{meta.total} фото</Text>
                 </View>
             </View>
-            <Pressable onPress={() => onBm(meta.id)} hitSlop={8}>
+            <Pressable disabled={order?.editing} onPress={() => onBm(meta.id)} hitSlop={8}>
                 <Ionicons name={isBm ? 'bookmark' : 'bookmark-outline'} size={22} color={isBm ? '#FFD700' : '#5c5c7a'} />
             </Pressable>
         </View>
@@ -351,6 +394,7 @@ function PhotoGrid({ collection, top, onBack, favIds, onFav }: {
     collection: CollectionMeta; top: number; onBack: () => void;
     favIds: string[]; onFav: (p: Photo) => Promise<void>;
 }) {
+    const { names } = useContext(NamesContext);
     const { t } = useTranslation();
     const { toast, showToast, dismissToast } = useToastQueue();
     const blocked = useContext(BlockedContext);
@@ -387,7 +431,7 @@ function PhotoGrid({ collection, top, onBack, favIds, onFav }: {
         <View style={styles.screen}>
             <View style={[styles.head, { paddingTop: top + 8 }]}>
                 <Pressable onPress={onBack} hitSlop={12}><Ionicons name="arrow-back" size={24} color="#fff" /></Pressable>
-                <Text style={styles.h2} numberOfLines={1}>{collection.title || 'Колекція'}</Text>
+                <Text style={styles.h2} numberOfLines={1}>{names[`collection:${collection.id}`] ?? collection.title ?? 'Колекція'}</Text>
             </View>
             {photos === null && <ActivityIndicator color="#7F77DD" style={{ marginTop: 28 }} />}
             <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 24 }}>

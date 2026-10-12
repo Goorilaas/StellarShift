@@ -340,3 +340,124 @@ test('unmount cancels pending autoscroll, and late scroll events after drop do n
     h.unmount();
     assert.equal(h.frames.size, 0);
 });
+
+const nameDisk = new Map();
+let failNameWrite = false;
+const nameApi = {
+    getItem: async key => nameDisk.get(key) ?? null,
+    setItem: async (key, value) => { if (failNameWrite) throw new Error('disk full'); nameDisk.set(key, value); },
+};
+const namesService = load('services/collectionNames.ts', { '@react-native-async-storage/async-storage': { default: nameApi } });
+test('names trim edges, accept 40 Unicode characters, reject empty, multiline and 41', () => {
+    assert.equal(namesService.normalizeCollectionName('  Космос  '), 'Космос');
+    assert.equal(namesService.normalizeCollectionName('𐐀'.repeat(40)).length, 80);
+    for (const value of ['', '  ', 'a'.repeat(41), 'Космос\n', 'Кос\rмос']) assert.throws(() => namesService.normalizeCollectionName(value));
+});
+test('independent names persist across reload and failed writes preserve the old value', async () => {
+    await Promise.all([namesService.saveCollectionName('mood:a', 'Обрії'), namesService.saveCollectionName('collection:a', 'Galaxy')]);
+    const reloaded = load('services/collectionNames.ts', { '@react-native-async-storage/async-storage': { default: nameApi } });
+    assert.deepEqual(plain(await reloaded.readCollectionNames(['mood:a', 'collection:a', 'missing'])), { 'mood:a': 'Обрії', 'collection:a': 'Galaxy' });
+    failNameWrite = true;
+    await assert.rejects(reloaded.saveCollectionName('mood:a', 'Змінено'), /disk full/);
+    failNameWrite = false;
+    assert.equal((await reloaded.readCollectionNames(['mood:a']))['mood:a'], 'Обрії');
+});
+test('alphabetic order puts Ukrainian before Latin, ignores case, uses natural numbers and stable ties', () => {
+    const ids = ['u2', 'a10', 'a2', 'u1', 'tie', 'unknown'];
+    const titles = { u2: 'Ясність', a10: 'Galaxy 10', a2: 'galaxy 2', u1: 'Абетка', tie: 'АБЕТКА' };
+    assert.deepEqual(plain(namesService.alphabeticIds(ids, titles)), ['u1', 'tie', 'u2', 'a2', 'a10', 'unknown']);
+    assert.deepEqual(ids, ['u2', 'a10', 'a2', 'u1', 'tie', 'unknown']);
+});
+function orderHookHarness(disk, initialIds) {
+    let si = 0, ei = 0, ids = initialIds;
+    const state = [], effects = [];
+    const hook = load('services/useCollectionOrder.ts', {
+        react: {
+            useState: initial => { const i = si++; if (!(i in state)) state[i] = initial; return [state[i], value => { state[i] = typeof value === 'function' ? value(state[i]) : value; }]; },
+            useCallback: fn => fn,
+            useEffect: (fn, deps) => { const i = ei++, old = effects[i]; if (!old || deps.some((v, j) => v !== old.deps[j])) { old?.cleanup?.(); effects[i] = { deps, cleanup: fn() }; } },
+        }, './collectionOrder': disk.order,
+    }).useCollectionOrder;
+    return { render: () => { si = ei = 0; return hook('moods', ids); }, ids: value => { ids = value; } };
+}
+test('legacy manual order survives alphabetical input and reload; reset tracks renames; failed reset preserves manual order', async () => {
+    const disk = storage(); await disk.order.saveCollectionOrder('moods', ['b', 'a']);
+    const h = orderHookHarness(disk, ['a', 'b']); h.render(); await new Promise(setImmediate);
+    assert.deepEqual(plain(h.render().ids), ['b', 'a']); assert.equal(h.render().manual, true);
+    const setItem = disk.api.setItem;
+    disk.api.setItem = async () => { throw new Error('full'); };
+    await assert.rejects(h.render().save(['a', 'b'], true));
+    assert.deepEqual(plain(h.render().ids), ['b', 'a']);
+    disk.api.setItem = setItem;
+    await h.render().save(['a', 'b'], true);
+    h.ids(['b', 'a']); assert.deepEqual(plain(h.render().ids), ['b', 'a']); assert.equal(h.render().manual, false);
+    const reloaded = orderHookHarness(disk, ['a', 'b']); reloaded.render(); await new Promise(setImmediate);
+    assert.deepEqual(plain(reloaded.render().ids), ['a', 'b']); assert.equal(reloaded.render().manual, false);
+    await reloaded.render().save(['b', 'a']); reloaded.ids(['a', 'b', 'c']);
+    assert.deepEqual(plain(reloaded.render().ids), ['b', 'a', 'c']);
+});
+test('alphabetize remains draft until Done; Back keeps old order and rename blocks Done', async () => {
+    const h = editingHarness(); let api = h.render(); api.start(); api = h.render();
+    api.reorder(['c', 'a', 'b']); api = h.render(); api.alphabetize(); api = h.render();
+    assert.deepEqual(plain(api.ids), ['a', 'b', 'c']); assert.equal(h.calls.length, 0);
+    api.setRenaming(true); api = h.render(); h.focusEffects[1](); assert.equal(h.back(), false);
+    await api.save(); assert.equal(h.calls.length, 0);
+    api.setRenaming(false); api = h.render(); api.cancel(); assert.equal(h.render().editing, false);
+});
+function nameHarness(save = async () => {}) {
+    let si = 0, ri = 0, ei = 0, keyboard, back;
+    const state = [], refs = [], effects = [], changes = [], saved = [];
+    const component = load('components/CollectionName.tsx', {
+        react: {
+            useState: initial => { const i = si++; if (!(i in state)) state[i] = initial; return [state[i], value => { state[i] = typeof value === 'function' ? value(state[i]) : value; }]; },
+            useRef: current => { const i = ri++; return refs[i] ?? (refs[i] = { current }); },
+            useEffect: (fn, deps) => { const i = ei++, old = effects[i]; if (!old || deps.some((v, j) => v !== old.deps[j])) { old?.cleanup?.(); effects[i] = { deps, cleanup: fn() }; } },
+        }, 'react/jsx-runtime': { jsx, jsxs: jsx },
+        'react-i18next': { useTranslation: () => ({ t: key => key }) },
+        'react-native': { View: 'View', Text: 'Text', TextInput: 'Input', Pressable: 'Pressable', StyleSheet: { create: x => x },
+            BackHandler: { addEventListener: (_name, fn) => { back = fn; return { remove() {} }; } },
+            Keyboard: { addListener: (_name, fn) => { keyboard = fn; return { remove() {} }; }, dismiss() {} },
+        }, '../services/collectionNames': namesService,
+    }).default;
+    return {
+        render: () => { si = ri = ei = 0; return component({ name: 'Galaxy', editing: true, onOpen() {}, onEditingChange: v => changes.push(v), onSave: async value => { saved.push(value); await save(); } }); },
+        saved, changes, keyboard: () => keyboard(), back: () => back(),
+    };
+}
+test('inline name rejects invalid input, retries failed persistence, and only closes after successful keyboard Done', async () => {
+    let fail = true;
+    const h = nameHarness(async () => { if (fail) throw new Error('full'); });
+    nodes(h.render()).find(n => n.type === 'Pressable').props.onPress();
+    let tree = h.render(); nodes(tree).find(n => n.type === 'Input').props.onChangeText('  ');
+    await nodes(h.render()).find(n => n.type === 'Input').props.onSubmitEditing();
+    assert.equal(h.saved.length, 0); assert.ok(nodes(h.render()).some(n => n.props?.accessibilityRole === 'alert'));
+    nodes(h.render()).find(n => n.type === 'Input').props.onChangeText('Космос');
+    await nodes(h.render()).find(n => n.type === 'Input').props.onSubmitEditing();
+    assert.ok(nodes(h.render()).some(n => n.type === 'Input'));
+    fail = false; await nodes(h.render()).find(n => n.type === 'Input').props.onSubmitEditing();
+    assert.ok(!nodes(h.render()).some(n => n.type === 'Input')); assert.deepEqual(h.changes, [true, false]);
+});
+test('Back and keyboard dismissal discard only current name without storage writes', () => {
+    for (const cancel of ['back', 'keyboard']) {
+        const h = nameHarness(); nodes(h.render()).find(n => n.type === 'Pressable').props.onPress();
+        nodes(h.render()).find(n => n.type === 'Input').props.onChangeText('Новий текст'); h.render(); h[cancel]();
+        assert.ok(!nodes(h.render()).some(n => n.type === 'Input')); assert.equal(h.saved.length, 0);
+    }
+});
+
+test('cancelled drag restores alphabetical mode instead of accidentally saving a manual order', () => {
+    const h = editingHarness(); let api = h.render(); api.start(); api = h.render();
+    api.setDragging(true); api = h.render(); api.reorder(['c', 'a', 'b']); api = h.render();
+    api.cancelReorder(); api.setDragging(false); api = h.render();
+    assert.deepEqual(plain(api.ids), ['a', 'b', 'c']); assert.equal(h.calls.length, 0);
+});
+test('duplicate keyboard Done does not write twice; Back cannot cancel a submitted pending save', async () => {
+    let finish;
+    const h = nameHarness(() => new Promise(resolve => { finish = resolve; }));
+    nodes(h.render()).find(n => n.type === 'Pressable').props.onPress();
+    nodes(h.render()).find(n => n.type === 'Input').props.onChangeText('Зорі');
+    const input = nodes(h.render()).find(n => n.type === 'Input');
+    const pending = input.props.onSubmitEditing(); await input.props.onSubmitEditing();
+    h.back(); assert.equal(h.saved.length, 1); assert.ok(nodes(h.render()).some(n => n.type === 'Input'));
+    finish(); await pending; assert.ok(!nodes(h.render()).some(n => n.type === 'Input'));
+});
