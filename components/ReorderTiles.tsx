@@ -7,11 +7,11 @@ import { edgeScrollStep, nearestTile, tilePositions, TilePosition } from '../ser
 
 type Drag = { id: string; ids: string[]; positions: Record<string, TilePosition>; from: number; target: number; offset: number; dx: number; dy: number; screenY: number };
 type Props = {
-    ids: string[]; columns?: number; fallbackHeight: number; editing: boolean; saving: boolean;
-    header?: ReactNode; onReorder: (ids: string[]) => void; onDragging: (active: boolean) => void;
-    renderItem: (id: string, visible: boolean) => ReactNode;
+    ids: string[]; columns?: number; fallbackHeight: number; editing: boolean; saving: boolean; renaming?: boolean;
+    header?: ReactNode; onReorderCancel?: () => void; onReorder: (ids: string[]) => void; onDragging: (active: boolean) => void;
+    renderItem: (id: string, visible: boolean, handle: (child: ReactNode) => ReactNode) => ReactNode;
 };
-export default function ReorderTiles({ ids, columns = 1, fallbackHeight, editing, saving, header, onReorder, onDragging, renderItem }: Props) {
+export default function ReorderTiles({ ids, columns = 1, fallbackHeight, editing, saving, renaming = false, header, onReorder, onReorderCancel, onDragging, renderItem }: Props) {
     const [width, setWidth] = useState(0);
     const [heights, setHeights] = useState<Record<string, number>>({});
     const [headerHeight, setHeaderHeight] = useState(0);
@@ -30,13 +30,13 @@ export default function ReorderTiles({ ids, columns = 1, fallbackHeight, editing
     const movement = useRef(new Animated.ValueXY()).current;
     const native = useMemo(() => Gesture.Native(), []);
     const layout = tilePositions(ids, width, columns, heights, fallbackHeight);
-    const current = useRef({ ids, layout, editing, saving, onReorder, onDragging, headerHeight, viewportHeight });
-    current.current = { ids, layout, editing, saving, onReorder, onDragging, headerHeight, viewportHeight };
+    const current = useRef({ ids, layout, editing, saving, onReorder, onReorderCancel, onDragging, headerHeight, viewportHeight });
+    current.current = { ids, layout, editing, saving, onReorder, onReorderCancel, onDragging, headerHeight, viewportHeight };
     const stopScroll = () => { if (frame.current !== null) cancelAnimationFrame(frame.current); frame.current = null; };
     useEffect(() => () => stopScroll(), []);
     useEffect(() => {
-        if (!editing || saving) { stopScroll(); drag.current = null; setActive(null); }
-    }, [editing, saving]);
+        if (!editing || saving || renaming) { stopScroll(); drag.current = null; setActive(null); }
+    }, [editing, saving, renaming]);
 
     const updateTarget = () => {
         const d = drag.current;
@@ -85,7 +85,10 @@ export default function ReorderTiles({ ids, columns = 1, fallbackHeight, editing
         stopScroll();
         updateTarget();
         setScrollY(offset.current);
-        if (!success && current.current.editing) current.current.onReorder(d.ids);
+        if (!success && current.current.editing) {
+            if (current.current.onReorderCancel) current.current.onReorderCancel();
+            else current.current.onReorder(d.ids);
+        }
         drag.current = null;
         setActive(null); current.current.onDragging(false);
     };
@@ -95,7 +98,7 @@ export default function ReorderTiles({ ids, columns = 1, fallbackHeight, editing
     }}>
         <GestureDetector gesture={native}>
             <Animated.ScrollView ref={scroll} scrollEnabled={!active && !saving} removeClippedSubviews={false}
-                contentContainerStyle={styles.content} scrollEventThrottle={16}
+                contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" scrollEventThrottle={16}
                 onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollOffset } } }], {
                     useNativeDriver: true,
                     listener: (e: { nativeEvent: { contentOffset: { y: number } } }) => {
@@ -109,7 +112,7 @@ export default function ReorderTiles({ ids, columns = 1, fallbackHeight, editing
                     {width > 0 && ids.map(id => {
                         const position = layout.positions[id];
                         const visible = position.y + headerHeight < scrollY + viewportHeight && position.y + headerHeight + position.height > scrollY;
-                        return <MovingTile key={id} position={position} editing={editing} saving={saving} active={id === active}
+                        return <MovingTile key={id} position={position} editing={editing} saving={saving || renaming} active={id === active}
                             movement={movement} scrollOffset={scrollOffset} releasePosition={releasePosition} native={native}
                             onHeight={height => setHeights(old => old[id] === height ? old : { ...old, [id]: height })}
                             onBegin={y => begin(id, y)} onMove={(dx, dy, y) => {
@@ -121,7 +124,7 @@ export default function ReorderTiles({ ids, columns = 1, fallbackHeight, editing
                                     updateTarget();
                                 }
                             }} onEnd={success => finish(id, success)}>
-                            {renderItem(id, visible && !editing)}
+                            {handle => renderItem(id, visible && !editing, handle)}
                         </MovingTile>;
                     })}
                 </View>
@@ -134,7 +137,7 @@ function MovingTile({ position, editing, saving, active, movement, scrollOffset,
     position: TilePosition; editing: boolean; saving: boolean; active: boolean; movement: Animated.ValueXY;
     scrollOffset: Animated.Value; releasePosition: RefObject<{ x: number; y: number }>;
     native: ReturnType<typeof Gesture.Native>; onHeight: (height: number) => void;
-    onBegin: (y: number) => void; onMove: (dx: number, dy: number, y: number) => void; onEnd: (success: boolean) => void; children: ReactNode;
+    onBegin: (y: number) => void; onMove: (dx: number, dy: number, y: number) => void; onEnd: (success: boolean) => void; children: (handle: (child: ReactNode) => ReactNode) => ReactNode;
 }) {
     const location = useRef(new Animated.ValueXY({ x: position.x, y: position.y })).current;
     const wobble = useRef(new Animated.Value(0)).current;
@@ -163,13 +166,11 @@ function MovingTile({ position, editing, saving, active, movement, scrollOffset,
         ]));
         animation.start(); return () => animation.stop();
     }, [editing, saving, active, wobble]);
-    return <GestureDetector gesture={pan}>
-        <Animated.View style={{ position: 'absolute', left: 0, top: 0, width: position.width,
+    return <Animated.View style={{ position: 'absolute', left: 0, top: 0, width: position.width,
             zIndex: active ? 100 : 0, elevation: active ? 12 : 0,
             transform: [...(active ? [{ translateX: movement.x }, { translateY: dragY }] : location.getTranslateTransform()), { scale: active ? 1.04 : 1 }, { rotate: wobble.interpolate({ inputRange: [-1, 1], outputRange: ['-0.7deg', '0.7deg'] }) }],
         }}>
-            <View onLayout={e => onHeight(e.nativeEvent.layout.height)} pointerEvents={editing ? 'none' : 'auto'}>{children}</View>
-        </Animated.View>
-    </GestureDetector>;
+            <View onLayout={e => onHeight(e.nativeEvent.layout.height)}>{children(child => <GestureDetector gesture={pan}><View>{child}</View></GestureDetector>)}</View>
+        </Animated.View>;
 }
 const styles = StyleSheet.create({ viewport: { flex: 1 }, content: { paddingHorizontal: 12, paddingBottom: 24 } });

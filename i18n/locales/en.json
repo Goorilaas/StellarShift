@@ -376,6 +376,11 @@
     "saving": "Saving…",
     "saveError": "Could not save the order. Try again — your changes are still here.",
     "loadError": "Could not load the order. Try again",
-    "success": "Everything in its place"
+    "success": "Everything in its place",
+    "alphabetical": "Alphabetical",
+    "rename": "Rename",
+    "nameLoadError": "Could not load custom names.",
+    "nameSaveError": "Not saved. Try again.",
+    "nameError": "Use 1–40 characters on one line."
   }
 }

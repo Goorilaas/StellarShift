@@ -9,13 +9,22 @@ type Props = { order: OrderEditing; orbit?: boolean; count: number };
 export default function CollectionOrderControl({ order, orbit = false, count }: Props) {
     const { t } = useTranslation();
     const Symbol = orbit ? OrderOrbit : OrderConstellation;
-    const disabled = !order.ready || order.saving || order.dragging || (!order.editing && count < 2);
+    const disabled = !order.ready || order.saving || order.dragging || order.renaming || (!order.editing && count < 1);
     return <Pressable disabled={disabled && !order.error} onPress={order.error ? order.retry : order.editing ? order.save : order.start}
         style={styles.button} accessibilityRole="button" accessibilityState={{ disabled }}>
         <View style={[styles.buttonContent, disabled && styles.disabled]}>
             <Symbol size={22} />
             <Text style={styles.link}>{t(order.error ? 'collections.retry' : order.saving ? 'collectionOrder.saving' : order.editing ? 'common.done' : 'collectionOrder.title')}</Text>
         </View>
+    </Pressable>;
+}
+
+export function CollectionAlphabetize({ order }: { order: OrderEditing }) {
+    const { t } = useTranslation();
+    if (!order.editing) return null;
+    return <Pressable accessibilityRole="button" disabled={order.saving || order.dragging || order.renaming}
+        onPress={order.alphabetize} style={{ minHeight: 44, paddingHorizontal: 16, justifyContent: 'center', alignSelf: 'flex-start' }}>
+        <Text style={styles.link}>{t('collectionOrder.alphabetical')}</Text>
     </Pressable>;
 }
 

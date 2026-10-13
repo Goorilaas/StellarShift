@@ -12,6 +12,10 @@ export function useOrderEditing(scope: string, ids: readonly string[]) {
     const [saveError, setSaveError] = useState(false);
     const [success, setSuccess] = useState(0);
     const [dragging, setDragging] = useState(false);
+    const [alphabetical, setAlphabetical] = useState(false);
+    const [renaming, setRenaming] = useState(false);
+    const renamingRef = useRef(renaming); renamingRef.current = renaming;
+    const dragSnapshot = useRef<{ ids: string[]; alphabetical: boolean } | null>(null);
     const busy = useRef(false);
     const focused = useRef(true);
     const editing = draft !== null;
@@ -25,14 +29,14 @@ export function useOrderEditing(scope: string, ids: readonly string[]) {
     }, []));
     useFocusEffect(useCallback(() => {
         if (!editing) return;
-        const back = BackHandler.addEventListener('hardwareBackPress', () => { cancel(); return true; });
+        const back = BackHandler.addEventListener('hardwareBackPress', () => { if (renamingRef.current) return false; cancel(); return true; });
         return () => back.remove();
     }, [editing, cancel]));
     const save = async () => {
-        if (busy.current || dragging || !draft) return;
+        if (busy.current || dragging || renaming || !draft) return;
         busy.current = true; setSaving(true); setSaveError(false);
         try {
-            await order.save(draft);
+            await order.save(alphabetical ? [...ids] : draft, alphabetical);
             if (focused.current) {
                 setDraft(null); setSuccess(n => n + 1);
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -40,11 +44,21 @@ export function useOrderEditing(scope: string, ids: readonly string[]) {
         } catch { if (focused.current) setSaveError(true); }
         finally { busy.current = false; setSaving(false); }
     };
-    return { ...order, ids: draft ?? order.ids, editing, saving, saveError, success, dragging,
+    return { ...order, ids: draft ? (alphabetical ? [...ids] : draft) : order.ids, editing, saving, renaming, setRenaming, saveError, success, dragging,
         clearSuccess: () => setSuccess(0),
-        start: () => { if (order.ready && !busy.current) { setDraft([...order.ids]); setSuccess(0); setSaveError(false); } },
-        cancel, save, setDragging,
-        reorder: (visible: string[]) => { if (!busy.current) setDraft(current => current && mergeVisibleOrder(current, visible)); },
+        start: () => { if (order.ready && !busy.current) { setAlphabetical(!order.manual); setDraft([...order.ids]); setSuccess(0); setSaveError(false); } },
+        cancel, save,
+        setDragging: (active: boolean) => {
+            if (active && draft) dragSnapshot.current = { ids: alphabetical ? [...ids] : [...draft], alphabetical };
+            if (!active) dragSnapshot.current = null;
+            setDragging(active);
+        },
+        cancelReorder: () => {
+            const previous = dragSnapshot.current;
+            if (previous) { setDraft(previous.ids); setAlphabetical(previous.alphabetical); }
+        },
+        alphabetize: () => { if (!busy.current && !dragging && !renaming) { setAlphabetical(true); setDraft([...ids]); } },
+        reorder: (visible: string[]) => { if (!busy.current) { setAlphabetical(false); setDraft(current => current && mergeVisibleOrder(alphabetical ? [...ids] : current, visible)); } },
     };
 }
 export type OrderEditing = ReturnType<typeof useOrderEditing>;

@@ -15,11 +15,11 @@ export function useCollectionOrder(scope: string, ids: readonly string[]) {
         }).catch(() => { if (alive) setError(true); });
         return () => { alive = false; };
     }, [scope, attempt]);
-    const save = useCallback(async (draft: string[]) => {
+    const save = useCallback(async (draft: string[], alphabetical = false) => {
         if (!ready) throw new Error('Order not loaded');
-        const next = reconcileOrder(ids, draft);
+        const next = alphabetical ? [] : reconcileOrder(ids, draft);
         await saveCollectionOrder(scope, next);
         setSaved(next);
     }, [scope, ids, ready]);
-    return { ids: reconcileOrder(ids, saved), ready, error, save, retry: () => setAttempt(n => n + 1) };
+    return { manual: saved.length > 0, ids: reconcileOrder(ids, saved), ready, error, save, retry: () => setAttempt(n => n + 1) };
 }
