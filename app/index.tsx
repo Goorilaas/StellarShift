@@ -1,3 +1,4 @@
+import { showBlockFeedback } from '../services/blockFeedback';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { CanceledError } from 'axios';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -586,7 +587,9 @@ export default function HomeScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => { });
     const wasFav = favorites.includes(photo.id);
     // Add to blocked store
-    await blockPhotoStore({ id: photo.id, small: photo.urls.small });
+    let result;
+    try { result = await blockPhotoStore({ id: photo.id, small: photo.urls.small }); }
+    catch { showToast(t('blockReplacement.hideFailed')); return; }
     // Silently remove from favorites if present
     if (wasFav) {
       const raw = await AsyncStorage.getItem('favorites_data');
@@ -597,11 +600,8 @@ export default function HomeScreen() {
       await AsyncStorage.setItem('favorites', JSON.stringify(newIds));
       await AsyncStorage.setItem('favorites_data', JSON.stringify(newData));
     }
-    setSelectedPhoto(null);
-    showToast(t('catalog.toast.blocked'), {
-      label: t('common.undo'),
-      onPress: () => undoBlock(photo, wasFav),
-    }, 5000);
+    setSelectedPhoto(current => current?.id === photo.id ? null : current);
+    showBlockFeedback(result, photo.id, t, showToast, dismissToast, () => { void undoBlock(photo, wasFav); });
   };
 
   const undoBlock = async (photo: Photo, wasFav: boolean) => {

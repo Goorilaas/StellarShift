@@ -22,6 +22,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
     companion object {
         const val ACTION_FAV = "com.gorilas.StellarShift.NOTIF_FAV"
         const val ACTION_BLOCK = "com.gorilas.StellarShift.NOTIF_BLOCK"
+        const val ACTION_RETRY_BLOCK = "com.gorilas.StellarShift.RETRY_BLOCK"
         const val ACTION_NEXT = "com.gorilas.StellarShift.NOTIF_NEXT"
 
         /** Додає {id,url} у pending-буфер, ігноруючи дублікати по id. Ліміт 50. */
@@ -58,9 +59,14 @@ class NotificationActionReceiver : BroadcastReceiver() {
                         BlockedPhotos.mutate(prefs, "add", JSONArray().put(
                             JSONObject().put("id", photoId).put("small", photoUrl)
                         ).toString())
-                        // Гидота зникає з екрана негайно. Порожній пул — прибираємо нотифікацію.
-                        val applied = WallpaperWorker.applyNext(context, manual = true)
-                        if (!applied) NotificationHelper.cancel(context)
+                        // A stale notification must not advance an unrelated current wallpaper.
+                        val result = WallpaperWorker.replaceBlockedCurrent(context, photoId)
+                        if (result == "failed") NotificationHelper.showReplacementFailure(context, photoId, photoUrl)
+                    }
+                    ACTION_RETRY_BLOCK -> {
+                        // Never re-hide on retry: the user may already have undone the block.
+                        val result = WallpaperWorker.replaceBlockedCurrent(context, photoId)
+                        if (result == "failed") NotificationHelper.showReplacementFailure(context, photoId, photoUrl)
                     }
                     ACTION_FAV -> {
                         appendPending(prefs, "pendingFavorites", photoId, photoUrl)

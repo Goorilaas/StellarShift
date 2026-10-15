@@ -1,3 +1,4 @@
+import { showBlockFeedback } from '../services/blockFeedback';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -465,13 +466,10 @@ function PhotoGrid({ collection, top, onBack, favIds, onFav }: {
                         showToast(t('catalog.toast.applied'));
                     }}
                     onToggleFav={() => onFav(viewing)}
-                    onBlocked={() => {
+                    onBlocked={result => {
                         const id = viewing.id;
-                        setViewing(null);
-                        showToast(t('catalog.toast.blocked'), {
-                            label: t('common.undo'),
-                            onPress: async () => { await unblockPhoto(id); dismissToast(); },
-                        }, 5000);
+                        setViewing(current => current?.id === id ? null : current);
+                        showBlockFeedback(result, id, t, showToast, dismissToast, async () => { await unblockPhoto(id); dismissToast(); });
                     }}
                 />
             )}

@@ -47,8 +47,8 @@ export const setWallpaperFromUrl = async (
     target: string,
     meta?: { id: string; small?: string; downloadLocation?: string }
 ): Promise<boolean> => {
-    const result = await WallpaperModule.setFromUrl(url, target);
-    if (meta) {
+    const result = await WallpaperModule.setFromUrl(url, target, meta?.id ?? '');
+    if (result && meta) {
         await recordHistory({ id: meta.id, url, small: meta.small, target, appliedAt: Date.now(), downloadLocation: meta.downloadLocation });
         // Fire Unsplash download-tracking ping (required by API ToS for "use" events).
         if (meta.downloadLocation) trackDownload(meta.downloadLocation);
@@ -96,9 +96,9 @@ export const setNotificationsEnabledNative = (enabled: boolean): Promise<void> =
 // Локалізовані рядки нотифікації-компаньйона: Kotlin читає їх з prefs.
 // Викликати на mount Settings і при зміні мови.
 export const setNotificationStrings = (s: {
-    title: string; fav: string; block: string; next: string; favDone: string; channelName: string;
+    title: string; fav: string; block: string; next: string; favDone: string; channelName: string; replaceFailed: string; retry: string;
 }): Promise<void> =>
-    WallpaperModule.setNotificationStrings(s.title, s.fav, s.block, s.next, s.favDone, s.channelName);
+    WallpaperModule.setNotificationStrings(s.title, s.fav, s.block, s.next, s.favDone, s.channelName, s.replaceFailed, s.retry);
 
 // Дії з шторки (❤️/🚫), накопичені поки застосунок не відкривали.
 export const drainPendingActions = async (): Promise<{ favorites: PendingAction[]; blocked: PendingAction[] }> => {

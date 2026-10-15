@@ -15,11 +15,12 @@ declare module 'react-native' {
             ): Promise<void>;
             updateRotationSettings(intervalMinutes: number, target: string): Promise<boolean>;
             stopRotation(): Promise<void>;
-            setFromUrl(url: string, target: string): Promise<boolean>;
+            setFromUrl(url: string, target: string, photoId: string): Promise<boolean>;
             setUnsplashKey(key: string): Promise<void>;
             setPoolRecipe(recipeJson: string): Promise<void>;
             setActiveCollections(json: string): Promise<void>;
             refreshPool(): Promise<boolean>;
+            replaceBlockedCurrent(photoId: string): Promise<'replaced' | 'unchanged' | 'failed'>;
             changeNow(): Promise<boolean>;
             drainPendingHistory(): Promise<string>;
             setSleepHours(enabled: boolean, startMin: number, endMin: number): Promise<void>;
@@ -28,7 +29,7 @@ declare module 'react-native' {
             disableLiveWallpaper(): Promise<boolean>;
             setLiveIntensity(px: number): Promise<void>;
             setNotificationsEnabled(enabled: boolean): Promise<void>;
-            setNotificationStrings(title: string, fav: string, block: string, next: string, favDone: string, channelName: string): Promise<void>;
+            setNotificationStrings(title: string, fav: string, block: string, next: string, favDone: string, channelName: string, replaceFailed: string, retry: string): Promise<void>;
             drainPendingActions(): Promise<string>;
             getBlockedPhotos(legacyJson: string): Promise<string>;
             mutateBlockedPhotos(operation: string, photosJson: string): Promise<string>;

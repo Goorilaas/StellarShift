@@ -33,8 +33,29 @@ export async function getBlockedIds(): Promise<Set<string>> {
     return new Set(list.map(p => p.id));
 }
 
-export async function blockPhoto(p: BlockedPhoto): Promise<void> {
-    await mutate('add', [p]);
+export type BlockResult = 'replaced' | 'unchanged' | 'failed';
+const replacements = new Map<string, Promise<BlockResult>>();
+const hides = new Map<string, Promise<BlockResult>>();
+
+export function retryBlockedReplacement(id: string): Promise<BlockResult> {
+    const pending = replacements.get(id);
+    if (pending) return pending;
+    const request = Promise.resolve().then(() => WallpaperModule.replaceBlockedCurrent(id))
+        .then((value: unknown): BlockResult => value === 'replaced' || value === 'unchanged' ? value : 'failed')
+        .catch((): BlockResult => 'failed')
+        .finally(() => replacements.delete(id));
+    replacements.set(id, request);
+    return request;
+}
+
+export function blockPhoto(p: BlockedPhoto, replaceCurrent = true): Promise<BlockResult> {
+    if (!replaceCurrent) return mutate('add', [p]).then(() => 'unchanged');
+    const pending = hides.get(p.id);
+    if (pending) return pending;
+    const request = mutate('add', [p]).then(() => retryBlockedReplacement(p.id))
+        .finally(() => hides.delete(p.id));
+    hides.set(p.id, request);
+    return request;
 }
 
 export async function unblockPhoto(id: string): Promise<void> {

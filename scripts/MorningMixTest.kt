@@ -223,5 +223,18 @@ fun main() {
         store.publish("a", catalog("mix-photo"), morning)
         check(MorningMixRotation.valid(prefs, store, selection, false, morning))
     }
+    test("manual replacement can use retained pool with rotation OFF during night pause") {
+        val (prefs, store) = setupRotation()
+        store.publish("a", catalog("a", "b"), morning)
+        MorningMixRotation.adopt(prefs, store)
+        prefs.edit().putInt("intervalMinutes", 0).putBoolean("sleepEnabled", true)
+            .putInt("sleepStart", 0).putInt("sleepEnd", 1439).commit()
+        val selection = MorningMixRotation.select(prefs, store, false)!!
+        check(!MorningMixRotation.valid(prefs, store, selection, false, morning))
+        check(MorningMixRotation.valid(prefs, store, selection, true, morning))
+        check(prefs.getInt("intervalMinutes", -1) == 0)
+        BlockedPhotos.mutate(prefs, "add", photos(selection.item.getString("id")).toString())
+        check(!MorningMixRotation.valid(prefs, store, selection, true, morning))
+    }
     println("$passed morning mix tests passed")
 }

@@ -102,5 +102,80 @@ fun main() {
         threads.forEach { it.join() }
         check(BlockedPhotos.ids(prefs).size == 80)
     }
+    test("legacy installs are unknown; only a tracked matching photo is replaced") {
+        val prefs = preferences()
+        BlockedPhotos.migrate(prefs, "[]")
+        BlockedPhotos.mutate(prefs, "add", photos("a", "b").toString())
+        check(CurrentWallpaper.replacementTarget(prefs, "a", 1, 2) == null)
+        CurrentWallpaper.record(prefs, "a", "both", 1, 2)
+        check(CurrentWallpaper.replacementTarget(prefs, "a", 1, 2) == "both")
+        check(CurrentWallpaper.replacementTarget(prefs, "b", 1, 2) == null)
+    }
+    test("home and lock retain independent identities across restart") {
+        val data = mutableMapOf<String, Any>()
+        val prefs = preferences(data)
+        BlockedPhotos.migrate(prefs, "[]")
+        CurrentWallpaper.record(prefs, "a", "both", 1, 2)
+        CurrentWallpaper.record(prefs, "b", "lock", 1, 3)
+        BlockedPhotos.mutate(prefs, "add", photos("a", "b").toString())
+        val reopened = preferences(data)
+        check(CurrentWallpaper.replacementTarget(reopened, "a", 1, 3) == "home")
+        check(CurrentWallpaper.replacementTarget(reopened, "b", 1, 3) == "lock")
+    }
+    test("Undo cancels a pending replacement without changing current identity or pool index") {
+        val prefs = preferences()
+        BlockedPhotos.migrate(prefs, "[]")
+        CurrentWallpaper.record(prefs, "a", "home", 1, 2)
+        BlockedPhotos.replacePool(prefs, photos("a", "b"), 1)
+        BlockedPhotos.mutate(prefs, "add", photos("a").toString())
+        val expected = CurrentWallpaper.snapshot(prefs)
+        check(CurrentWallpaper.replacementTarget(prefs, "a", 1, 2, expected) == "home")
+        BlockedPhotos.mutate(prefs, "remove", photos("a").toString())
+        check(CurrentWallpaper.replacementTarget(prefs, "a", 1, 2, expected) == null)
+        check(CurrentWallpaper.snapshot(prefs) == expected)
+        check(BlockedPhotos.next(prefs)?.getString("id") == "b")
+    }
+    test("duplicate successful replacement cannot advance again; live reinstall invalidates a pending snapshot") {
+        val prefs = preferences()
+        BlockedPhotos.migrate(prefs, "[]")
+        BlockedPhotos.mutate(prefs, "add", photos("a").toString())
+        CurrentWallpaper.record(prefs, "a", "home", 10, -1)
+        val old = CurrentWallpaper.snapshot(prefs)
+        CurrentWallpaper.record(prefs, "a", "home", 10, -1)
+        check(CurrentWallpaper.replacementTarget(prefs, "a", 10, -1, old) == null)
+        CurrentWallpaper.record(prefs, "b", "home", 10, -1)
+        check(CurrentWallpaper.replacementTarget(prefs, "a", 10, -1) == null)
+    }
+    test("external wallpaper changes invalidate only affected screens") {
+        val prefs = preferences()
+        BlockedPhotos.migrate(prefs, "[]")
+        BlockedPhotos.mutate(prefs, "add", photos("a").toString())
+        CurrentWallpaper.record(prefs, "a", "both", 1, 2)
+        check(CurrentWallpaper.replacementTarget(prefs, "a", 9, 2) == "lock")
+        check(CurrentWallpaper.replacementTarget(prefs, "a", 9, 8) == null)
+    }
+    test("empty remaining pool keeps identity and block, allowing later retry without enabling rotation") {
+        val prefs = preferences()
+        BlockedPhotos.migrate(prefs, "[]")
+        prefs.edit().putInt("intervalMinutes", 0).commit()
+        CurrentWallpaper.record(prefs, "a", "home", 1, 2)
+        BlockedPhotos.replacePool(prefs, photos("a"), 1)
+        BlockedPhotos.mutate(prefs, "add", photos("a").toString())
+        val expected = CurrentWallpaper.snapshot(prefs)
+        check(BlockedPhotos.next(prefs) == null)
+        check(CurrentWallpaper.replacementTarget(prefs, "a", 1, 2, expected) == "home")
+        BlockedPhotos.replacePool(prefs, photos("a", "b"), 2)
+        check(BlockedPhotos.next(prefs)?.getString("id") == "b")
+        check(prefs.getInt("intervalMinutes", -1) == 0)
+    }
+    test("mirrored lock identity follows the system wallpaper and rejects external home changes") {
+        val prefs = preferences()
+        BlockedPhotos.migrate(prefs, "[]")
+        BlockedPhotos.mutate(prefs, "add", photos("a").toString())
+        CurrentWallpaper.record(prefs, "a", "both", 10, -1)
+        check(CurrentWallpaper.replacementTarget(prefs, "a", 10, -1) == "both")
+        check(CurrentWallpaper.replacementTarget(prefs, "a", 11, -1) == null)
+        check(CurrentWallpaper.replacementTarget(prefs, "a", 10, 12) == "home")
+    }
     println("$passed native tests passed")
 }
