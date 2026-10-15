@@ -264,7 +264,7 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
 
     // JS пише локалізовані рядки нотифікації — Kotlin не знає про i18next.
     @ReactMethod
-    fun setNotificationStrings(title: String, fav: String, block: String, next: String, favDone: String, channelName: String, promise: Promise) {
+    fun setNotificationStrings(title: String, fav: String, block: String, next: String, favDone: String, channelName: String, replaceFailed: String, retry: String, promise: Promise) {
         try {
             val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
             prefs.edit()
@@ -274,6 +274,8 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
                 .putString("notifNext", next)
                 .putString("notifFavDone", favDone)
                 .putString("notifChannelName", channelName)
+                .putString("notifReplaceFailed", replaceFailed)
+                .putString("notifRetry", retry)
                 .apply()
             promise.resolve(null)
         } catch (e: Exception) {
@@ -327,12 +329,12 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
     }
 
     @ReactMethod
-    fun setFromUrl(url: String, target: String, promise: Promise) {
+    fun setFromUrl(url: String, target: String, photoId: String, promise: Promise) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 // LW-aware: при активній живій шпалері пише файл (engine fade'ить),
                 // інакше класичний static. Файл кешується в обох випадках.
-                WallpaperWorker.applyWallpaper(reactApplicationContext, url, target)
+                WallpaperWorker.applyWallpaper(reactApplicationContext, url, target, photoId)
                 withContext(Dispatchers.Main) { promise.resolve(true) }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) { promise.reject("SET_ERROR", e.message, e) }
@@ -357,6 +359,18 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
             promise.resolve(null)
         } catch (e: Exception) {
             promise.reject("BATTERY_ERROR", e.message, e)
+        }
+    }
+
+    @ReactMethod
+    fun replaceBlockedCurrent(photoId: String, promise: Promise) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val result = WallpaperWorker.replaceBlockedCurrent(reactApplicationContext, photoId)
+                withContext(Dispatchers.Main) { promise.resolve(result) }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { promise.reject("REPLACE_BLOCKED_ERROR", e.message, e) }
+            }
         }
     }
 

@@ -1,3 +1,4 @@
+import { showBlockFeedback } from '../services/blockFeedback';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import axios, { isCancel } from 'axios';
@@ -755,6 +756,8 @@ export default function SettingsScreen() {
             next: t('notif.next'),
             favDone: t('notif.favDone'),
             channelName: t('notif.channel'),
+            replaceFailed: t('blockReplacement.failed'),
+            retry: t('blockReplacement.retry'),
         }).catch(() => { });
     }, [lang, t]);
 
@@ -852,7 +855,9 @@ export default function SettingsScreen() {
     const blockFromHistory = async (h: HistoryEntry) => {
         setHistMenuTarget(null);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => { });
-        await blockPhoto({ id: h.id, small: h.small ?? h.url });
+        let result;
+        try { result = await blockPhoto({ id: h.id, small: h.small ?? h.url }); }
+        catch { showToast(t('blockReplacement.hideFailed')); return; }
         // silent з улюблених, як у каталозі
         if (favIds.includes(h.id)) {
             const raw = await AsyncStorage.getItem('favorites_data');
@@ -862,21 +867,8 @@ export default function SettingsScreen() {
             await AsyncStorage.setItem('favorites', JSON.stringify(newData.map(p => p.id)));
             setFavIds(prev => prev.filter(id => id !== h.id));
         }
-        const isCurrent = history[0]?.id === h.id;
-        if (autoChangeRef.current) {
-            if (isCurrent) {
-                // «Прибрати гидоту»: заблокував поточну → вона зникає з екрана негайно
-                try {
-                    await changeWallpaperNow();
-                    showToast(t('settings.toast.nastyGone'));
-                } catch { /* порожній пул — нічого міняти */ }
-                syncNativeHistory().then(() => getHistory().then(setHistory));
-            } else {
-                showToast(t('catalog.toast.blocked'));
-            }
-        } else {
-            showToast(t('catalog.toast.blocked'));
-        }
+        showBlockFeedback(result, h.id, t, showToast, dismissToast);
+        syncNativeHistory().then(() => getHistory().then(setHistory)).catch(() => {});
     };
 
     // Сховані категорії каталогу: повернення. Каталог перечитує на focus.
@@ -917,7 +909,7 @@ export default function SettingsScreen() {
 
     const undoUnblockOne = async (photo: BlockedPhoto) => {
         dismissToast();
-        await blockPhoto(photo);
+        await blockPhoto(photo, false);
     };
 
     const confirmClearBlocked = async () => {

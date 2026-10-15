@@ -382,5 +382,12 @@
     "nameLoadError": "Could not load custom names.",
     "nameSaveError": "Not saved. Try again.",
     "nameError": "Use 1–40 characters on one line."
+  },
+  "blockReplacement": {
+    "replaced": "Photo hidden. Wallpaper changed",
+    "failed": "Photo hidden. Could not change wallpaper",
+    "retry": "Try again",
+    "hideFailed": "Could not hide the photo. Try again",
+    "noLongerNeeded": "Replacement is no longer needed"
   }
 }

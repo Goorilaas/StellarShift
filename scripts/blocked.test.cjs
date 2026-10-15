@@ -164,3 +164,69 @@ test('settings unblock/clear/Undo never reload Unsplash; Undo merges instead of 
     await toasts.pop().onPress();
     assert.deepEqual([...hidden.keys()].sort(), ['a', 'shade']);
 });
+
+test('hide emits state before replacement; duplicate taps share one operation and offline failure keeps the block', async () => {
+    let writes = 0, replacements = 0, updates = 0;
+    const network = deferred();
+    const blocked = moduleFrom('services/blocked.ts', {
+        '@react-native-async-storage/async-storage': { default: { getItem: async () => null } },
+        'react-native': { NativeModules: { WallpaperModule: {
+            getBlockedPhotos: async () => '[]',
+            mutateBlockedPhotos: async () => { writes++; return '[]'; },
+            replaceBlockedCurrent: async () => { replacements++; assert.equal(updates, 1); return network.promise; },
+        } } },
+    });
+    blocked.subscribeBlocked(() => updates++);
+    const one = blocked.blockPhoto({ id: 'a', small: '' });
+    const two = blocked.blockPhoto({ id: 'a', small: '' });
+    assert.equal(one, two);
+    await settle(); assert.equal(writes, 1); assert.equal(replacements, 1);
+    network.resolve('failed'); assert.equal(await one, 'failed'); assert.equal(updates, 1);
+    await blocked.retryBlockedReplacement('a'); assert.equal(writes, 1); assert.equal(replacements, 2);
+});
+test('retry uses native current-photo guard and never re-hides; restore Undo does not replace', async () => {
+    const calls = [];
+    const blocked = moduleFrom('services/blocked.ts', {
+        '@react-native-async-storage/async-storage': { default: { getItem: async () => null } },
+        'react-native': { NativeModules: { WallpaperModule: {
+            getBlockedPhotos: async () => '[]',
+            mutateBlockedPhotos: async op => { calls.push(op); return '[]'; },
+            replaceBlockedCurrent: async id => { calls.push(id); return 'unchanged'; },
+        } } },
+    });
+    assert.equal(await blocked.retryBlockedReplacement('old'), 'unchanged');
+    await blocked.blockPhoto({ id: 'a', small: '' }, false);
+    await blocked.restoreBlocked([{ id: 'b', small: '' }]);
+    assert.deepEqual(calls, ['old', 'add', 'add']);
+});
+test('feedback retains Undo and offers guarded retry after replacement failure, without claiming a new install on stale retry', async () => {
+    const toasts = []; let retried = 0, undone = 0;
+    const wait = deferred();
+    const { showBlockFeedback } = moduleFrom('services/blockFeedback.ts', {
+        './blocked': { retryBlockedReplacement: async () => { retried++; return wait.promise; } },
+    });
+    const show = (message, action) => toasts.push({ message, action });
+    showBlockFeedback('failed', 'a', key => key, show, () => {}, () => undone++);
+    assert.equal(toasts[0].message, 'catalog.toast.blocked');
+    toasts[0].action.onPress(); assert.equal(undone, 1);
+    assert.equal(toasts[1].message, 'blockReplacement.failed');
+    const pending = toasts[1].action.onPress(); await toasts[1].action.onPress(); assert.equal(retried, 1);
+    wait.resolve('unchanged'); await pending;
+    assert.equal(toasts.at(-1).message, 'blockReplacement.noLongerNeeded');
+});
+
+test('manual installs pass photo identity to native and record history/tracking only on success', async () => {
+    const calls = [], writes = [], tracked = []; let success = false;
+    const service = moduleFrom('services/wallpaperService.ts', {
+        '@react-native-async-storage/async-storage': { default: { getItem: async () => '[]', setItem: async (...args) => writes.push(args) } },
+        'react-native': { NativeModules: { WallpaperModule: { setFromUrl: async (...args) => { calls.push(args); return success; } } } },
+        './rateApp': { bumpSetWallpaperCount: () => {} },
+        './unsplashTracking': { trackDownload: url => tracked.push(url) },
+        './blocked': { getBlocked: async () => [] },
+    });
+    const meta = { id: 'a', small: 'small', downloadLocation: 'tracking' };
+    assert.equal(await service.setWallpaperFromUrl('image', 'lock', meta), false);
+    assert.deepEqual(calls[0], ['image', 'lock', 'a']); assert.equal(writes.length, 0); assert.equal(tracked.length, 0);
+    success = true; await service.setWallpaperFromUrl('image', 'home', meta);
+    assert.equal(JSON.parse(writes[0][1])[0].target, 'home'); assert.deepEqual(tracked, ['tracking']);
+});

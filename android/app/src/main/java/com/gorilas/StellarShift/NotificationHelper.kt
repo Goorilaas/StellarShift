@@ -11,7 +11,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import java.io.File
-import java.io.FileOutputStream
+import android.util.AtomicFile
 
 /**
  * Нотифікація-компаньйон автозміни: «Зараз на екрані» з фото і діями
@@ -58,14 +58,18 @@ object NotificationHelper {
     }
 
     /** Кеш поточного фото — для re-post мітки 💜 і майбутнього Live Wallpaper. */
-    fun saveCurrentToFile(context: Context, bitmap: Bitmap) {
-        try {
+    fun saveCurrentToFile(context: Context, bitmap: Bitmap): Boolean {
+        val file = AtomicFile(File(context.filesDir, CURRENT_FILE))
+        var output: java.io.FileOutputStream? = null
+        return try {
+            output = file.startWrite()
             val scaled = scaleTo(bitmap, 1440)
-            FileOutputStream(File(context.filesDir, CURRENT_FILE)).use { out ->
-                scaled.compress(Bitmap.CompressFormat.JPEG, 88, out)
-            }
+            check(scaled.compress(Bitmap.CompressFormat.JPEG, 88, output))
+            file.finishWrite(output)
+            true
         } catch (_: Exception) {
-            // кеш — best effort
+            file.failWrite(output)
+            false
         }
     }
 
@@ -145,6 +149,24 @@ object NotificationHelper {
     fun markFavorited(context: Context, photoId: String, photoUrl: String) {
         val bmp = loadCurrentFromFile(context) ?: return
         showApplied(context, bmp, photoId, photoUrl, favorited = true)
+    }
+
+    fun showReplacementFailure(context: Context, photoId: String, photoUrl: String) {
+        if (!isEnabled(context)) return
+        try {
+            ensureChannel(context)
+            val p = prefs(context)
+            val message = p.getString("notifReplaceFailed", null) ?: "Фото приховано. Не вдалося змінити шпалеру"
+            val retry = p.getString("notifRetry", null) ?: "Спробувати ще"
+            val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle(p.getString("notifTitle", null) ?: "StellarShift")
+                .setContentText(message).setStyle(NotificationCompat.BigTextStyle().bigText(message))
+                .setOnlyAlertOnce(true)
+                .addAction(0, retry, actionIntent(context, NotificationActionReceiver.ACTION_RETRY_BLOCK, 4, photoId, photoUrl))
+                .build()
+            NotificationManagerCompat.from(context).notify(NOTIF_ID, notification)
+        } catch (_: Exception) { }
     }
 
     fun cancel(context: Context) {

@@ -126,13 +126,11 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
         private fun applyLockIfSeparate(context: Context, bitmap: Bitmap, target: String) {
             if (target == "home") return
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
-            try {
-                val wm = WallpaperManager.getInstance(context)
-                if (wm.getWallpaperId(WallpaperManager.FLAG_LOCK) != -1) {
-                    val cropHint = Rect(0, 0, bitmap.width, bitmap.height)
-                    wm.setBitmap(bitmap, cropHint, true, WallpaperManager.FLAG_LOCK)
-                }
-            } catch (_: Exception) { }
+            val wm = WallpaperManager.getInstance(context)
+            if (wm.getWallpaperId(WallpaperManager.FLAG_LOCK) != -1) {
+                val cropHint = Rect(0, 0, bitmap.width, bitmap.height)
+                wm.setBitmap(bitmap, cropHint, true, WallpaperManager.FLAG_LOCK)
+            }
         }
 
         /**
@@ -142,19 +140,63 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
          * LW неактивна → класичний static-шлях. Файл пишеться в ОБОХ випадках —
          * він джерело і для LW, і для мітки 💜 у шторці.
          */
-        suspend fun applyWallpaper(context: Context, url: String, target: String): Bitmap {
+        suspend fun applyWallpaper(context: Context, url: String, target: String, photoId: String): Bitmap = applyMutex.withLock {
             val bitmap = downloadBitmap(url)
-            applyBitmap(context, bitmap, target)
-            return bitmap
+            currentCoroutineContext().ensureActive()
+            val prefs = context.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+            synchronized(BlockedPhotos) {
+                check(photoId.isBlank() || photoId !in BlockedPhotos.ids(prefs)) { "Photo was hidden during download" }
+                applyAndRecord(context, bitmap, target, photoId)
+            }
+            bitmap
         }
 
-        private fun applyBitmap(context: Context, bitmap: Bitmap, target: String) {
-            if (isOurLiveWallpaper(context)) {
-                applyLockIfSeparate(context, bitmap, target)
-            } else {
-                applyStatic(context, bitmap, target)
+        private fun wallpaperIds(context: Context): Pair<Int, Int> {
+            val manager = WallpaperManager.getInstance(context)
+            return manager.getWallpaperId(WallpaperManager.FLAG_SYSTEM) to manager.getWallpaperId(WallpaperManager.FLAG_LOCK)
+        }
+
+        private fun applyAndRecord(context: Context, bitmap: Bitmap, target: String, photoId: String) {
+            val prefs = context.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+            val live = isOurLiveWallpaper(context)
+            try {
+                if (live && target != "lock") {
+                    if (target == "both") applyLockIfSeparate(context, bitmap, target)
+                    check(NotificationHelper.saveCurrentToFile(context, bitmap)) { "Cannot update live wallpaper file" }
+                } else {
+                    // An explicit lock-only install must not change our live home surface.
+                    applyStatic(context, bitmap, target)
+                    if (!live) NotificationHelper.saveCurrentToFile(context, bitmap)
+                }
+                val (homeId, lockId) = wallpaperIds(context)
+                val actualTarget = if (target == "home" && lockId == -1) "both" else target
+                CurrentWallpaper.record(prefs, photoId, actualTarget, homeId, lockId)
+            } catch (e: Exception) {
+                // Partial platform failure is not proof that the old photo is still installed.
+                val (homeId, lockId) = wallpaperIds(context)
+                CurrentWallpaper.record(prefs, "", target, homeId, lockId)
+                throw e
             }
-            NotificationHelper.saveCurrentToFile(context, bitmap)
+        }
+
+        /** A retry does not hide again: Undo, another install, or another successful replacement wins. */
+        suspend fun replaceBlockedCurrent(context: Context, photoId: String): String = applyMutex.withLock {
+            val prefs = context.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+            val (homeId, lockId) = wallpaperIds(context)
+            val target = CurrentWallpaper.replacementTarget(prefs, photoId, homeId, lockId)
+                ?: return@withLock "unchanged"
+            val expected = CurrentWallpaper.snapshot(prefs)
+            try {
+                val applied = applyNextLocked(context, manual = true, onlyPendingMix = false,
+                    replacementId = photoId, replacementTarget = target, expectedIdentity = expected)
+                if (applied) "replaced"
+                else {
+                    val (latestHome, latestLock) = wallpaperIds(context)
+                    if (CurrentWallpaper.replacementTarget(prefs, photoId, latestHome, latestLock, expected) == null) "unchanged"
+                    else "failed"
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (_: Exception) { "failed" }
         }
 
         /**
@@ -170,7 +212,9 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
             }
         }
 
-        private suspend fun applyNextLocked(context: Context, manual: Boolean, onlyPendingMix: Boolean): Boolean {
+        private suspend fun applyNextLocked(context: Context, manual: Boolean, onlyPendingMix: Boolean,
+                                            replacementId: String? = null, replacementTarget: String? = null,
+                                            expectedIdentity: String? = null): Boolean {
             val prefs = context.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
             val store = MorningMixWorker.store(context)
             if (!manual && (prefs.getInt("intervalMinutes", 0) <= 0 || MorningMixRotation.sleeping(prefs))) return false
@@ -186,8 +230,12 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
             currentCoroutineContext().ensureActive()
             synchronized(BlockedPhotos) {
                 if (!MorningMixRotation.valid(prefs, store, selection, manual)) return false
-                val target = prefs.getString("target", "both") ?: "both"
-                applyBitmap(context, bitmap, target)
+                if (replacementId != null) {
+                    val (homeId, lockId) = wallpaperIds(context)
+                    if (CurrentWallpaper.replacementTarget(prefs, replacementId, homeId, lockId, expectedIdentity) != replacementTarget) return false
+                }
+                val target = replacementTarget ?: (prefs.getString("target", "both") ?: "both")
+                applyAndRecord(context, bitmap, target, id)
                 appendPendingHistory(prefs, id, url, target)
                 BlockedPhotos.advance(prefs, id)
                 if (mixToken != null) {

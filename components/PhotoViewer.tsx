@@ -7,7 +7,7 @@ import { ActivityIndicator, Animated, Dimensions, Image, Modal, Pressable, Statu
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import { randomCheer } from '../services/cheer';
-import { blockPhoto } from '../services/blocked';
+import { blockPhoto, BlockResult } from '../services/blocked';
 import { savePhotoToGallery, sharePhoto } from '../services/photoActions';
 import { setWallpaperFromUrl } from '../services/wallpaperService';
 import AuthorInfoModal from './AuthorInfoModal';
@@ -22,7 +22,7 @@ const { width, height } = Dimensions.get('window');
 // смикає зі спільних сервісів. Окремий від каталогу навмисно (A1) — якщо міняєш
 // тут UI/кнопки/анімації, дзеркаль у каталог/улюблені. Див. memory.
 export default function PhotoViewer({ photo, isFav, onClose, onToggleFav, onBlocked, onApplied }: {
-    photo: Photo; isFav: boolean; onClose: () => void; onToggleFav: () => Promise<void>; onBlocked: () => void; onApplied: () => void;
+    photo: Photo; isFav: boolean; onClose: () => void; onToggleFav: () => Promise<void>; onBlocked: (result: BlockResult) => void; onApplied: () => void;
 }) {
     const insets = useSafeAreaInsets();
     const { t } = useTranslation();
@@ -36,6 +36,7 @@ export default function PhotoViewer({ photo, isFav, onClose, onToggleFav, onBloc
     const heartRotate = useRef(new Animated.Value(0)).current;
     const lastTapRef = useRef(0);
     const favoritePending = useRef(false);
+    const blockPending = useRef(false);
 
     // Політ серця — той самий, що в каталозі (pop + плавний підйом + легке гойдання).
     const triggerHeartAnim = () => {
@@ -113,9 +114,14 @@ export default function PhotoViewer({ photo, isFav, onClose, onToggleFav, onBloc
     };
 
     const onBlock = async () => {
-        await blockPhoto({ id: photo.id, small: photo.urls.small });
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
-        onBlocked();
+        if (blockPending.current) return;
+        blockPending.current = true;
+        try {
+            const result = await blockPhoto({ id: photo.id, small: photo.urls.small });
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
+            onBlocked(result);
+        } catch { showToast(t('blockReplacement.hideFailed')); }
+        finally { blockPending.current = false; }
     };
 
     return (
