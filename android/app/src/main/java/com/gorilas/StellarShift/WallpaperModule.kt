@@ -63,6 +63,7 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
                 BlockedPhotos.replacePool(prefs, org.json.JSONArray(poolJson), System.currentTimeMillis())
                 prefs.edit()
                     .putString("target", target)
+                    .putBoolean("pausedByCollectionHide", false)
                     .putInt("intervalMinutes", intervalMinutes)
                     .putBoolean("wifiOnly", wifiOnly)
                     .putBoolean("chargingOnly", chargingOnly)
@@ -97,6 +98,7 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
             synchronized(rotationLock) {
                 val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
                 prefs.edit()
+                    .putBoolean("pausedByCollectionHide", false)
                     .putInt("intervalMinutes", maxOf(intervalMinutes, 15))
                     .putString("target", target)
                     .apply()
@@ -123,13 +125,36 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
         }
     }
 
+    @ReactMethod
+    fun getCollectionVisibility(promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+            synchronized(rotationLock) { promise.resolve(HiddenCollections.state(prefs)) }
+        } catch (e: Exception) { promise.reject("COLLECTION_READ", e.message, e) }
+    }
+
+    @ReactMethod
+    fun mutateCollectionVisibility(key: String, idsJson: String, restore: Boolean, choice: String, promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
+            synchronized(rotationLock) {
+                val state = HiddenCollections.mutate(prefs, key, org.json.JSONArray(idsJson), restore, choice)
+                if (prefs.getBoolean("pausedByCollectionHide", false)) {
+                    refreshJob?.cancel()
+                    WallpaperWorker.cancel(reactApplicationContext)
+                }
+                promise.resolve(state)
+            }
+        } catch (e: Exception) { promise.reject("COLLECTION_WRITE", e.message, e) }
+    }
+
     // Активні колекції (Model B): JS пише ID; Worker.buildPool читає й перебиває
     // категорійний рецепт. Порожньо → назад на категорії.
     @ReactMethod
     fun setActiveCollections(json: String, promise: Promise) {
         try {
             val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
-            synchronized(rotationLock) { prefs.edit().putString("activeCollections", json).apply() }
+            synchronized(rotationLock) { prefs.edit().putString("activeCollections", HiddenCollections.filtered(prefs, org.json.JSONArray(json)).toString()).apply() }
             promise.resolve(null)
         } catch (e: Exception) {
             promise.reject("ACTIVE_COLL_ERROR", e.message, e)
@@ -149,7 +174,7 @@ class WallpaperModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
                         if (rebuilt) {
                             val prefs = reactApplicationContext.getSharedPreferences("WallpaperPrefs", Context.MODE_PRIVATE)
                             val interval = prefs.getInt("intervalMinutes", 0).let { if (it >= 15) it else 30 }
-                            prefs.edit().putInt("intervalMinutes", interval).apply()
+                            prefs.edit().putBoolean("pausedByCollectionHide", false).putInt("intervalMinutes", interval).apply()
                             WallpaperWorker.schedule(reactApplicationContext, interval, false, false)
                         }
                     }

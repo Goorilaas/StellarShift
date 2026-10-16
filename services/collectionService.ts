@@ -37,6 +37,15 @@ async function readCache<T>(storageKey: string): Promise<T | undefined> {
     }
 }
 
+// A hidden item needs its last known label/cover even after the network TTL expires.
+export const getCachedCollectionMeta = async (id: string): Promise<CollectionMeta | null> => {
+    const key = `collection_cache_v1:meta:${id}`;
+    const cached = await readCache<CollectionMeta>(key);
+    if (cached) return cached;
+    try { const value = JSON.parse(await AsyncStorage.getItem(key) ?? 'null')?.value; return value?.id === id && typeof value.title === 'string' ? value : null; }
+    catch { return null; }
+};
+
 // Перша сторінка спільна з відкладеним запитом прев’ю та фото-гридом.
 export const getCachedCollectionPhotos = async (collectionId: string): Promise<Photo[] | null> =>
     (await readCache<Photo[]>(`collection_cache_v1:photos:${collectionId}:1:30`)) ?? null;

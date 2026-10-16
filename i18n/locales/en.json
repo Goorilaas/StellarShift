@@ -370,6 +370,24 @@
     "rural": "Countryside",
     "search": "🔍 Search"
   },
+  "collectionVisibility": {
+    "settings": "Collection settings",
+    "hiddenMoods": "Hidden collections",
+    "hiddenSubs": "Hidden selections",
+    "restoreHint": "Restoring does not enable rotation. Individually hidden selections stay hidden.",
+    "empty": "Nothing here yet",
+    "restore": "Restore",
+    "restored": "Restored. You can enable rotation separately.",
+    "hidden": "Hidden",
+    "undo": "Undo",
+    "cancel": "Cancel",
+    "hide": "Hide",
+    "last": "This is the last collection source in rotation. After hiding:",
+    "activeWarning": "Selections from this tile will be removed from rotation. Hide it?",
+    "categories": "Use selected categories",
+    "pause": "Pause auto-change",
+    "error": "Could not finish. Check the current state and try again."
+  },
   "collectionOrder": {
     "editHint": "Tap the name to rename. Drag the cover to move.",
     "title": "Reorder",

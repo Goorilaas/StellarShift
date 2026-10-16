@@ -18,6 +18,8 @@ declare module 'react-native' {
             setFromUrl(url: string, target: string, photoId: string): Promise<boolean>;
             setUnsplashKey(key: string): Promise<void>;
             setPoolRecipe(recipeJson: string): Promise<void>;
+            getCollectionVisibility(): Promise<string>;
+            mutateCollectionVisibility(key: string, idsJson: string, restore: boolean, choice: string): Promise<string>;
             setActiveCollections(json: string): Promise<void>;
             refreshPool(): Promise<boolean>;
             replaceBlockedCurrent(photoId: string): Promise<'replaced' | 'unchanged' | 'failed'>;

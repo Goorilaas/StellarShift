@@ -1,3 +1,5 @@
+import { CollectionVisibilityProvider, CollectionManagement, HideCollection, useCollectionVisibility } from '../components/CollectionVisibility';
+import { excludedCollections } from '../services/hiddenCollections';
 import { showBlockFeedback } from '../services/blockFeedback';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,7 +25,7 @@ import { useBlockedPhotos } from '../services/useBlockedPhotos';
 import { CollectionMeta, getCachedCollectionPhotos, getCollectionMeta, getCollectionPhotos } from '../services/collectionService';
 import { classifyCollectionError, CollectionError } from '../services/collectionError';
 import { fetchFirstCover, loadCoversMap, mergeMoodCovers } from '../services/moodCovers';
-import { getActiveCollections, getBookmarkedCollections, toggleActiveCollection, toggleBookmarkCollection } from '../services/collectionSubs';
+import { getBookmarkedCollections, toggleActiveCollection, toggleBookmarkCollection } from '../services/collectionSubs';
 import { getFavoriteIds, toggleFavoritePhoto } from '../services/favorites';
 import { getUnsplashKey } from '../services/unsplashKey';
 import { refreshPoolNative, setActiveCollectionsNative, setUnsplashKeyNative } from '../services/wallpaperService';
@@ -83,7 +85,7 @@ export default function CollectionsScreen() {
     if (nameError) return <View style={styles.screen}><Text style={styles.empty}>{t('collectionOrder.nameLoadError')}</Text>
         <Pressable onPress={() => setAttempt(n => n + 1)} style={styles.retryButton}><Text style={{ color: '#fff' }}>{t('collections.retry')}</Text></Pressable></View>;
     if (blocked === null || names === null) return <View style={styles.screen}><ActivityIndicator color="#7F77DD" /></View>;
-    return <NamesContext.Provider value={{ names, save }}><BlockedContext.Provider value={blocked}><CollectionsContent /></BlockedContext.Provider></NamesContext.Provider>;
+    return <NamesContext.Provider value={{ names, save }}><BlockedContext.Provider value={blocked}><CollectionVisibilityProvider><CollectionsContent /></CollectionVisibilityProvider></BlockedContext.Provider></NamesContext.Provider>;
 }
 
 function CollectionsContent() {
@@ -96,12 +98,14 @@ function CollectionsContent() {
     const [collection, setCollection] = useState<CollectionMeta | null>(null);
     const [tab, setTab] = useState<'moods' | 'mine' | 'active'>('moods');
     const [bookmarks, setBookmarks] = useState<string[]>([]);
-    const [active, setActive] = useState<string[]>([]);
+    const visibility = useCollectionVisibility();
+    const active = visibility.state.active;
+    const excluded = excludedCollections(visibility.state);
+    const visibleBookmarks = bookmarks.filter(id => !excluded.has(id));
     const [favIds, setFavIds] = useState<string[]>([]);
 
     useEffect(() => {
         getBookmarkedCollections().then(setBookmarks);
-        getActiveCollections().then(setActive);
         getFavoriteIds().then(setFavIds);
     }, []);
 
@@ -120,7 +124,7 @@ function CollectionsContent() {
     const onFav = async (p: Photo) => setFavIds(await toggleFavoritePhoto(p));
     const onAct = async (id: string) => {
         const next = await toggleActiveCollection(id);
-        setActive(next);
+        await visibility.refresh();
         try {
             await setUnsplashKeyNative(await getUnsplashKey());
             if (next.length > 0) {
@@ -150,14 +154,14 @@ function CollectionsContent() {
                 </View>
                 <ScrollView horizontal pointerEvents={moodOrder.editing ? "none" : "auto"} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
                     <Chip label="Настрої" on={tab === 'moods'} onPress={() => setTab('moods')} />
-                    <Chip label={`Мої колекції${bookmarks.length ? ` · ${bookmarks.length}` : ''}`} on={tab === 'mine'} onPress={() => setTab('mine')} />
+                    <Chip label={`Мої колекції${visibleBookmarks.length ? ` · ${visibleBookmarks.length}` : ''}`} on={tab === 'mine'} onPress={() => setTab('mine')} />
                     <Chip label={`У ротації${active.length ? ` · ${active.length}` : ''}`} on={tab === 'active'} onPress={() => setTab('active')} />
                 </ScrollView>
             </View>
-            {tab === 'moods' && <CollectionAlphabetize order={moodOrder} />}
+            {tab === 'moods' && <CollectionAlphabetize order={moodOrder} management={<CollectionManagement names={names} disabled={moodOrder.saving || moodOrder.dragging || moodOrder.renaming} />} />}
             {tab === 'moods' && <CollectionOrderFeedback order={moodOrder} />}
             {tab === 'moods' && <Grid order={moodOrder} onPick={(m, cover) => { setMood(m); setMoodCover(cover); }} />}
-            {tab === 'mine' && <Shelf ids={bookmarks} emptyMsg="Полиця порожня. Збережи колекції з настроїв — і вони з'являться тут."
+            {tab === 'mine' && <Shelf ids={visibleBookmarks} emptyMsg="Полиця порожня. Збережи колекції з настроїв — і вони з'являться тут."
                 bookmarks={bookmarks} active={active} onBm={onBm} onAct={onAct} onOpen={setCollection} />}
             {tab === 'active' && <Shelf ids={active} emptyMsg="Поки нічого не в ротації. Активуй колекцію в настрої — і вона крутитиметься тут."
                 bookmarks={bookmarks} active={active} onBm={onBm} onAct={onAct} onOpen={setCollection} />}
@@ -176,6 +180,7 @@ function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () 
 function Grid({ onPick, order }: { onPick: (m: Mood, cover?: string) => void; order: OrderEditing }) {
     const { names, save } = useContext(NamesContext);
     const blocked = useContext(BlockedContext);
+    const { state } = useCollectionVisibility();
     const [covers, setCovers] = useState<Record<string, string>>({});
 
     // Шафл на focus: щоразу як відкриваєш таб — випадкова обкладинка кожного
@@ -200,7 +205,7 @@ function Grid({ onPick, order }: { onPick: (m: Mood, cover?: string) => void; or
         return () => { alive = false; };
     }, []));
 
-    return <ReorderTiles ids={order.ids} columns={2} fallbackHeight={132} editing={order.editing} saving={order.saving} renaming={order.renaming}
+    return <ReorderTiles ids={order.ids.filter(id => !state.hidden[`mood:${id}`])} columns={2} fallbackHeight={132} editing={order.editing} saving={order.saving} renaming={order.renaming}
         onReorder={order.reorder} onReorderCancel={order.cancelReorder} onDragging={order.setDragging} renderItem={(id, _visible, handle) => {
             const m = MOODS.find(item => item.id === id)!;
             const s = STYLE[m.id] ?? FALLBACK;
@@ -219,6 +224,7 @@ function Grid({ onPick, order }: { onPick: (m: Mood, cover?: string) => void; or
                     <View pointerEvents="none"><Text style={styles.cardSub} numberOfLines={2}>{m.subtitle}</Text>
                     <Text style={styles.count}>{m.collectionIds.length} колекцій</Text></View>
                 </View>
+                {order.editing && <HideCollection id={`mood:${id}`} ids={m.collectionIds} name={names[`mood:${id}`] ?? m.name} disabled={order.saving || order.dragging || order.renaming} />}
             </View>;
         }} />;
 }
@@ -233,16 +239,20 @@ function MoodDetail({ mood, heroCover, top, onBack, bookmarks, active, onBm, onA
     const [metas, setMetas] = useState<CollectionMeta[] | null>(null);
     const { names } = useContext(NamesContext);
     const order = useOrderEditing(`mood:${mood.id}`, alphabeticIds(mood.collectionIds, Object.fromEntries(mood.collectionIds.map(id => [id, names[`collection:${id}`] ?? metas?.find(m => m.id === id)?.title ?? '']))));
-    const orderedMetas = metas && order.ids.flatMap(id => metas.filter(meta => meta.id === id));
+    const { state } = useCollectionVisibility();
+    const excluded = excludedCollections(state);
+    const orderedMetas = metas && order.ids.filter(id => !excluded.has(id)).flatMap(id => metas.filter(meta => meta.id === id));
     const color = colorFor(mood.id);
     const s = STYLE[mood.id] ?? FALLBACK;
     const blocked = useContext(BlockedContext);
+    const visibleIdsKey = JSON.stringify(mood.collectionIds.filter(id => !excluded.has(id)));
     const hero = [heroCover, ...(metas ?? []).map(m => m.cover)].find(url => url && !isBlockedCover(url, blocked));
 
     useEffect(() => {
         let alive = true;
-        if (mood.collectionIds.length === 0) { setMetas([]); return; }
-        Promise.all(mood.collectionIds.map(id => getCollectionMeta(id)))
+        const visibleIds: string[] = JSON.parse(visibleIdsKey);
+        if (visibleIds.length === 0) { setMetas([]); return; }
+        Promise.all(visibleIds.map(id => getCollectionMeta(id)))
             .then(r => {
                 const ms = r.filter((x): x is CollectionMeta => !!x);
                 if (alive) setMetas(ms);
@@ -251,7 +261,7 @@ function MoodDetail({ mood, heroCover, top, onBack, bookmarks, active, onBm, onA
             })
             .catch(() => { if (alive) setMetas([]); });
         return () => { alive = false; };
-    }, [mood]);
+    }, [mood, visibleIdsKey]);
 
     return (
         <View style={styles.screen}>
@@ -260,7 +270,7 @@ function MoodDetail({ mood, heroCover, top, onBack, bookmarks, active, onBm, onA
                 <Text style={styles.h2} numberOfLines={1}>{names[`mood:${mood.id}`] ?? mood.name}</Text>
                 <CollectionOrderControl order={order} orbit count={orderedMetas?.length ?? 0} />
             </View>
-            <CollectionAlphabetize order={order} />
+            <CollectionAlphabetize order={order} management={<CollectionManagement moodId={mood.id} names={names} disabled={order.saving || order.dragging || order.renaming} />} />
             <CollectionOrderFeedback order={order} orbit />
             <ReorderTiles ids={(orderedMetas ?? []).map(meta => meta.id)} fallbackHeight={124} editing={order.editing} saving={order.saving} renaming={order.renaming}
                 onReorder={order.reorder} onReorderCancel={order.cancelReorder} onDragging={order.setDragging}
@@ -359,7 +369,7 @@ function Row({ meta, visible, color, isBm, isAct, onBm, onAct, onOpen, order, ha
     }, [meta.id, visible]);
 
     return (
-        <View style={styles.ac}>
+        <View style={[styles.ac, order?.editing && { paddingRight: 44 }]}>
             <>{handle(<Pressable disabled={order?.saving || order?.renaming} onPress={open} onLongPress={longPress} delayLongPress={400}>
                 {cover
                     ? <Image source={{ uri: cover }} style={styles.cov} />
@@ -384,7 +394,8 @@ function Row({ meta, visible, color, isBm, isAct, onBm, onAct, onOpen, order, ha
                     <Text style={styles.ap}>{meta.total} фото</Text>
                 </View>
             </View>
-            <Pressable disabled={order?.editing} onPress={() => onBm(meta.id)} hitSlop={8}>
+            {order?.editing && <HideCollection id={`collection:${meta.id}`} ids={[meta.id]} name={title} disabled={order.saving || order.dragging || order.renaming} />}
+            <Pressable disabled={order?.editing} style={order?.editing ? { display: 'none' } : undefined} onPress={() => onBm(meta.id)} hitSlop={8}>
                 <Ionicons name={isBm ? 'bookmark' : 'bookmark-outline'} size={22} color={isBm ? '#FFD700' : '#5c5c7a'} />
             </Pressable>
         </View>

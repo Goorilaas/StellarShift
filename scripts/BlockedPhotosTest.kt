@@ -177,5 +177,61 @@ fun main() {
         check(CurrentWallpaper.replacementTarget(prefs, "a", 11, -1) == null)
         check(CurrentWallpaper.replacementTarget(prefs, "a", 10, 12) == "home")
     }
+
+    test("hiding an inactive source preserves current pool, active sources and OFF") {
+        val data = mutableMapOf<String, Any>("activeCollections" to "[\"b\"]", "photoPool" to photos("keep").toString())
+        val prefs = preferences(data)
+        HiddenCollections.mutate(prefs, "collection:a", JSONArray("[\"a\"]"), false, "")
+        check(pool(prefs) == listOf("keep")); check(HiddenCollections.active(prefs).toString() == "[\"b\"]")
+        check(prefs.getInt("intervalMinutes", 0) == 0)
+    }
+    test("removing one active source clears stale pool but keeps rotation enabled") {
+        val prefs = preferences(mutableMapOf("activeCollections" to "[\"a\",\"b\"]", "intervalMinutes" to 30, "photoPool" to photos("old").toString()))
+        HiddenCollections.mutate(prefs, "collection:a", JSONArray("[\"a\"]"), false, "remove")
+        check(HiddenCollections.active(prefs).toString() == "[\"b\"]"); check(pool(prefs).isEmpty())
+        check(prefs.getInt("intervalMinutes", 0) == 30); check(prefs.getLong("lastPoolBuild", -1) == 0L)
+    }
+    test("last source requires explicit choice; stale confirmation changes nothing") {
+        val prefs = preferences(mutableMapOf("activeCollections" to "[\"a\"]", "intervalMinutes" to 30, "photoPool" to photos("old").toString()))
+        for (choice in listOf("", "remove")) {
+            check(runCatching { HiddenCollections.mutate(prefs, "collection:a", JSONArray("[\"a\"]"), false, choice) }.isFailure)
+            check(HiddenCollections.hidden(prefs).length() == 0); check(pool(prefs) == listOf("old"))
+        }
+    }
+    test("pause commits hidden parent, all removed active children and OFF together") {
+        val prefs = preferences(mutableMapOf("activeCollections" to "[\"a\",\"b\"]", "intervalMinutes" to 30))
+        val state = JSONObject(HiddenCollections.mutate(prefs, "mood:space", JSONArray("[\"a\",\"b\"]"), false, "pause"))
+        check(state.getJSONArray("active").length() == 0); check(state.getBoolean("paused"))
+        check(prefs.getInt("intervalMinutes", 99) == 0)
+        check(state.getJSONObject("hidden").has("mood:space"))
+    }
+    test("categories choice preserves recipe and interval without old source fallback") {
+        val prefs = preferences(mutableMapOf("activeCollections" to "[\"a\"]", "intervalMinutes" to 30, "poolRecipe" to "chosen", "photoPool" to photos("old").toString()))
+        HiddenCollections.mutate(prefs, "collection:a", JSONArray("[\"a\"]"), false, "categories")
+        check(HiddenCollections.active(prefs).length() == 0); check(pool(prefs).isEmpty())
+        check(prefs.getString("poolRecipe", "") == "chosen"); check(prefs.getInt("intervalMinutes", 0) == 30)
+    }
+    test("restore parent preserves independently hidden children and never enables rotation") {
+        val prefs = preferences(mutableMapOf("activeCollections" to "[\"b\"]", "intervalMinutes" to 30))
+        HiddenCollections.mutate(prefs, "collection:a", JSONArray("[\"a\"]"), false, "")
+        HiddenCollections.mutate(prefs, "mood:space", JSONArray("[\"a\",\"b\"]"), false, "pause")
+        HiddenCollections.mutate(prefs, "mood:space", JSONArray(), true, "")
+        check(HiddenCollections.hidden(prefs).has("collection:a"))
+        check(!HiddenCollections.hidden(prefs).has("mood:space"))
+        check(HiddenCollections.active(prefs).length() == 0); check(prefs.getInt("intervalMinutes", 99) == 0)
+    }
+    test("hidden sources cannot be activated by stale JS or duplicate source ids") {
+        val prefs = preferences()
+        HiddenCollections.mutate(prefs, "mood:space", JSONArray("[\"a\",\"b\"]"), false, "")
+        check(HiddenCollections.filtered(prefs, JSONArray("[\"a\",\"c\",\"b\",\"c\"]")).toString() == "[\"c\"]")
+    }
+    test("visibility survives restart, retains unknown ids, restoration does not touch favorites or names") {
+        val data = mutableMapOf<String, Any>("favorites" to "saved", "names" to "custom")
+        HiddenCollections.mutate(preferences(data), "mood:future", JSONArray("[\"unknown\"]"), false, "")
+        val reloaded = preferences(data)
+        check(HiddenCollections.hidden(reloaded).has("mood:future"))
+        HiddenCollections.mutate(reloaded, "mood:future", JSONArray(), true, "")
+        check(data["favorites"] == "saved"); check(data["names"] == "custom")
+    }
     println("$passed native tests passed")
 }

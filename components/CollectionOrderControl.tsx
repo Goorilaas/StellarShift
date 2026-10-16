@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { ReactNode, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { OrderEditing } from '../services/useOrderEditing';
@@ -6,10 +6,10 @@ import OrderConstellation from './OrderConstellation';
 import OrderOrbit from './OrderOrbit';
 
 type Props = { order: OrderEditing; orbit?: boolean; count: number };
-export default function CollectionOrderControl({ order, orbit = false, count }: Props) {
+export default function CollectionOrderControl({ order, orbit = false }: Props) {
     const { t } = useTranslation();
     const Symbol = orbit ? OrderOrbit : OrderConstellation;
-    const disabled = !order.ready || order.saving || order.dragging || order.renaming || (!order.editing && count < 1);
+    const disabled = !order.ready || order.saving || order.dragging || order.renaming;
     return <Pressable disabled={disabled && !order.error} onPress={order.error ? order.retry : order.editing ? order.save : order.start}
         style={styles.button} accessibilityRole="button" accessibilityState={{ disabled }}>
         <View style={[styles.buttonContent, disabled && styles.disabled]}>
@@ -19,13 +19,13 @@ export default function CollectionOrderControl({ order, orbit = false, count }: 
     </Pressable>;
 }
 
-export function CollectionAlphabetize({ order }: { order: OrderEditing }) {
+export function CollectionAlphabetize({ order, management }: { order: OrderEditing; management?: ReactNode }) {
     const { t } = useTranslation();
     if (!order.editing) return null;
-    return <View><Pressable accessibilityRole="button" disabled={order.saving || order.dragging || order.renaming}
+    return <View><View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: 12 }}><Pressable accessibilityRole="button" disabled={order.saving || order.dragging || order.renaming}
         onPress={order.alphabetize} style={{ minHeight: 44, paddingHorizontal: 16, justifyContent: 'center', alignSelf: 'flex-start' }}>
         <Text style={styles.link}>{t('collectionOrder.alphabetical')}</Text>
-    </Pressable><Text style={styles.hint}>{t('collectionOrder.editHint')}</Text></View>;
+    </Pressable>{management}</View><Text style={styles.hint}>{t('collectionOrder.editHint')}</Text></View>;
 }
 
 export function CollectionOrderFeedback({ order, orbit = false }: { order: OrderEditing; orbit?: boolean }) {
