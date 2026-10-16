@@ -1,7 +1,9 @@
 import * as Haptics from 'expo-haptics';
-import { ReactNode, RefObject, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, ScrollView, StyleSheet, View } from 'react-native';
+import { ReactNode, RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Keyboard, ScrollView, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { RenameVisibility } from './RenameVisibility';
+import { renameScrollOffset } from '../services/renameViewport';
 import { moveItem } from '../services/collectionOrder';
 import { edgeScrollStep, nearestTile, tilePositions, TilePosition } from '../services/tileOrder';
 
@@ -20,6 +22,31 @@ export default function ReorderTiles({ ids, columns = 1, fallbackHeight, editing
     const [active, setActive] = useState<string | null>(null);
     const viewport = useRef<View>(null);
     const scroll = useRef<ScrollView>(null);
+    const [keyboardInset, setKeyboardInset] = useState(0);
+    const focusedField = useRef<View | null>(null);
+    const keyboardTop = useRef<number | null>(null);
+    const reveal = useCallback(() => {
+        const field = focusedField.current;
+        if (!field || keyboardTop.current === null) return;
+        viewport.current?.measureInWindow((_x, y, _w, height) => {
+            if (keyboardTop.current === null || focusedField.current !== field) return;
+            setKeyboardInset(Math.max(0, y + height - keyboardTop.current));
+            field.measureInWindow((_fx, fy, _fw, fh) => {
+                if (keyboardTop.current === null || focusedField.current !== field) return;
+                const next = renameScrollOffset(offset.current, fy, fh, y, height, keyboardTop.current);
+                if (Math.abs(next - offset.current) > 1) scroll.current?.scrollTo({ y: next, animated: true });
+            });
+        });
+    }, []);
+    const focusField = useCallback((field: View | null) => {
+        focusedField.current = field;
+        reveal();
+    }, [reveal]);
+    useEffect(() => {
+        const show = Keyboard.addListener('keyboardDidShow', event => { keyboardTop.current = event.endCoordinates.screenY; reveal(); });
+        const hide = Keyboard.addListener('keyboardDidHide', () => { keyboardTop.current = null; setKeyboardInset(0); });
+        return () => { show.remove(); hide.remove(); };
+    }, [reveal]);
     const top = useRef(0);
     const offset = useRef(0);
     const drag = useRef<Drag | null>(null);
@@ -92,13 +119,14 @@ export default function ReorderTiles({ ids, columns = 1, fallbackHeight, editing
         drag.current = null;
         setActive(null); current.current.onDragging(false);
     };
-    return <View ref={viewport} style={styles.viewport} onLayout={e => {
+    return <RenameVisibility.Provider value={focusField}><View ref={viewport} style={styles.viewport} onLayout={e => {
         setViewportHeight(e.nativeEvent.layout.height);
+        reveal();
         viewport.current?.measureInWindow((_x, y) => { top.current = y; });
     }}>
         <GestureDetector gesture={native}>
             <Animated.ScrollView ref={scroll} scrollEnabled={!active && !saving} removeClippedSubviews={false}
-                contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" scrollEventThrottle={16}
+                onContentSizeChange={reveal} contentContainerStyle={[styles.content, { paddingBottom: 24 + keyboardInset }]} keyboardShouldPersistTaps="handled" scrollEventThrottle={16}
                 onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollOffset } } }], {
                     useNativeDriver: true,
                     listener: (e: { nativeEvent: { contentOffset: { y: number } } }) => {
@@ -130,7 +158,7 @@ export default function ReorderTiles({ ids, columns = 1, fallbackHeight, editing
                 </View>
             </Animated.ScrollView>
         </GestureDetector>
-    </View>;
+    </View></RenameVisibility.Provider>;
 }
 
 function MovingTile({ position, editing, saving, active, movement, scrollOffset, releasePosition, native, onHeight, onBegin, onMove, onEnd, children }: {

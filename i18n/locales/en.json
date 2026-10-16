@@ -371,6 +371,7 @@
     "search": "🔍 Search"
   },
   "collectionOrder": {
+    "editHint": "Tap the name to rename. Drag the cover to move.",
     "title": "Reorder",
     "hint": "Hold a tile and drag it. Back cancels your changes.",
     "saving": "Saving…",
