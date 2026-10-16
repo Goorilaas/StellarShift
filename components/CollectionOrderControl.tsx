@@ -22,10 +22,10 @@ export default function CollectionOrderControl({ order, orbit = false, count }: 
 export function CollectionAlphabetize({ order }: { order: OrderEditing }) {
     const { t } = useTranslation();
     if (!order.editing) return null;
-    return <Pressable accessibilityRole="button" disabled={order.saving || order.dragging || order.renaming}
+    return <View><Pressable accessibilityRole="button" disabled={order.saving || order.dragging || order.renaming}
         onPress={order.alphabetize} style={{ minHeight: 44, paddingHorizontal: 16, justifyContent: 'center', alignSelf: 'flex-start' }}>
         <Text style={styles.link}>{t('collectionOrder.alphabetical')}</Text>
-    </Pressable>;
+    </Pressable><Text style={styles.hint}>{t('collectionOrder.editHint')}</Text></View>;
 }
 
 export function CollectionOrderFeedback({ order, orbit = false }: { order: OrderEditing; orbit?: boolean }) {
@@ -53,6 +53,7 @@ export function CollectionOrderFeedback({ order, orbit = false }: { order: Order
     </Animated.View>;
 }
 const styles = StyleSheet.create({
+    hint: { color: '#AFA9EC', fontSize: 13, paddingHorizontal: 16, paddingBottom: 12 },
     button: { minHeight: 44, justifyContent: 'center', flexShrink: 0 },
     buttonContent: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     feedback: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, minHeight: 54, paddingHorizontal: 12 },

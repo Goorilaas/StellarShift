@@ -5,6 +5,8 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 const ts = require('typescript');
+const visibility = { RenameVisibility: { Provider: 'RenameProvider' } };
+const noopReveal = () => {};
 const plain = value => JSON.parse(JSON.stringify(value));
 function load(file, mocks, globals = {}) {
     const exports = {};
@@ -213,6 +215,7 @@ test('header button starts editing or confirms current draft; orbit is selected 
 });
 function tileHarness(columns = 2) {
     let si = 0, ri = 0, ei = 0, ids = ['a', 'b', 'c', 'd', 'e', 'f'], clock = 0, frameId = 0;
+    const keyboard = {};
     const effects = [];
     const state = [312, {}, 0, 200, 0, null], refs = [], frames = new Map(), changes = [], scrolls = [], dragging = [], writes = [];
     const { order } = storage();
@@ -224,7 +227,7 @@ function tileHarness(columns = 2) {
     const component = load('components/ReorderTiles.tsx', {
         react: {
             useState: initial => { const i = si++; if (!(i in state)) state[i] = initial; return [state[i], next => { writes.push(i); state[i] = typeof next === 'function' ? next(state[i]) : next; }]; },
-            useRef: current => { const i = ri++; return refs[i] ?? (refs[i] = { current }); }, useMemo: fn => fn(),
+            useRef: current => { const i = ri++; return refs[i] ?? (refs[i] = { current }); }, useMemo: fn => fn(), useCallback: fn => fn,
             useEffect: (fn, deps) => {
                 const i = ei++, old = effects[i];
                 if (!old || deps.some((value, index) => value !== old.deps[index])) {
@@ -232,7 +235,7 @@ function tileHarness(columns = 2) {
                 }
             },
         }, 'react/jsx-runtime': { jsx, jsxs: jsx },
-        'react-native': { View: 'View', StyleSheet: { create: x => x }, Animated: {
+        'react-native': { Keyboard: { addListener: (name, fn) => { keyboard[name] = fn; return { remove() { delete keyboard[name]; } }; } }, View: 'View', StyleSheet: { create: x => x }, Animated: {
             ValueXY, Value, ScrollView: 'ScrollView',
             event: (mapping, options) => {
                 assert.equal(options.useNativeDriver, true);
@@ -242,6 +245,7 @@ function tileHarness(columns = 2) {
         'react-native-gesture-handler': { Gesture: { Native: () => ({}) }, GestureDetector: 'GestureDetector' },
         'expo-haptics': { ImpactFeedbackStyle: { Light: 'light' }, impactAsync: async () => {} },
         '../services/collectionOrder': order, '../services/tileOrder': tiles,
+        './RenameVisibility': visibility, '../services/renameViewport': load('services/renameViewport.ts', {}),
     }, {
         requestAnimationFrame: fn => { frames.set(++frameId, fn); return frameId; },
         cancelAnimationFrame: id => frames.delete(id),
@@ -262,7 +266,7 @@ function tileHarness(columns = 2) {
         const pending = [...frames.values()]; frames.clear(); pending.forEach(fn => fn(clock));
         if (acknowledge && scrolls.length) report(scrolls.at(-1));
     }
-    return { render, frames, changes, scrolls, dragging, writes, tick, report, ids: () => ids, unmount: () => effects.forEach(e => e.cleanup?.()) };
+    return { render, keyboard, frames, changes, scrolls, dragging, writes, tick, report, ids: () => ids, unmount: () => effects.forEach(e => e.cleanup?.()) };
 }
 test('actual tile drag callbacks shift neighboring slots, cancel restores draft, and frames stop', () => {
     const h = tileHarness(); const tree = h.render();
@@ -408,7 +412,8 @@ function nameHarness(save = async () => {}) {
     let si = 0, ri = 0, ei = 0, keyboard, back;
     const state = [], refs = [], effects = [], changes = [], saved = [];
     const component = load('components/CollectionName.tsx', {
-        react: {
+        './RenameVisibility': visibility,
+        react: { useContext: () => noopReveal,
             useState: initial => { const i = si++; if (!(i in state)) state[i] = initial; return [state[i], value => { state[i] = typeof value === 'function' ? value(state[i]) : value; }]; },
             useRef: current => { const i = ri++; return refs[i] ?? (refs[i] = { current }); },
             useEffect: (fn, deps) => { const i = ei++, old = effects[i]; if (!old || deps.some((v, j) => v !== old.deps[j])) { old?.cleanup?.(); effects[i] = { deps, cleanup: fn() }; } },
@@ -460,4 +465,37 @@ test('duplicate keyboard Done does not write twice; Back cannot cancel a submitt
     const pending = input.props.onSubmitEditing(); await input.props.onSubmitEditing();
     h.back(); assert.equal(h.saved.length, 1); assert.ok(nodes(h.render()).some(n => n.type === 'Input'));
     finish(); await pending; assert.ok(!nodes(h.render()).some(n => n.type === 'Input'));
+});
+
+const viewportMath = load('services/renameViewport.ts', {});
+test('rename scroll reveals the lower field and validation message above an overlay keyboard', () => {
+    const reveal = viewportMath.renameScrollOffset;
+    assert.equal(reveal(0, 700, 60, 100, 800, 600), 172);
+    assert.equal(reveal(172, 528, 60, 100, 800, 600), 172);
+    assert.equal(reveal(172, 528, 90, 100, 800, 600), 202);
+});
+test('rename scroll respects resized viewport, upper edge and an already visible field', () => {
+    const reveal = viewportMath.renameScrollOffset;
+    assert.equal(reveal(200, 450, 60, 100, 400, 900), 222);
+    assert.equal(reveal(200, 90, 60, 100, 400, 900), 178);
+    assert.equal(reveal(200, 150, 60, 100, 400, 900), 200);
+});
+test('keyboard overlay adds trailing scroll space for the last tile and removes it on dismissal', () => {
+    const h = tileHarness(2);
+    let tree = h.render();
+    const viewport = nodes(tree).find(n => n.type === 'View' && n.props.ref);
+    viewport.props.ref.current = { measureInWindow: fn => fn(0, 100, 312, 800) };
+    let y = 700;
+    nodes(tree).find(n => n.type === 'RenameProvider').props.value({ measureInWindow: fn => fn(0, y, 140, 60) });
+    h.keyboard.keyboardDidShow({ endCoordinates: { screenY: 600 } });
+    tree = h.render();
+    const scroll = nodes(tree).find(n => n.type === 'ScrollView');
+    assert.equal(scroll.props.contentContainerStyle[1].paddingBottom, 324);
+    assert.equal(h.scrolls.at(-1), 172);
+    h.report(172); y = 528;
+    scroll.props.onContentSizeChange();
+    assert.equal(h.scrolls.length, 1);
+    h.keyboard.keyboardDidHide(); tree = h.render();
+    assert.equal(nodes(tree).find(n => n.type === 'ScrollView').props.contentContainerStyle[1].paddingBottom, 24);
+    h.unmount(); assert.deepEqual(Object.keys(h.keyboard), []);
 });

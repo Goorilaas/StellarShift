@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BackHandler, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { RenameVisibility } from './RenameVisibility';
 import { normalizeCollectionName } from '../services/collectionNames';
 
 type Props = { name: string; editing?: boolean; disabled?: boolean; lines?: number;
@@ -11,6 +12,8 @@ export default function CollectionName({ name, editing, disabled, lines = 1, onO
     const [draft, setDraft] = useState<string | null>(null);
     const [error, setError] = useState<'invalid' | 'save' | null>(null);
     const [saving, setSaving] = useState(false);
+    const reveal = useContext(RenameVisibility);
+    const field = useRef<View>(null);
     const busy = useRef(false);
     const input = useRef<TextInput>(null);
     const notify = useRef(onEditingChange); notify.current = onEditingChange;
@@ -24,8 +27,8 @@ export default function CollectionName({ name, editing, disabled, lines = 1, onO
         };
         const back = BackHandler.addEventListener('hardwareBackPress', cancel);
         const keyboard = Keyboard.addListener('keyboardDidHide', cancel);
-        return () => { back.remove(); keyboard.remove(); notify.current?.(false); };
-    }, [active]);
+        return () => { back.remove(); keyboard.remove(); reveal(null); notify.current?.(false); };
+    }, [active, reveal]);
     useEffect(() => { if (!saving && error === 'save') input.current?.focus(); }, [saving, error]);
     const save = async () => {
         if (busy.current || draft === null) return;
@@ -35,13 +38,14 @@ export default function CollectionName({ name, editing, disabled, lines = 1, onO
         catch { setError('save'); }
         finally { busy.current = false; setSaving(false); }
     };
-    return <View style={{ minHeight: lines === 2 ? 44 : 38, justifyContent: 'center' }}>
-        {active ? <TextInput ref={input} editable={!saving} autoFocus value={draft} onChangeText={setDraft} multiline={false}
+    return <View ref={field} collapsable={false} onLayout={() => { if (active) reveal(field.current); }} style={{ minHeight: lines === 2 ? 44 : 38, justifyContent: 'center' }}>
+        {active ? <TextInput ref={input} editable={!saving} autoFocus onFocus={() => reveal(field.current)} value={draft} onChangeText={setDraft} multiline={false}
             returnKeyType="done" blurOnSubmit={false} onSubmitEditing={save}
             onBlur={() => { if (!busy.current) { setDraft(null); setError(null); } }}
             accessibilityLabel={t('collectionOrder.rename')} style={styles.input} />
             : <Pressable disabled={disabled} onLongPress={onLongPress} delayLongPress={400}
                 onPress={() => { if (editing) { setDraft(name); setError(null); } else onOpen(); }}
+                style={editing ? styles.editable : undefined}
                 accessibilityRole="button" accessibilityLabel={editing ? t('collectionOrder.rename') + ': ' + name : name}>
                 <Text numberOfLines={lines} style={styles.name}>{name}</Text>
             </Pressable>}
@@ -50,6 +54,7 @@ export default function CollectionName({ name, editing, disabled, lines = 1, onO
 }
 const styles = StyleSheet.create({
     name: { color: '#fff', fontSize: 17, fontWeight: '600' },
-    input: { color: '#fff', fontSize: 16, borderWidth: 1, borderColor: '#AFA9EC', borderRadius: 8, padding: 6, minHeight: 38 },
+    editable: { borderWidth: 1, borderColor: 'rgba(175,169,236,0.5)', borderRadius: 8, backgroundColor: 'rgba(10,10,26,0.45)', paddingHorizontal: 6, paddingVertical: 4 },
+    input: { backgroundColor: 'rgba(10,10,26,0.75)', color: '#fff', fontSize: 16, borderWidth: 1, borderColor: '#AFA9EC', borderRadius: 8, padding: 6, minHeight: 38 },
     error: { color: '#ffafaf', fontSize: 12 },
 });
