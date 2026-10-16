@@ -33,6 +33,7 @@ import { SvgXml } from 'react-native-svg';
 import { CATEGORIES, CATEGORY_QUERIES, Category, CHAOS_CATEGORY, CHAOS_QUERIES, FAVORITES_CATEGORY, filterNoPeople, PEOPLE_TAGS, pickCategoryQueries, sortCategoriesByLabel, subCountForMix } from '../components/categories';
 import { blockPhoto, BlockedPhoto, clearBlocked, getBlockedIds, restoreBlocked, unblockPhoto } from '../services/blocked';
 import { useBlockedPhotos } from '../services/useBlockedPhotos';
+import { getCollectionVisibility } from '../services/hiddenCollections';
 import { getActiveCollections } from '../services/collectionSubs';
 import { clearUserKey, getUnsplashKey, getUserKey, setUserKey, useUnsplashKey, validateKey } from '../services/unsplashKey';
 import { openUnsplashHome } from '../services/unsplashTracking';
@@ -362,6 +363,7 @@ export default function SettingsScreen() {
             const s = await AsyncStorage.getItem('settings');
             if (s) {
                 const p = JSON.parse(s);
+                if ((await getCollectionVisibility()).paused) p.autoChange = false;
                 setIntervalVal(p.interval ?? 30);
                 setApplyTo(p.applyTo ?? 'both');
                 setSleepEnabled(p.sleepEnabled ?? false);

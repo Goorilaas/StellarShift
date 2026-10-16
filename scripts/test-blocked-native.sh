@@ -20,5 +20,6 @@ java_bin="${JAVA_HOME:+$JAVA_HOME/bin/}java"
     -no-stdlib -no-reflect -classpath "$classpath" -d "$test_dir" \
     "$project_dir/android/app/src/main/java/com/gorilas/StellarShift/BlockedPhotos.kt" \
     "$project_dir/android/app/src/main/java/com/gorilas/StellarShift/CurrentWallpaper.kt" \
+    "$project_dir/android/app/src/main/java/com/gorilas/StellarShift/HiddenCollections.kt" \
     "$project_dir/scripts/BlockedPhotosTest.kt"
 "$java_bin" -cp "$test_dir:$classpath" com.gorilas.StellarShift.BlockedPhotosTestKt
